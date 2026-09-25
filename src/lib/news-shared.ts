@@ -407,3 +407,53 @@ export function toNewsArticle(raw: any): NewsArticle {
         is_enriched: false,
     };
 }
+
+/**
+ * Canonical 12-hour AM/PM Eastern Time formatters for NouGenNews.
+ */
+export function formatNewsTime(dateInput: string | number | Date | null | undefined): string {
+    if (!dateInput) return '';
+    try {
+        const d = new Date(dateInput);
+        if (isNaN(d.getTime())) return '';
+        return new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/New_York',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZoneName: 'short'
+        }).format(d);
+    } catch {
+        return '';
+    }
+}
+
+export function formatNewsDate(dateInput: string | number | Date | null | undefined, locale = 'en-US'): string {
+    if (!dateInput) return '';
+    try {
+        const d = new Date(dateInput);
+        if (isNaN(d.getTime())) return '';
+        return new Intl.DateTimeFormat(locale, {
+            timeZone: 'America/New_York',
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }).format(d);
+    } catch {
+        return '';
+    }
+}
+
+export function formatNewsDateTime(dateInput: string | number | Date | null | undefined, locale = 'en-US'): string {
+    if (!dateInput) return '';
+    try {
+        const d = new Date(dateInput);
+        if (isNaN(d.getTime())) return '';
+        const datePart = formatNewsDate(d, locale);
+        const timePart = formatNewsTime(d);
+        return datePart && timePart ? `${datePart} at ${timePart}` : datePart || timePart;
+    } catch {
+        return '';
+    }
+}

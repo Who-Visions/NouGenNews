@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.next/
+
+# Environment & Secrets
+.env
+.env.local
+.env.production
+service-account.json
+
+# Data
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build
+dist/
+out/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*

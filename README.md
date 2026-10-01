@@ -108,7 +108,7 @@ Uses Domain-Wide Delegation with a service account to store article images in `d
 
 © 2026 Who Visions LLC. All rights reserved.
 
-<!-- nougen:fleet-role:begin (generated from nougen-handoffs fleet/manifest.json; edit the manifest, not this block) -->
+<!-- nougen:fleet-role:begin (generated from NouGenRelay fleet/manifest.json; edit the manifest, not this block) -->
 ## Fleet role
 
 | | |

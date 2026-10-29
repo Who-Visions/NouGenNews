@@ -128,3 +128,20 @@ test("Webz is capped monthly, not daily", () => {
   assert.equal(REGISTRY.webz.cap.period, "month");
   assert.ok(REGISTRY.webz.cap.max < 1000, "stops short of the plan's 1,000 calls");
 });
+
+test("NewsAPI: mainstream headlines, the publisher suffix and removed articles dropped, a daily cap", async () => {
+  const http = async (url) => {
+    assert.match(url, /^https:\/\/newsapi\.org\/v2\/top-headlines\?/);
+    return reply({ status: "ok", articles: [
+      { title: "Fed holds rates steady - CBS News", url: "https://cbs.test/a", source: { name: "CBS News" }, description: "d", urlToImage: "https://img.test/a.jpg", publishedAt: "2026-10-28T15:00:00Z" },
+      { title: "[Removed]", url: "https://removed.test/x", source: { name: "x" } },
+      { title: "No web link", url: "ftp://x.test/y", source: { name: "x" } },
+    ] });
+  };
+  const r = await fetchProvider({ id: "newsapi", env: { NEWSAPI_KEY: "N" }, file: tmp(), http, now: () => NOW });
+  assert.equal(r.items.length, 1);
+  assert.equal(r.items[0].title, "Fed holds rates steady");
+  assert.equal(r.items[0].source, "CBS News");
+  assert.equal(REGISTRY.newsapi.cap.period, "day");
+  assert.ok(REGISTRY.newsapi.cap.max < 100);
+});

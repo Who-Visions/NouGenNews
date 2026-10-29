@@ -13,6 +13,7 @@ import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
 import { scoreStory } from "../../core/edition.js";
 import { findAlerts } from "../../core/alerts.js";
+import { dedupeStories } from "../../core/dedupe.js";
 import { BreakingAlert } from "./BreakingAlert.jsx";
 import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
 import { loadCity, loadRegion, loadMetro, loadScope } from "./CornerClock.jsx";
@@ -300,6 +301,9 @@ function serpStory(it, meta) {
     readMins: 1, lang: "en", originalLang: "en",
   };
 }
+
+// One copy of every story, however many sources carried it, then playable first and newest first.
+const mergeWire = (list) => dedupeStories(list).sort(byPlayableThenNew);
 
 const byPlayableThenNew = (a, b) => ((b.videos?.length ? 1 : 0) - (a.videos?.length ? 1 : 0)) || (b.timestamp || 0) - (a.timestamp || 0);
 
@@ -611,7 +615,7 @@ export function NewsView() {
     }));
     providerRef.current = Object.fromEntries(results);
     const ids = new Set(feeds.map((f) => f.id));
-    setArticles((prev) => prev.filter((a) => !ids.has(a.feedId)).concat(results.flatMap(([, s]) => s)).sort(byPlayableThenNew));
+    setArticles((prev) => mergeWire(prev.filter((a) => !ids.has(a.feedId)).concat(results.flatMap(([, s]) => s))));
   }, []);
   useEffect(() => { loadProviders(); }, [loadProviders]);
 
@@ -631,7 +635,7 @@ export function NewsView() {
       }
       setLocalVia(via);
       localRef.current = items;
-      setArticles((prev) => prev.filter((a) => a.feedId !== LOCAL_ID).concat(items).sort(byPlayableThenNew));
+      setArticles((prev) => mergeWire(prev.filter((a) => a.feedId !== LOCAL_ID).concat(items)));
       setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: true, count: items.length } }));
     } catch (e) {
       setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: false, error: e?.message || "Failed" } }));
@@ -701,7 +705,7 @@ export function NewsView() {
       });
 
       // Stories the app can play come first, then newest first.
-      aggregated = aggregated.concat(localRef.current, Object.values(providerRef.current).flat()).sort(byPlayableThenNew);
+      aggregated = mergeWire(aggregated.concat(localRef.current, Object.values(providerRef.current).flat()));
       setFeedHealth(healthMap);
       setArticles(aggregated);
       if (placeRef.current) loadLocal(placeRef.current);

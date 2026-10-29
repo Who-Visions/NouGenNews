@@ -168,6 +168,17 @@ export const FEEDS = [
     lang: "en",
   },
   {
+    id: "headlines",
+    name: "Headlines (about a day old)",
+    desc: "Mainstream US headlines from NewsAPI.org; the free plan delays them by about a day",
+    url: "@provider:newsapi",
+    icon: "\uD83D\uDDDE",
+    badge: "Headlines",
+    section: "Top stories",
+    accent: "#e8b86d",
+    lang: "en",
+  },
+  {
     id: "trending",
     name: "Trending on screen",
     desc: "Film and TV trending this week (TMDB)",

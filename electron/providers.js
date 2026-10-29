@@ -111,7 +111,28 @@ const webz = {
   },
 };
 
-const REGISTRY = { thenewsapi, tmdb, nasa, webz };
+// NewsAPI.org: mainstream US headlines. The free plan delays articles by about a day, so this is a background layer
+// of well-known outlets, not a source of breaking news (its stories are too old to raise an alert).
+const newsapi = {
+  id: "newsapi",
+  env: "NEWSAPI_KEY",
+  ttlMs: 6 * 3600 * 1000,
+  cap: { period: "day", max: 30 }, // the free plan allows 100 requests a day
+  async run({ key, get }) {
+    const d = await get(`https://newsapi.org/v2/top-headlines?${new URLSearchParams({ country: "us", pageSize: "40", apiKey: key })}`);
+    const items = [];
+    for (const a of (d && d.articles) || []) {
+      const source = clean(a.source && a.source.name);
+      let title = clean(a.title);
+      if (source && title.endsWith(` - ${source}`)) title = title.slice(0, -(source.length + 3)).trim();
+      if (!title || title === "[Removed]" || !isHttp(a.url)) continue;
+      items.push({ title, link: a.url, source, desc: clean(a.description), thumbnail: isHttp(a.urlToImage) ? a.urlToImage : "", timestamp: Date.parse(a.publishedAt) || 0 });
+    }
+    return items;
+  },
+};
+
+const REGISTRY = { thenewsapi, tmdb, nasa, webz, newsapi };
 
 // ---- shared cache, caps and the fetch wrapper ------------------------------------------------------------------
 

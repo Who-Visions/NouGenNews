@@ -1004,8 +1004,8 @@ export function NewsView() {
             }}
           >
             {speech.mode === "briefing" && speaking
-              ? `⏹ Stop brief (${speech.index}/${speech.total})`
-              : "🎙️ Brief me"}
+              ? <><span aria-hidden="true">⏹</span><span className="lbl"> Stop brief ({speech.index}/{speech.total})</span></>
+              : <><span aria-hidden="true">🎙️</span><span className="lbl"> Brief me</span></>}
           </button>
 
           {ollamaInfo.online && (
@@ -1041,8 +1041,8 @@ export function NewsView() {
               }}
             >
               {prefs.briefMode === "ollama"
-                ? `🧠 Local AI (${prefs.ollamaModel || ollamaInfo.best})`
-                : "⚡ Quick Brief"}
+                ? <><span aria-hidden="true">🧠</span><span className="lbl"> Local AI ({prefs.ollamaModel || ollamaInfo.best})</span></>
+                : <><span aria-hidden="true">⚡</span><span className="lbl"> Quick Brief</span></>}
             </button>
           )}
 
@@ -1113,7 +1113,7 @@ export function NewsView() {
               fontSize: 12,
             }}
           >
-            {loading ? "Syncing…" : "↻ Sync"}
+            <span aria-hidden="true">{loading ? "⟳" : "↻"}</span><span className="lbl"> {loading ? "Syncing…" : "Sync"}</span>
           </button>
         </div>
       </div>

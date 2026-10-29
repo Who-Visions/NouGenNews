@@ -69,3 +69,14 @@ body, .app-shell { background: #000; }
 }
 .app-shell .nh-title { font-size: clamp(26px, 2.6vw, 38px); line-height: 1.12; }
 .app-shell .news-view-container .mono, .app-shell .news-view-container kbd { font-family: var(--font-mono); }
+
+/* One-line command bar. Labels fold to icons below 1560px; the bar wraps only when even that is too wide. */
+.app-shell .news-toolbar { flex-wrap: wrap; row-gap: 8px; }
+.app-shell .news-toolbar > .news-search-actions { order: 3; flex: 0 0 auto; margin-left: auto; gap: 6px !important; }
+.app-shell .news-search-actions .news-search-box { width: 170px !important; }
+.app-shell .news-search-actions input { height: 30px; }
+.app-shell .news-toolbar button[data-testid="brief-me-btn"] , .app-shell .news-toolbar .news-filter-strip > button { height: 30px; }
+@media (max-width: 1560px) {
+  .app-shell .news-toolbar .lbl { display: none; }
+  .app-shell .news-toolbar .news-filter-strip > button:not(.news-burger) { padding: 0 9px !important; }
+}

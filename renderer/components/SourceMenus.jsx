@@ -36,8 +36,8 @@ export function SourceMenus({ feeds, counts, activeFeed, onPick }) {
         All Wire <span className="sm__n mono">{counts.all ?? 0}</span>
       </button>
       {(counts.library ?? 0) > 0 && (
-        <button type="button" className={`sm__btn${activeFeed === "library" ? " is-active" : ""}`} onClick={() => pick("library")}>
-          <span className="sm__heart" aria-hidden="true">&#9829;</span> In your library <span className="sm__n mono">{counts.library}</span>
+        <button type="button" title="Stories about titles in your library" className={`sm__btn${activeFeed === "library" ? " is-active" : ""}`} onClick={() => pick("library")}>
+          <span className="sm__heart" aria-hidden="true">&#9829;</span> Library <span className="sm__n mono">{counts.library}</span>
         </button>
       )}
       {sections.map(([name, items], i) => (

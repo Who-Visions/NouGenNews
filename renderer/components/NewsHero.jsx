@@ -3,8 +3,21 @@
 // thin progress bar runs while the carousel auto-advances. It pauses on hover, on focus, and while a
 // video plays. Left/Right arrows step it; the parent owns the rest of the keyboard.
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
+import { HeroScroller } from "./HeroScroller.jsx";
 
-const DWELL_MS = 8000;
+const DWELL_MS = 16000;
+
+// The text the hero scroller carries: the feed's longer body when it has one (plain paragraphs, capped),
+// otherwise the short summary.
+function heroText(item) {
+  try {
+    const doc = new DOMParser().parseFromString(item.contentHtml || "", "text/html");
+    const paras = [...doc.querySelectorAll("p")].map((p) => p.textContent.replace(/\s+/g, " ").trim()).filter((t) => t.length > 30 && !/pic.twitter.com|https?://t.co//i.test(t));
+    const body = paras.join("\n\n");
+    if (body.length > (item.desc || "").length + 40) return body.slice(0, 1600);
+  } catch { /* fall back to the summary */ }
+  return item.desc;
+}
 
 function Player({ video, embedPort }) {
   if (video.kind === "youtube") {
@@ -85,16 +98,7 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
           <span className="nh-count">{safe + 1} / {count}</span>
         </div>
         <h2 className="nh-title">{item.title}</h2>
-        {item.desc ? (
-          <div className="nh-crawl" style={{ "--crawl-s": `${Math.max(16, Math.round(item.desc.length * 0.16))}s` }}>
-            <div className="nh-crawl__plane">
-              <div className="nh-crawl__text" key={item.id}>
-                <p className="nh-crawl__kicker">{item.source}</p>
-                <p>{item.desc}</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {item.desc ? <HeroScroller text={heroText(item)} resetKey={item.id} /> : null}
         {item.creator ? <p className="nh-byline">By {item.creator}</p> : null}
         <div className="nh-actions">
           <button type="button" className="nh-btn nh-btn-primary" onClick={() => onRead(item)}>Read <kbd>Enter</kbd></button>

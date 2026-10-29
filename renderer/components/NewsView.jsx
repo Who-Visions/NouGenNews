@@ -33,12 +33,12 @@ const IDLE_SPEECH = {
 
 // ─── NOUGEN DESIGN TOKENS (nougen-core/DESIGN.md) ────────────────────────────
 const TOKENS = {
-  surfaceBase: "#141414",
-  surfaceElevated: "#202020",
-  surfaceInteractive: "#202020",
-  surfaceHover: "#333333",
-  surfaceSelected: "#282828",
-  borderSubtle: "rgba(119, 119, 119, 0.3)",
+  surfaceBase: "#000000",
+  surfaceElevated: "rgba(255, 255, 255, 0.05)",
+  surfaceInteractive: "rgba(255, 255, 255, 0.06)",
+  surfaceHover: "rgba(255, 255, 255, 0.12)",
+  surfaceSelected: "rgba(255, 255, 255, 0.09)",
+  borderSubtle: "rgba(255, 255, 255, 0.12)",
   borderFocus: "#e8b86d",
   accentPrimary: "#e8b86d",
   accentMuted: "rgba(232, 184, 109, 0.18)",

@@ -24,3 +24,6 @@
 .sm__name { flex: 1; }
 .sm :focus-visible { outline: 2px solid var(--nn-accent, #e8b86d); outline-offset: 2px; }
 .no-glass .sm__list { backdrop-filter: none; -webkit-backdrop-filter: none; background: #0e0e0e; }
+/* Keep the command bar on one line: the section buttons drop their count badges on narrower windows (the
+   counts stay inside each dropdown). */
+@media (max-width: 1700px) { .sm__split .sm__n { display: none; } }

@@ -1035,7 +1035,7 @@ export function NewsView() {
         }}
       >
         <div className="news-filter-strip" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" className="nh-btn" aria-label="Sources and settings menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>☰<kbd>M</kbd></button>
+          <button type="button" className="nh-btn news-burger" aria-label="Sources and settings menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>☰<kbd>M</kbd></button>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 4 }}>
             <span
               style={{
@@ -1113,6 +1113,7 @@ export function NewsView() {
           )}
 
 
+          <div className="news-chips">
           {FEEDS.map((f) => {
             const active = activeFeed === f.id;
             const health = feedHealth[f.id];
@@ -1164,6 +1165,7 @@ export function NewsView() {
               </button>
             );
           })}
+          </div>
         </div>
 
         {/* Search, Dynamic Translate & Action Controls */}

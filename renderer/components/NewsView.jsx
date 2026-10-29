@@ -981,9 +981,7 @@ export function NewsView() {
                 boxShadow: loading ? "0 0 8px #f59e0b" : "0 0 8px #10b981",
               }}
             />
-            <h1 style={{ fontSize: 16, fontWeight: 700, margin: 0, letterSpacing: "-0.3px" }}>
-              News Wire
-            </h1>
+            <span className="sr-only">News Wire</span>
           </div>
 
           <button
@@ -1146,17 +1144,11 @@ export function NewsView() {
             )}
           </div>
 
-          {lastUpdated && (
-            <span style={{ fontSize: 11, color: TOKENS.textMuted, fontVariantNumeric: "tabular-nums" }}>
-              {lastUpdated}
-            </span>
-          )}
-
           <button
             type="button"
             onClick={fetchAllFeeds}
             disabled={loading}
-            title="Sync live RSS feeds"
+            title={lastUpdated ? `Sync live RSS feeds (last synced ${lastUpdated})` : "Sync live RSS feeds"}
             style={{
               background: TOKENS.surfaceInteractive,
               border: `1px solid ${TOKENS.borderSubtle}`,

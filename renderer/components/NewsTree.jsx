@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { loadCity, saveCity, defaultCity } from "./CornerClock.jsx";
 import "./NewsTree.css";
 
 // Topic folders, by the badge each feed carries.
@@ -31,6 +32,7 @@ export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wir
   const [closed, setClosed] = useState({});
   const [glass, setGlass] = useState(loadGlass);
   const [autoplay, setAutoplay] = useState(loadAutoplay);
+  const [city, setCityText] = useState(loadCity);
   const changeAutoplay = (on) => {
     setAutoplay(on);
     try { localStorage.setItem(AUTOPLAY_KEY, on ? "on" : "off"); } catch { /* storage unavailable */ }
@@ -102,6 +104,12 @@ export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wir
                   <label className="nt-row">
                     <input type="checkbox" checked={autoplay} onChange={(e) => changeAutoplay(e.target.checked)} />
                     Autoplay videos in stories
+                  </label>
+                </li>
+                <li>
+                  <label className="nt-row">
+                    City
+                    <input className="nt-input" type="text" value={city} maxLength={60} onChange={(e) => setCityText(e.target.value)} onBlur={() => saveCity(city.trim() === defaultCity() ? "" : city.trim())} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} aria-label="City for the weather" />
                   </label>
                 </li>
                 <li className="nt-row nt-langs" role="group" aria-label="Translate headlines">

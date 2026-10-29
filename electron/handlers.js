@@ -7,6 +7,7 @@ const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
+  weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80) }),
   // Titles the reader owns (NouGenFlix library), for lifting related stories. Read-only.
   library_titles: () => require("./library").libraryTitles(app),
   restart: () => { app.relaunch(); app.exit(0); },

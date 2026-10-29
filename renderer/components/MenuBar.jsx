@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
+import { CornerClock } from "./CornerClock.jsx";
 import "./MenuBar.css";
 
 // Each item presses the key the news view already listens for, so menu and keyboard never drift apart.
@@ -83,6 +84,7 @@ export function MenuBar() {
           )}
         </div>
       ))}
+      <CornerClock />
       <button type="button" className="menubar__restart" title="Restart the app" onClick={() => invoke("restart")}>&#8635; Restart</button>
     </div>
   );

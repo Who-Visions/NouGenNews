@@ -39,30 +39,50 @@ async function resolveHandle(handle, http) {
   const res = await http(`https://www.youtube.com/@${encodeURIComponent(handle)}`, { headers: { "Accept-Language": "en" } }, { retries: false, timeoutMs: 15000 });
   if (!res.ok) return "";
   const html = await res.text();
-  const m = html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})"/) || html.match(/"channelId":"(UC[A-Za-z0-9_-]{22})"/);
+  const m = html.match(/<link rel="canonical" href="https:[/][/]www[.]youtube[.]com[/]channel[/](UC[A-Za-z0-9_-]{22})"/) || html.match(/"channelId":"(UC[A-Za-z0-9_-]{22})"/);
+  return m ? m[1] : "";
+}
+
+// When a link is wrong or gone, the channel's name still finds it: the first channel in YouTube's channel search.
+async function resolveName(name, http) {
+  const res = await http(`https://www.youtube.com/results?search_query=${encodeURIComponent(name)}&sp=EgIQAg%3D%3D`, { headers: { "Accept-Language": "en" } }, { retries: false, timeoutMs: 15000 });
+  if (!res.ok) return "";
+  const m = (await res.text()).match(/"channelId":"(UC[A-Za-z0-9_-]{22})"/);
   return m ? m[1] : "";
 }
 
 function readJson(file, fallback) { try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return fallback; } }
 
+// A list entry is a reference ("@handle", a link, a UC id) or { name, ref }. Returns { ref, name }.
+const entry = (e) => (e && typeof e === "object" ? { ref: String(e.ref || e.url || "").trim(), name: String(e.name || "").trim() } : { ref: String(e || "").trim(), name: "" });
+
 // Every channel's latest videos, merged. { items, channels: [{ref, id, ok}] }. Never throws.
-async function fetchYoutube({ userDir, bundled = path.join(__dirname, "youtube-channels.json"), http = fetchSafe, perChannel = 15 } = {}) {
+async function fetchYoutube({ userDir, bundled = path.join(__dirname, "youtube-channels.json"), http = fetchSafe, perChannel = 6 } = {}) {
   const idsFile = path.join(userDir, "youtube-ids.json");
   const known = readJson(idsFile, {});
-  const refs = [...(readJson(bundled, { channels: [] }).channels || []), ...(readJson(path.join(userDir, "youtube-channels.json"), { channels: [] }).channels || [])];
-  const unique = [...new Set(refs.map((r) => String(r).trim()).filter(Boolean))];
+  const raw = [...(readJson(bundled, { channels: [] }).channels || []), ...(readJson(path.join(userDir, "youtube-channels.json"), { channels: [] }).channels || [])].map(entry).filter((e) => e.ref || e.name);
+  const unique = [...new Map(raw.map((e) => [(e.ref || e.name).toLowerCase(), e])).values()];
   let dirty = false;
-  const channels = await Promise.all(unique.map(async (ref) => {
+  const remember = (k, id) => { if (id && known[k] !== id) { known[k] = id; dirty = true; } };
+  const feed = async (id) => {
+    const res = await http(`https://www.youtube.com/feeds/videos.xml?channel_id=${id}`, {}, { retries: false, timeoutMs: 15000 });
+    return res.ok ? parseAtom(await res.text()).slice(0, perChannel) : null;
+  };
+  const channels = await Promise.all(unique.map(async ({ ref, name }) => {
+    const label = ref || name;
     try {
       const p = parseChannelRef(ref);
-      if (!p) return { ref, ok: false, items: [] };
-      let id = p.id || known[p.handle.toLowerCase()];
-      if (!id) { id = await resolveHandle(p.handle, http); if (id) { known[p.handle.toLowerCase()] = id; dirty = true; } }
-      if (!id) return { ref, ok: false, items: [] };
-      const res = await http(`https://www.youtube.com/feeds/videos.xml?channel_id=${id}`, {}, { retries: false, timeoutMs: 15000 });
-      if (!res.ok) return { ref, id, ok: false, items: [] };
-      return { ref, id, ok: true, items: parseAtom(await res.text()).slice(0, perChannel) };
-    } catch { return { ref, ok: false, items: [] }; }
+      const key = p && p.handle ? p.handle.toLowerCase() : "";
+      let id = (p && p.id) || (key && known[key]) || "";
+      if (!id && p && p.handle) { id = await resolveHandle(p.handle, http); remember(key, id); }
+      let items = id ? await feed(id) : null;
+      if (!items && name) {
+        const nk = `name:${name.toLowerCase()}`;
+        const byName = known[nk] || (await resolveName(name, http));
+        if (byName && byName !== id) { id = byName; items = await feed(id); if (items) remember(nk, id); }
+      }
+      return items ? { ref: label, id, ok: true, items } : { ref: label, id, ok: false, items: [] };
+    } catch { return { ref: label, ok: false, items: [] }; }
   }));
   if (dirty) { try { fs.mkdirSync(userDir, { recursive: true }); fs.writeFileSync(idsFile, JSON.stringify(known)); } catch { /* a missing cache only costs a lookup */ } }
   return { items: channels.flatMap((c) => c.items), channels: channels.map(({ ref, id, ok }) => ({ ref, id, ok })) };

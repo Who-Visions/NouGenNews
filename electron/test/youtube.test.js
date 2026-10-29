@@ -48,3 +48,19 @@ test("addChannel keeps a list and rejects non-channels", () => {
   assert.deepEqual(addChannel(dir, "@One"), ["@One"]);
   assert.throws(() => addChannel(dir, "https://example.com"));
 });
+
+test("a wrong link falls back to the channel's name, and the answer is remembered", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "yt-"));
+  const bundled = path.join(dir, "b.json");
+  fs.writeFileSync(bundled, JSON.stringify({ channels: [{ name: "Real Channel", ref: "@Wrong" }, { name: "No Link" }] }));
+  let searches = 0;
+  const http = async (url) => {
+    if (url.includes("/@Wrong")) return { ok: false };
+    if (url.includes("/results?")) { searches += 1; return { ok: true, text: async () => '"channelId":"UCrealrealrealrealrealre"' }; }
+    return { ok: true, text: async () => ATOM };
+  };
+  const r = await fetchYoutube({ userDir: dir, bundled, http });
+  assert.deepEqual(r.channels.map((c) => c.ok), [true, true]);
+  await fetchYoutube({ userDir: dir, bundled, http });
+  assert.equal(searches, 2);
+});

@@ -1,109 +1,41 @@
-# NouGenNews — Elite News Intelligence Pipeline
+<!-- nougen-readme-compiler: v1 | persona: fleet-operator (agent-fleet-operators) [4447bbb01c1222f1] -->
 
-> **Who Visions LLC** — NouGenAi News Intelligence Pipeline
-> Elite RSS ingestion, article image scraping, Google Drive storage, and real-time news feed.
+# 🚀 NouGenNews — Elite News Intelligence Pipeline
 
-## 🚀 Performance
+Elite RSS ingestion, article image scraping, Google Drive storage, and real-time news feed, engineered for maximum throughput and minimal operational overhead.
 
-| Metric | Sequential v1 | Elite v2 | Speedup |
-|---|---|---|---|
-| Scrape concurrency | 1 lane | 8 lanes | **8×** |
-| Drive upload concurrency | 1 lane | 6 lanes | **6×** |
-| Page read per article | Full page (~200KB) | Head-only (16KB + early abort) | **~12×** less bandwidth |
-| DB writes | 1 UPDATE per row | Single batched transaction | **~50×** faster I/O |
-| Feed fetching | Sequential | Promise.allSettled fanout | **~6×** |
-| DNS lookups | Cold, per-request | Pre-warmed in parallel | Eliminates ~100ms/host |
+## 📚 Contents
+- [📋 Table of Contents](#table-of-contents)
+- [⚙️ Installation and Deployment Doctrine](#installation-and-deployment-doctrine)
+- [🏗️ Core Architecture: The Throughput Engine](#core-architecture-the-throughput-engine)
+- [⚡ Performance Metrics: Quantifying Leverage](#performance-metrics-quantifying-leverage)
+- [🔑 Key Operational Techniques (Doctrine)](#key-operational-techniques-doctrine)
+- [🔗 Integration Points and Data Persistence](#integration-points-and-data-persistence)
 
-**Result: 58 articles with genuine images in 11.2 seconds.**
+## 📋 📋 Table of Contents
 
-## 🏗️ Architecture
+A high-level overview of the operational doctrine for this pipeline.
 
-```
-RSS Feeds (6 sources)
-    │
-    ├─ Promise.allSettled ──→ Parallel XML fetch
-    │
-    ▼
-Extract Articles (top 8 per feed)
-    │
-    ├─ 8-lane Scrape Pool ──→ HEAD-only streaming (16KB)
-    │                          ├─ og:image / twitter:image regex
-    │                          ├─ JSON-LD image extraction
-    │                          └─ AbortController.abort() on match
-    │
-    ├─ 6-lane Drive Pool ──→ Upload to Google Drive
-    │                          └─ /api/media/{fileId} proxy URL
-    │
-    └─ Batch Transaction ──→ Single INSERT/UPSERT to SQLite
-```
+## ⚙️ ⚙️ Installation and Deployment Doctrine
 
-## 📡 News Sources
+Establish the operational baseline by cloning the repository and provisioning the necessary runtime environment. This sequence ensures all dependencies are correctly mapped before initiating the feed ingestion phase.
 
-| Source | Category |
-|---|---|
-| TechCrunch | Technology |
-| The Verge | Technology |
-| Ars Technica | Technology |
-| New York Times | Top Stories |
-| BBC News | World |
-| Wired | Technology |
+## 🏗️ 🏗️ Core Architecture: The Throughput Engine
 
-## 🔑 Key Techniques
+The system operates on a parallel, staged execution model designed for maximum leverage. We utilize parallel XML fetching, an 8-lane scrape pool employing head-only streaming (16KB reads) to minimize bandwidth expenditure, and a 6-lane Drive pool for concurrent storage. All persistent writes are consolidated into a single batched SQLite transaction, maximizing I/O efficiency.
 
-### Zero-Dep Concurrency Semaphore
-```typescript
-function createPool(maxConcurrency: number) {
-    let active = 0;
-    const queue: (() => void)[] = [];
-    return async function <T>(fn: () => Promise<T>): Promise<T> {
-        if (active >= maxConcurrency) {
-            await new Promise<void>(resolve => queue.push(resolve));
-        }
-        active++;
-        try { return await fn(); }
-        finally { active--; queue.shift()?.(); }
-    };
-}
-```
+## ⚡ ⚡ Performance Metrics: Quantifying Leverage
 
-### Early-Abort Streaming Scraper
-Only reads the first 16KB of each article page (the `<head>` section where `og:image` lives), then kills the TCP connection immediately.
+The pipeline demonstrates significant operational gains. Key metrics include an 8x speedup in scrape concurrency, a ~50x acceleration in DB writes via batched transactions, and reduced bandwidth usage by ~12x through early-abort streaming. This architecture prioritizes speed and resource efficiency over brute-force processing.
 
-### Batched SQLite Transactions
-All DB writes happen in a single `BEGIN/COMMIT` transaction — one atomic fsync instead of N individual writes.
+## 🔑 🔑 Key Operational Techniques (Doctrine)
 
-### DNS Pre-Warming
-Resolves all unique hostnames in parallel before starting the scrape phase, eliminating cold DNS lookups from the critical path.
+The system relies on several core techniques that define its operational advantage: Zero-Dep Concurrency Semaphores to manage resource contention, Early-Abort Streaming Scrapers to terminate connections immediately upon finding necessary data, and DNS Pre-Warming to eliminate cold lookups from the critical path. These techniques ensure predictable, high-velocity execution.
 
-## 📦 Setup
+## 🔗 🔗 Integration Points and Data Persistence
 
-```bash
-# Clone
-git clone https://github.com/Who-Visions/NouGenNews.git
-cd NouGenNews
+Data persistence leverages a single batched SQLite transaction for atomic writes, ensuring data integrity without the overhead of numerous individual fsync operations. Image assets are managed via Domain-Wide Delegation with Google Drive, utilizing a proxy endpoint (`/api/media/[fileId]`) for zero API cost storage.
 
-# Install
-npm install
+## 🔗 Links
 
-# Configure
-cp .env.example .env.local
-# Add your service-account.json for Google Drive access
-
-# Run pipeline
-npx tsx scripts/enrich_articles_with_real_images.ts
-
-# Start server
-npm run dev
-```
-
-## 🗄️ Google Drive Integration
-
-Uses Domain-Wide Delegation with a service account to store article images in `dave@whovisions.com`'s Google Drive at zero API cost.
-
-- **Folder**: `NouGenAi-site/news/`
-- **Proxy**: `/api/media/[fileId]` returns raw image bytes
-- **Auth**: JWT with `subject` delegation
-
-## 📄 License
-
-© 2026 Who Visions LLC. All rights reserved.
+- [Source Repository](<https://github.com/Who-Visions/NouGenNews>)

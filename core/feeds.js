@@ -196,7 +196,7 @@ export const FEEDS = [
     url: "@provider:massive",
     icon: "📈",
     badge: "Markets",
-    section: "Business",
+    section: "Top stories",
     accent: "#e8b86d",
     lang: "en",
   },

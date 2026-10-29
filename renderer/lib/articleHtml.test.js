@@ -81,3 +81,26 @@ test("hiResUrl leaves other hosts and bad input alone", () => {
   assert.equal(hiResUrl(""), "");
   assert.equal(hiResUrl("javascript:alert(1)"), "javascript:alert(1)");
 });
+
+import { imageKey, dropDuplicateImages } from "./articleHtml.js";
+test("imageKey treats resized and re-encoded copies as one picture", () => {
+  const a = imageKey("https://i0.wp.com/site.test/wp-content/uploads/2026/10/Photo-150x150.jpg?w=300&strip=all");
+  const b = imageKey("https://site.test/wp-content/uploads/2026/10/Photo.webp");
+  assert.equal(a, b);
+  assert.notEqual(a, imageKey("https://site.test/wp-content/uploads/2026/10/Other.jpg"));
+});
+test("dropDuplicateImages removes the lead picture and later repeats, keeps the first copy, drops empty wrappers", () => {
+  const html = '<p>One</p><figure><a href="https://x.test"><img src="https://s.test/a.jpg"></a></figure><p>Two</p><img src="https://s.test/b.jpg"><p>Three</p><p><img src="https://s.test/b-300x200.jpg"></p>';
+  const out = dropDuplicateImages(html, "https://s.test/a-640x360.jpg", doc);
+  assert.ok(!out.includes("a.jpg"), "lead picture removed from the body: " + out);
+  assert.ok(!out.includes("<figure"), "its empty figure and link go with it");
+  assert.equal((out.match(/<img/g) || []).length, 1, "the first copy of b stays, its repeat goes");
+  assert.match(out, /<p>One<\/p>/);
+  assert.match(out, /<p>Three<\/p>/);
+});
+test("dropDuplicateImages leaves text and unique pictures untouched", () => {
+  const html = '<p>No pictures</p>';
+  assert.equal(dropDuplicateImages(html, "https://s.test/a.jpg", doc), html);
+  const two = '<img src="https://s.test/1.jpg"><img src="https://s.test/2.jpg">';
+  assert.equal(dropDuplicateImages(two, "", doc), two);
+});

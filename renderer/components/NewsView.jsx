@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
-import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail } from "../lib/articleHtml.js";
+import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages } from "../lib/articleHtml.js";
 import { TailCarousel } from "./TailCarousel.jsx";
 import { BreakingTicker } from "./BreakingTicker.jsx";
 import { FrontSections } from "./FrontSections.jsx";
@@ -851,6 +851,8 @@ export function NewsView() {
   currentArticleRef.current = currentArticle;
   // Site furniture after the story becomes the footer carousel instead of part of the page.
   const tail = useMemo(() => splitTail(currentArticle?.contentHtml || ""), [currentArticle?.contentHtml]);
+  // Each picture once: the lead picture and repeats inside the body are dropped from the body.
+  const articleBody = useMemo(() => dropDuplicateImages(tail.body, currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
 
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.scrollTop = 0;
@@ -1609,7 +1611,7 @@ export function NewsView() {
                   e.preventDefault();
                   openInApp(a.getAttribute("href"));
                 }}
-                dangerouslySetInnerHTML={{ __html: tail.body }}
+                dangerouslySetInnerHTML={{ __html: articleBody }}
               />
               <div className="news-reader-bar">
                 <button type="button" className="nh-btn" onClick={() => listenTo(currentArticle)}>

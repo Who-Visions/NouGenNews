@@ -107,14 +107,14 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
           <button type="button" className="nh-btn" onClick={() => onListen(item)}>{listening ? "Stop listening" : "Listen"} <kbd>L</kbd></button>
           <button type="button" className="nh-btn" onClick={() => onSource(item.link)}>Open source in app</button>
         </div>
-        <div className="nh-nav">
+        {count > 1 && <div className="nh-nav">
           <button type="button" className="nh-arrow" onClick={() => go(safe - 1)} aria-label="Previous story">‹</button>
           <button type="button" className="nh-arrow" onClick={() => go(safe + 1)} aria-label="Next story">›</button>
           <span className="nh-hint mono">← → step</span>
-        </div>
+        </div>}
       </div>
 
-      <ol className="nh-strip" aria-label="Up next">
+      {count > 1 && <ol className="nh-strip" aria-label="Up next">
         {items.map((it, i) => (
           <li key={it.id}>
             <button
@@ -134,7 +134,7 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
             </button>
           </li>
         ))}
-      </ol>
+      </ol>}
     </section>
   );
 });

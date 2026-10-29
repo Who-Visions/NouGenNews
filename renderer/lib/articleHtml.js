@@ -141,3 +141,42 @@ export function splitTail(html, doc = typeof document !== "undefined" ? document
   const body = kids.slice(0, at).map((n) => (n.nodeType === 1 ? n.outerHTML : n.textContent)).join("");
   return { body, items };
 }
+
+// A picture's identity: host and path without CDN prefix, size suffix ("-150x150"), query or extension, so a
+// resized or re-encoded copy of the same file counts as the same picture.
+export function imageKey(src) {
+  try {
+    const u = new URL(String(src || "").replace(/&amp;/g, "&").trim());
+    // A WordPress CDN address carries the real host as its first path segment ("i0.wp.com/site.test/...").
+    const cdn = /^i\d\.wp\.com$/.test(u.hostname);
+    return ((cdn ? "" : u.hostname) + (cdn ? u.pathname.replace(/^\//, "") : u.pathname)).replace(/-\d{2,4}x\d{2,4}(\.[A-Za-z0-9]+)$/, "$1").replace(/\.(?:jpe?g|png|webp|avif|gif)$/i, "").toLowerCase();
+  } catch {
+    return String(src || "");
+  }
+}
+
+// Removes from an article body any picture that is the lead picture or already appeared earlier in the body (and
+// a figure or link left empty by that). The first copy is kept.
+export function dropDuplicateImages(html, leadSrc = "", doc = typeof document !== "undefined" ? document : null) {
+  const source = String(html || "");
+  if (!doc || !source || !/<img/i.test(source)) return source;
+  const host = doc.createElement("div");
+  host.innerHTML = source;
+  const seen = new Set(leadSrc ? [imageKey(leadSrc)] : []);
+  let removed = 0;
+  for (const img of [...host.querySelectorAll("img")]) {
+    const k = imageKey(img.getAttribute("src"));
+    if (!k) continue;
+    if (seen.has(k)) {
+      let node = img;
+      // Climb out of wrappers that hold nothing but this picture.
+      while (node.parentElement && node.parentElement !== host && /^(A|FIGURE|P|SPAN|DIV)$/.test(node.parentElement.tagName) && !node.parentElement.textContent.trim() && node.parentElement.querySelectorAll("img").length === 1) node = node.parentElement;
+      // A caption on a figure is kept with the figure only if it says something: the figure goes with its picture.
+      node.remove();
+      removed += 1;
+    } else {
+      seen.add(k);
+    }
+  }
+  return removed ? host.innerHTML : source;
+}

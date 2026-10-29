@@ -291,8 +291,10 @@ function serpStory(it, meta) {
   return {
     id: `${meta.id}::${it.link}`, feedId: meta.id, title: it.title, link: it.link,
     timeFormatted: it.timestamp ? agoLabel(it.timestamp) : "", timestamp: it.timestamp || 0,
-    desc: "", videos: [], creator: "", categories: [], source: it.source || meta.name,
-    badge: meta.badge, accent: meta.accent, imageUrl: it.thumbnail || "", contentHtml: "",
+    desc: it.desc || "", videos: [], creator: "", categories: [], source: it.source || meta.name,
+    badge: meta.badge, accent: meta.accent, imageUrl: it.thumbnail || "",
+    contentHtml: it.desc ? sanitizeArticleHtml(`<p>${String(it.desc).replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>`) : "",
+    noFullText: !!meta.noFullText,
     readMins: 1, lang: "en", originalLang: "en",
   };
 }
@@ -576,6 +578,23 @@ export function NewsView() {
   const [city, setCity] = useState(loadCity);
   const [place, setPlace] = useState("");
   const [localVia, setLocalVia] = useState("");
+  // API providers (TheNewsAPI, TMDB, NASA ...): each feed whose url is "@provider:<id>" is fetched in the main
+  // process (key, cache and cap live there) and merged into the wire. A provider with no key returns nothing.
+  const providerRef = useRef({});
+  const loadProviders = useCallback(async () => {
+    const feeds = FEEDS.filter((f) => f.url && f.url.startsWith("@provider:"));
+    const results = await Promise.all(feeds.map(async (f) => {
+      try {
+        const r = await invoke("provider_feed", { id: f.url.slice("@provider:".length) });
+        return [f.id, r && r.items ? r.items.map((it) => serpStory(it, f)) : []];
+      } catch { return [f.id, []]; }
+    }));
+    providerRef.current = Object.fromEntries(results);
+    const ids = new Set(feeds.map((f) => f.id));
+    setArticles((prev) => prev.filter((a) => !ids.has(a.feedId)).concat(results.flatMap(([, s]) => s)).sort(byPlayableThenNew));
+  }, []);
+  useEffect(() => { loadProviders(); }, [loadProviders]);
+
   const loadLocal = useCallback(async (query) => {
     if (!query) return;
     const meta = { ...FEEDS.find((x) => x.id === LOCAL_ID), url: localFeedUrl(query) };
@@ -619,7 +638,7 @@ export function NewsView() {
     abortRef.current = ctrl;
 
     setLoading(true);
-    const activeTargets = FEEDS.filter((f) => f.url && f.url !== "@local");
+    const activeTargets = FEEDS.filter((f) => f.url && !f.url.startsWith("@"));
     const healthMap = {};
 
     try {
@@ -662,10 +681,11 @@ export function NewsView() {
       });
 
       // Stories the app can play come first, then newest first.
-      aggregated = aggregated.concat(localRef.current).sort(byPlayableThenNew);
+      aggregated = aggregated.concat(localRef.current, Object.values(providerRef.current).flat()).sort(byPlayableThenNew);
       setFeedHealth(healthMap);
       setArticles(aggregated);
       if (placeRef.current) loadLocal(placeRef.current);
+      loadProviders();
       setSelectedArticleId((prev) => prev || aggregated[0]?.id || null);
       setLastUpdated(
         new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -790,7 +810,7 @@ export function NewsView() {
   const [fetchingFull, setFetchingFull] = useState(false);
   useEffect(() => {
     const a = rawCurrentArticle;
-    if (!a || a.full || !a.link || (a.feedId === LOCAL_ID && isGoogleLink(a.link))) return undefined;
+    if (!a || a.full || !a.link || a.noFullText || (a.feedId === LOCAL_ID && isGoogleLink(a.link))) return undefined;
     let live = true;
     setFetchingFull(true);
     invoke("article_fetch", { url: a.link })

@@ -11,11 +11,12 @@ export function SourceMenus({ feeds, counts, activeFeed, onPick, localLabel, loc
     const map = new Map();
     for (const f of feeds) {
       if (f.id === "all" || f.id === "local" || !f.section) continue;
+      if (f.url && f.url.startsWith("@provider:") && !(counts[f.id] > 0)) continue; // no key or nothing loaded
       if (!map.has(f.section)) map.set(f.section, []);
       map.get(f.section).push(f);
     }
     return [...map];
-  }, [feeds]);
+  }, [feeds, counts]);
 
   useEffect(() => {
     if (open === null) return undefined;
@@ -45,7 +46,11 @@ export function SourceMenus({ feeds, counts, activeFeed, onPick, localLabel, loc
           <span aria-hidden="true">&#128205;</span> {localLabel || "Near you"} <span className="sm__n mono">{counts.local}</span>
         </button>
       )}
-      {sections.map(([name, items], i) => (
+      {sections.map(([name, items], i) => (items.length === 1 && !items[0].url?.startsWith("http") ? (
+        <button key={name} type="button" title={items[0].desc} className={`sm__btn${activeFeed === items[0].id ? " is-active" : ""}`} onClick={() => pick(items[0].id)}>
+          <span aria-hidden="true">{items[0].icon}</span> {name} <span className="sm__n mono">{counts[items[0].id] ?? 0}</span>
+        </button>
+      ) : (
         <div key={name} className="sm__menu">
           <div className={`sm__split${activeIn(name, items) ? " is-active" : ""}`}>
             <button type="button" className="sm__main" onClick={() => pick(`section:${name}`)}>
@@ -67,7 +72,7 @@ export function SourceMenus({ feeds, counts, activeFeed, onPick, localLabel, loc
             </ul>
           )}
         </div>
-      ))}
+      )))}
     </div>
   );
 }

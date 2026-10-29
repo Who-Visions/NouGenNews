@@ -80,3 +80,14 @@ body, .app-shell { background: #000; }
   .app-shell .news-toolbar .lbl { display: none; }
   .app-shell .news-toolbar .news-filter-strip > button:not(.news-burger) { padding: 0 9px !important; }
 }
+
+/* Command bar, one line with every source: the search is an icon until it is used (press / or click), and the
+   language button drops its label on narrower windows. */
+.app-shell .news-search-actions .news-search-box { width: 44px !important; transition: width 120ms ease-out; }
+.app-shell .news-search-actions .news-search-box:focus-within { width: 240px !important; }
+.app-shell .news-search-actions .news-search-box:not(:focus-within) input::placeholder { color: transparent; }
+.app-shell .news-search-actions .news-search-box:not(:focus-within) input { cursor: pointer; }
+.app-shell .news-search-actions .news-search-box::after { content: "🔍"; position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: 0.75; pointer-events: none; }
+.app-shell .news-search-actions .news-search-box:focus-within::after { display: none; }
+@media (max-width: 1700px) { .lm__btn > span:nth-child(2) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .app-shell .news-search-actions .news-search-box { transition: none; } }

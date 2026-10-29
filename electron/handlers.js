@@ -8,6 +8,11 @@ const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
+  // Any registered API provider (electron/providers.js): cached on disk, capped, keyed from the environment.
+  provider_feed: (args = {}) => require("./providers").fetchProvider({
+    id: String(args.id || "").slice(0, 30),
+    file: path.join(app.getPath("userData"), "provider-cache.json"),
+  }).then((r) => (r ? { items: r.items, cached: !!r.cached, stale: !!r.stale } : null)),
   // Near you from SerpApi when a key is present (publisher links, pictures); null means use the free feed.
   // The key stays in this process: only the stories go back to the page.
   local_news: (args = {}) => require("./serp").searchLocalNews({

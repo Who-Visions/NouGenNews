@@ -2,11 +2,19 @@
 const { fetchSafe } = require("./safe");
 const embed = require("./embed");
 const { app } = require("electron");
+const path = require("node:path");
 
 const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
+  // Near you from SerpApi when a key is present (publisher links, pictures); null means use the free feed.
+  // The key stays in this process: only the stories go back to the page.
+  local_news: (args = {}) => require("./serp").searchLocalNews({
+    query: String(args.query || ""),
+    apiKey: process.env.SERPAPI_API_KEY || "",
+    file: path.join(app.getPath("userData"), "serp-cache.json"),
+  }).then((r) => (r ? { items: r.items, cached: !!r.cached, stale: !!r.stale } : null)),
   // The real article address behind a Google News link, so the side browser opens the publisher's page.
   resolve_story_url: (args = {}) => require("./gnews").resolveStoryUrl(String(args.url || "")),
   // Opens the Windows cast flyout so the whole window can be mirrored to a TV (electron/cast.js).

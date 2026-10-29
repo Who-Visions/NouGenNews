@@ -277,6 +277,26 @@ function estimateReadingMinutes(htmlOrText) {
 }
 
 // Stories the app can play first, then newest first.
+const isGoogleLink = (u) => /^https?:\/\/news\.google\.com\//i.test(String(u || ""));
+
+function agoLabel(ts) {
+  const mins = Math.floor((Date.now() - ts) / 60000);
+  if (mins >= 0 && mins < 60) return `${mins}m ago`;
+  if (mins >= 60 && mins < 1440) return `${Math.floor(mins / 60)}h ago`;
+  return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+// A SerpApi result (publisher link, thumbnail, source) as a wire story.
+function serpStory(it, meta) {
+  return {
+    id: `${meta.id}::${it.link}`, feedId: meta.id, title: it.title, link: it.link,
+    timeFormatted: it.timestamp ? agoLabel(it.timestamp) : "", timestamp: it.timestamp || 0,
+    desc: "", videos: [], creator: "", categories: [], source: it.source || meta.name,
+    badge: meta.badge, accent: meta.accent, imageUrl: it.thumbnail || "", contentHtml: "",
+    readMins: 1, lang: "en", originalLang: "en",
+  };
+}
+
 const byPlayableThenNew = (a, b) => ((b.videos?.length ? 1 : 0) - (a.videos?.length ? 1 : 0)) || (b.timestamp || 0) - (a.timestamp || 0);
 
 function parseFeedXml(xml, feedMeta) {
@@ -555,12 +575,22 @@ export function NewsView() {
   const placeRef = useRef("");
   const [city, setCity] = useState(loadCity);
   const [place, setPlace] = useState("");
+  const [localVia, setLocalVia] = useState("");
   const loadLocal = useCallback(async (query) => {
     if (!query) return;
     const meta = { ...FEEDS.find((x) => x.id === LOCAL_ID), url: localFeedUrl(query) };
     try {
-      const raw = await invoke("rss_raw_fetch", { feedUrl: meta.url });
-      const items = parseFeedXml(typeof raw === "string" ? raw : raw?.xml || "", meta).slice(0, 30);
+      let items = [];
+      let via = "google";
+      try {
+        const r = await invoke("local_news", { query });
+        if (r && r.items && r.items.length) { items = r.items.map((it) => serpStory(it, meta)); via = "serpapi"; }
+      } catch { /* the free feed below */ }
+      if (!items.length) {
+        const raw = await invoke("rss_raw_fetch", { feedUrl: meta.url });
+        items = parseFeedXml(typeof raw === "string" ? raw : raw?.xml || "", meta).slice(0, 30);
+      }
+      setLocalVia(via);
       localRef.current = items;
       setArticles((prev) => prev.filter((a) => a.feedId !== LOCAL_ID).concat(items).sort(byPlayableThenNew));
       setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: true, count: items.length } }));
@@ -758,7 +788,7 @@ export function NewsView() {
   const [fetchingFull, setFetchingFull] = useState(false);
   useEffect(() => {
     const a = rawCurrentArticle;
-    if (!a || a.full || !a.link || a.feedId === LOCAL_ID) return undefined;
+    if (!a || a.full || !a.link || (a.feedId === LOCAL_ID && isGoogleLink(a.link))) return undefined;
     let live = true;
     setFetchingFull(true);
     invoke("article_fetch", { url: a.link })
@@ -828,12 +858,12 @@ export function NewsView() {
   // Left/Right drive the hero, L listens, T cycles translation, R syncs, ? shows this list, Esc backs out.
   const openStory = useCallback((a) => {
     if (!a?.link) return;
-    if (a.feedId !== LOCAL_ID) { openInApp(a.link); return; }
+    if (a.feedId !== LOCAL_ID || !isGoogleLink(a.link)) { openInApp(a.link); return; }
     invoke("resolve_story_url", { url: a.link }).then((u) => openInApp(u || a.link)).catch(() => openInApp(a.link));
   }, []);
   const readStory = useCallback((a) => {
     if (!a) return;
-    if (a.feedId === LOCAL_ID) { openStory(a); return; }
+    if (a.feedId === LOCAL_ID && isGoogleLink(a.link)) { openStory(a); return; }
     speechRef.current?.stop();
     setArticleLangOverride(null);
     setSelectedArticleId(a.id);
@@ -1110,7 +1140,7 @@ export function NewsView() {
           )}
 
 
-          <SourceMenus feeds={FEEDS} counts={feedCounts} activeFeed={activeFeed} onPick={setActiveFeed} localLabel={place.split(",")[0]} />
+          <SourceMenus feeds={FEEDS} counts={feedCounts} activeFeed={activeFeed} onPick={setActiveFeed} localLabel={place.split(",")[0]} localVia={localVia} />
         </div>
 
         {/* Search, Dynamic Translate & Action Controls */}

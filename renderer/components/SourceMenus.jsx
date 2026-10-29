@@ -3,7 +3,7 @@ import "./SourceMenus.css";
 
 // The source strip as dropdowns: All Wire and In your library, then one menu per print section holding
 // its sources. Clicking a section's name shows the whole section; the caret opens the list.
-export function SourceMenus({ feeds, counts, activeFeed, onPick, localLabel }) {
+export function SourceMenus({ feeds, counts, activeFeed, onPick, localLabel, localVia }) {
   const [open, setOpen] = useState(null);
   const ref = useRef(null);
 
@@ -41,7 +41,7 @@ export function SourceMenus({ feeds, counts, activeFeed, onPick, localLabel }) {
         </button>
       )}
       {(counts.local ?? 0) > 0 && (
-        <button type="button" title="News about your city (change it in Settings)" className={`sm__btn${activeFeed === "local" ? " is-active" : ""}`} onClick={() => pick("local")}>
+        <button type="button" title={`News about your city (change it in Settings)${localVia === "serpapi" ? " \u00b7 via SerpApi" : localVia ? " \u00b7 via Google News" : ""}`} className={`sm__btn${activeFeed === "local" ? " is-active" : ""}`} onClick={() => pick("local")}>
           <span aria-hidden="true">&#128205;</span> {localLabel || "Near you"} <span className="sm__n mono">{counts.local}</span>
         </button>
       )}

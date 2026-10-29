@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/start.cjs",
     "build": "vite build",
     "test": "node --test \"electron/test/*.test.js\" \"renderer/lib/*.test.js\" \"core/test/*.test.js\"",
     "next:dev": "npx cross-env NODE_OPTIONS='--openssl-legacy-provider --max-old-space-size=4096' next dev -p 3000",
@@ -20,7 +20,8 @@
     "py:pylint": "python scripts/audit_python.py --targets scripts --skip-compile",
     "typecheck": "tsc --noEmit",
     "validate:python": "npm run py:audit",
-    "validate": "npm run lint && npm run typecheck && npm run build:vinext && npm run validate:python"
+    "validate": "npm run lint && npm run typecheck && npm run build:vinext && npm run validate:python",
+    "start:plain": "electron ."
   },
   "dependencies": {
     "@extractus/article-extractor": "^8.1.0",

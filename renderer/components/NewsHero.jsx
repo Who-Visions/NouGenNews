@@ -3,6 +3,7 @@
 // thin progress bar runs while the carousel auto-advances. It pauses on hover, on focus, and while a
 // video plays. Left/Right arrows step it; the parent owns the rest of the keyboard.
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
+import { Ago } from "./Ago.jsx";
 import { HeroScroller } from "./HeroScroller.jsx";
 import { HeroTitle } from "./HeroTitle.jsx";
 
@@ -93,7 +94,7 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
         <div className="nh-meta mono">
           <span className="nh-source">{item.source}</span>
           <span aria-hidden="true">·</span>
-          <span>{item.timeFormatted}</span>
+          <span><Ago ts={item.timestamp} fallback={item.timeFormatted} /></span>
           <span aria-hidden="true">·</span>
           <span>{item.readMins} min read</span>
           <span className="nh-count">{safe + 1} / {count}</span>

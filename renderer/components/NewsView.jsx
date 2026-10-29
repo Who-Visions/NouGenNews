@@ -8,6 +8,8 @@ import { Masthead } from "./Masthead.jsx";
 import { SourceMenus } from "./SourceMenus.jsx";
 import { LangMenu } from "./LangMenu.jsx";
 import { NewsHero } from "./NewsHero.jsx";
+import { Ago } from "./Ago.jsx";
+import { clampTs } from "../lib/age.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
@@ -313,7 +315,7 @@ const inWire = (a) => !WIRE_OFF.has(a.feedId);
 // One copy of every story, however many sources carried it, then playable first and newest first.
 const mergeWire = (list) => dedupeStories(list).sort(byPlayableThenNew);
 
-const byPlayableThenNew = (a, b) => ((b.videos?.length ? 1 : 0) - (a.videos?.length ? 1 : 0)) || (b.timestamp || 0) - (a.timestamp || 0);
+const byPlayableThenNew = (a, b) => clampTs(b.timestamp) - clampTs(a.timestamp) || String(a.id).localeCompare(String(b.id));
 
 function parseFeedXml(xml, feedMeta) {
   const items = [];
@@ -732,6 +734,17 @@ export function NewsView() {
   useEffect(() => {
     fetchAllFeeds();
     return () => abortRef.current?.abort();
+  }, [fetchAllFeeds]);
+
+  // Always the latest: pull again every minute while the window is visible, and the moment it comes back into view.
+  useEffect(() => {
+    let last = Date.now();
+    const pull = () => { if (document.visibilityState === "visible") { last = Date.now(); fetchAllFeeds(); } };
+    const t = setInterval(pull, 60000);
+    const back = () => { if (document.visibilityState === "visible" && Date.now() - last > 20000) pull(); };
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
   }, [fetchAllFeeds]);
 
   // Keep a stable list of articles matching the current feed + search query
@@ -1418,7 +1431,7 @@ export function NewsView() {
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
-                        {item.timeFormatted}
+                        <Ago ts={item.timestamp} fallback={item.timeFormatted} />
                       </span>
                     </div>
 
@@ -1531,7 +1544,7 @@ export function NewsView() {
                     </span>
                   )}
                   <span style={{ fontSize: 12, color: TOKENS.textSecondary }}>
-                    {currentArticle.timeFormatted}
+                    <Ago ts={currentArticle.timestamp} fallback={currentArticle.timeFormatted} />
                   </span>
                   <span style={{ fontSize: 12, color: TOKENS.textMuted }}>
                     • {currentArticle.readMins} min read

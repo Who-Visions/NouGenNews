@@ -46,6 +46,8 @@ function extractArticle(html, url = "") {
     if (bestLen > paragraphText(body)) body = best;
   }
   body = body.replace(/<(div|section|aside|ul)\b[^>]*class=["'][^"']*\b(share|social|related|newsletter|comments?)\b[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi, "");
+  // The page's own headline (the app shows the title itself) and its breadcrumb trail are furniture, not story.
+  body = body.replace(/<h1\b[^>]*>[^]*?<[/]h1>/gi, "").replace(/<(ul|ol|nav)\b[^>]*breadcrumb[^>]*>[^]*?<[/]\1>/gi, "");
   // Lazy-loaded images carry the real picture in data-src.
   body = body.replace(/<img\b([^>]*?)\bdata-(?:src|lazy-src|original)=(["'][^"']+["'])([^>]*)>/gi, (all, a, src, b) => (/\bsrc=/.test(a + b) ? all.replace(/\bsrc=["'][^"']*["']/, `src=${src}`) : `<img${a} src=${src}${b}>`));
   // Relative links and pictures resolve against the page.

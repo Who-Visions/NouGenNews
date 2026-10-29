@@ -40,3 +40,10 @@ test("only public https pages are fetched", async () => {
   const out = await articleFetch("https://news.test/a", async () => ({ ok: true, text: async () => `<article>${para("x")}</article>` }));
   assert.match(out.html, /x paragraph 0/);
 });
+
+test("the page's own headline and breadcrumb trail are dropped from the body", () => {
+  const html = `<html><body><article><ul class="breadcrumbs"><li><a href="https://x.test/c">Television</a></li></ul><h1 class="t" data-a="1">Big Story Headline By Author</h1><p>${"Real story text goes here. ".repeat(20)}</p></article></body></html>`;
+  const out = extractArticle(html, "https://x.test/a");
+  assert.doesNotMatch(out.html, /Television|Big Story Headline/);
+  assert.match(out.html, /Real story text/);
+});

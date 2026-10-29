@@ -190,6 +190,17 @@ export const FEEDS = [
     lang: "en",
   },
   {
+    id: "markets",
+    name: "Markets",
+    desc: "Market news from financial outlets, tagged with tickers (Massive)",
+    url: "@provider:massive",
+    icon: "📈",
+    badge: "Markets",
+    section: "Business",
+    accent: "#e8b86d",
+    lang: "en",
+  },
+  {
     id: "events",
     name: "Biggest stories today",
     desc: "The day's biggest events, ranked by how many articles cover them (Event Registry)",

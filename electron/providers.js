@@ -194,7 +194,29 @@ const eventregistry = {
   },
 };
 
-const REGISTRY = { thenewsapi, tmdb, nasa, webz, newsapi, newsdata, eventregistry };
+// Massive (formerly Polygon): market news from financial outlets, each story tagged with the tickers it concerns. The
+// bearer key goes in a header, never the address.
+const massive = {
+  id: "massive",
+  env: "MASSIVE_API_KEY",
+  ttlMs: 10 * 60 * 1000,
+  cap: { period: "day", max: 150 },
+  async run({ key, get }) {
+    const d = await get("https://api.massive.com/v2/reference/news?limit=50&order=desc&sort=published_utc", { Authorization: `Bearer ${key}` });
+    const items = [];
+    for (const a of (d && d.results) || []) {
+      if (!a.title || !isHttp(a.article_url)) continue;
+      const tick = Array.isArray(a.tickers) && a.tickers.length ? ` [${a.tickers.slice(0, 4).join(" ")}]` : "";
+      items.push({
+        title: clean(a.title), link: a.article_url, source: clean((a.publisher && a.publisher.name) || "Markets"),
+        desc: clean(a.description) + tick, thumbnail: isHttp(a.image_url) ? a.image_url : "", timestamp: Date.parse(a.published_utc) || 0,
+      });
+    }
+    return items;
+  },
+};
+
+const REGISTRY = { thenewsapi, tmdb, nasa, webz, newsapi, newsdata, eventregistry, massive };
 
 // ---- shared cache, caps and the fetch wrapper ------------------------------------------------------------------
 

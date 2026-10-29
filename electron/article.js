@@ -59,7 +59,7 @@ async function articleFetch(raw, http = fetchSafe) {
   let u;
   try { u = new URL(String(raw || "").trim()); } catch { throw new Error("Article error: bad URL"); }
   if (u.protocol !== "https:" || !isPublicHost(u.hostname)) throw new Error("Article error: public https pages only");
-  const res = await http(u.toString(), { headers: { Accept: "text/html", "User-Agent": "Mozilla/5.0 NouGenFlix" } });
+  const res = await http(u.toString(), { headers: { Accept: "text/html", "User-Agent": "Mozilla/5.0 NouGenNews" } });
   if (!res.ok) throw new Error(`Article error: HTTP ${res.status}`);
   return extractArticle((await res.text()).slice(0, MAX_BYTES), u.toString());
 }

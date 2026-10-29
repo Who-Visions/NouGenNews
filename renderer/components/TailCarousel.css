@@ -14,3 +14,18 @@
 .tail :focus-visible { outline: 2px solid var(--nn-accent, #e8b86d); outline-offset: 2px; }
 @keyframes tail-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .tail__item { animation: none; } }
+
+.tail__slot { position: relative; flex: 1; min-width: 0; height: 100%; display: flex; }
+.tail__card {
+  position: absolute; right: 0; bottom: calc(100% + 12px); width: 340px; z-index: 30;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: rgba(10, 10, 10, 0.95); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 12px 32px rgba(0, 0, 0, 0.7);
+  animation: tail-in 160ms ease-out; pointer-events: none;
+}
+.tail__cardimg { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.tail__cardbody { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; white-space: normal; }
+.tail__cardbody b { font-size: 14px; line-height: 1.3; color: var(--nn-text, #f2eee6); }
+.tail__cardbody p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--nn-muted, #bdb8ad); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.tail__cardbody .mono { font-size: 10px; color: var(--nn-dim, #8f8a80); }
+@media (prefers-reduced-motion: reduce) { .tail__card { animation: none; } }

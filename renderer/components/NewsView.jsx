@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
 import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail } from "../lib/articleHtml.js";
 import { TailCarousel } from "./TailCarousel.jsx";
+import { BreakingTicker } from "./BreakingTicker.jsx";
+import { FrontSections } from "./FrontSections.jsx";
+import { Masthead } from "./Masthead.jsx";
 import { NewsHero } from "./NewsHero.jsx";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
@@ -221,11 +224,24 @@ const HTML_ENTITIES = {
   "&nbsp;": " ",
 };
 
-function decodeEntities(str) {
+function decodeEntities(str, pass = 0) {
   if (!str) return "";
+  const out = decodeOnce(str);
+  return pass < 1 && /&#?[a-zA-Z0-9]+;/.test(out) && out !== str ? decodeEntities(out, pass + 1) : out;
+}
+
+function decodeOnce(str) {
   return str
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1")
-    .replace(/&[#a-zA-Z0-9]+;/g, (match) => HTML_ENTITIES[match] || match);
+    .replace(/&[#a-zA-Z0-9]+;/g, (match) => HTML_ENTITIES[match] || numericEntity(match));
+}
+
+// Any numeric entity (&#39; &#038; &#x2019;) the table does not list; feeds use them freely.
+function numericEntity(match) {
+  const m = /^&#(x?)([0-9a-fA-F]+);$/.exec(match);
+  if (!m) return match;
+  const code = parseInt(m[2], m[1] ? 16 : 10);
+  try { return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match; } catch { return match; }
 }
 
 function cleanPlainText(str) {
@@ -603,6 +619,7 @@ export function NewsView() {
     const q = search.trim().toLowerCase();
     const kept = withLibrary.filter((a) => {
       if (activeFeed === "library") return !!a.libraryHits?.length;
+      if (activeFeed.startsWith("section:")) return FEEDS.find((f) => f.id === a.feedId)?.section === activeFeed.slice(8);
       if (activeFeed !== "all" && a.feedId !== activeFeed) return false;
       if (!q) return true;
       return (
@@ -612,7 +629,7 @@ export function NewsView() {
         a.categories.some((c) => c.toLowerCase().includes(q))
       );
     });
-    if (!libraryTerms.length || (activeFeed !== "all" && activeFeed !== "library")) return kept;
+    if (!libraryTerms.length || (activeFeed !== "all" && activeFeed !== "library" && !activeFeed.startsWith("section:"))) return kept;
     const now = Date.now();
     return kept.map((a) => [a, scoreStory(a, { now, terms: libraryTerms })]).sort((x, y) => y[1] - x[1]).map((x) => x[0]);
   }, [withLibrary, libraryTerms, activeFeed, search]);
@@ -646,6 +663,15 @@ export function NewsView() {
     if (wireLang === "orig") return searchFiltered;
     return searchFiltered.map((a) => wireTranslatedMap[`${a.id}::${wireLang}`] || a);
   }, [searchFiltered, wireLang, wireTranslatedMap]);
+
+  const sectionCounts = useMemo(() => {
+    const c = {};
+    for (const a of withLibrary) {
+      const sec = FEEDS.find((f) => f.id === a.feedId)?.section;
+      if (sec) c[sec] = (c[sec] || 0) + 1;
+    }
+    return c;
+  }, [withLibrary]);
 
   const rawCurrentArticle = useMemo(
     () => searchFiltered.find((a) => a.id === selectedArticleId) || searchFiltered[0] || null,
@@ -918,6 +944,7 @@ export function NewsView() {
       )}
 
       {/* ─── TOP TELEMETRY & FILTER BAR ─── */}
+      {!mobileReading && <Masthead storyCount={articles.length} libraryCount={withLibrary.filter((a) => a.libraryHits?.length).length} />}
       <div
         className="news-toolbar"
         style={{
@@ -1066,6 +1093,8 @@ export function NewsView() {
           </div>
         </div>
 
+        <BreakingTicker stories={withLibrary} terms={libraryTerms} onOpen={(a) => readStory(a)} />
+
         {/* Search, Dynamic Translate & Action Controls */}
         <div className="news-search-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <div
@@ -1194,6 +1223,16 @@ export function NewsView() {
           onRead={readStory}
           onListen={listenTo}
           onSource={openInApp}
+        />
+      )}
+
+      {activeFeed === "all" && !search.trim() && !mobileReading && (
+        <FrontSections
+          stories={withLibrary}
+          terms={libraryTerms}
+          counts={sectionCounts}
+          onRead={(s) => readStory(s)}
+          onPickSection={(name) => setActiveFeed(`section:${name}`)}
         />
       )}
 

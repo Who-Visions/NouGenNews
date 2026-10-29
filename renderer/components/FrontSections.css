@@ -1,0 +1,18 @@
+.fs { display: grid; gap: 28px; margin: 6px 0 28px; }
+.fs__head { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--nn-line, rgba(255, 255, 255, 0.12)); }
+.fs__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--nn-accent, #e8b86d); align-self: center; }
+.fs__head h2 { margin: 0; font: 500 26px/1.1 var(--font-head); letter-spacing: -0.01em; color: var(--nn-text, #f2eee6); }
+.fs__chan { font: 600 10px/1 var(--font-mono, Consolas, monospace); letter-spacing: 0.1em; text-transform: uppercase; color: var(--nn-dim, #8f8a80); }
+.fs__all { margin-left: auto; font: 700 10px/1 var(--font-mono, Consolas, monospace); letter-spacing: 0.1em; text-transform: uppercase; color: var(--nn-accent, #e8b86d); background: transparent; border: 0; cursor: pointer; }
+.fs__all:hover { text-decoration: underline; }
+.fs__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
+.fs__card { display: flex; flex-direction: column; gap: 8px; padding: 12px; text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--nn-panel, rgba(255, 255, 255, 0.05)); border: 1px solid var(--nn-line, rgba(255, 255, 255, 0.12)); border-radius: 4px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14); }
+.fs__card:hover { background: var(--nn-hover, rgba(255, 255, 255, 0.13)); }
+.fs__card img, .fs__noimg { width: 100%; aspect-ratio: 16 / 9; max-height: 230px; object-fit: cover; border-radius: 3px; background: #0a0a0a; display: block; }
+.fs__meta { display: flex; gap: 10px; align-items: center; font: 600 10px/1 var(--font-mono, Consolas, monospace); letter-spacing: 0.06em; text-transform: uppercase; color: var(--nn-dim, #8f8a80); }
+.fs__meta b { color: var(--nn-accent, #e8b86d); }
+.fs__meta em { margin-left: auto; font-style: normal; color: var(--nn-accent, #e8b86d); }
+.fs__title { font: 500 19px/1.25 var(--font-head); color: var(--nn-text, #f2eee6); }
+.fs__desc { font-size: 13px; line-height: 1.5; color: var(--nn-muted, #bdb8ad); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fs__more { margin-top: auto; font: 600 11px/1 var(--font-mono, Consolas, monospace); color: var(--nn-accent, #e8b86d); }
+.fs :focus-visible { outline: 2px solid var(--nn-accent, #e8b86d); outline-offset: 2px; }

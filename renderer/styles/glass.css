@@ -56,3 +56,15 @@ body, .app-shell { background: #000; }
 .app-shell .news-chips > button { flex: none; white-space: nowrap; padding: 3px 9px !important; font-size: 12px !important; gap: 6px !important; border-radius: 4px !important; }
 .app-shell .news-chips::-webkit-scrollbar { height: 4px; }
 .app-shell .news-search-actions .news-search-box { width: 220px !important; }
+
+/* Typography from the Stitch edition design: Newsreader headlines, Inter body, JetBrains Mono labels. */
+:root {
+  --font-head: "Newsreader Variable", Georgia, "Times New Roman", serif;
+  --font-main: "Inter Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", Consolas, monospace;
+}
+.app-shell .nh-title, .app-shell .news-article-canvas h1, .app-shell .news-article-canvas h2, .app-shell .article-native-content h2, .app-shell .article-native-content h3 {
+  font-family: var(--font-head); font-weight: 500; letter-spacing: -0.015em;
+}
+.app-shell .nh-title { font-size: clamp(26px, 2.6vw, 38px); line-height: 1.12; }
+.app-shell .news-view-container .mono, .app-shell .news-view-container kbd { font-family: var(--font-mono); }

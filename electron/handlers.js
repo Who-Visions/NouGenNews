@@ -8,6 +8,14 @@ const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
+  // A desktop notification for a red alert. Skipped when the window is already in front (the banner is visible).
+  notify: (args = {}) => {
+    const { Notification, BrowserWindow } = require("electron");
+    const w = BrowserWindow.getAllWindows()[0];
+    if (!Notification.isSupported() || (w && w.isFocused())) return false;
+    new Notification({ title: String(args.title || "").slice(0, 80), body: String(args.body || "").slice(0, 200), urgency: "critical" }).show();
+    return true;
+  },
   // Any registered API provider (electron/providers.js): cached on disk, capped, keyed from the environment.
   provider_feed: (args = {}) => require("./providers").fetchProvider({
     id: String(args.id || "").slice(0, 30),

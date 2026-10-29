@@ -33,6 +33,7 @@ const MENUS = [
   { name: "Help", items: [
     { label: "Keyboard help", keys: "?", run: press("?") },
     { label: "Show or hide menu bar", keys: "Ctrl+M", run: () => window.dispatchEvent(new CustomEvent("nn:toggle-menubar")) },
+    { label: "Preview breaking-news alert", keys: "", run: () => window.dispatchEvent(new CustomEvent("nn:alert-demo")) },
   ] },
 ];
 

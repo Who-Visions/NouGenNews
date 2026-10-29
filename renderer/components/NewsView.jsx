@@ -12,6 +12,8 @@ import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
 import { scoreStory } from "../../core/edition.js";
+import { findAlerts } from "../../core/alerts.js";
+import { BreakingAlert } from "./BreakingAlert.jsx";
 import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
 import { loadCity, loadRegion, loadMetro, loadScope } from "./CornerClock.jsx";
 import "./NewsView.css";
@@ -292,7 +294,7 @@ function serpStory(it, meta) {
     id: `${meta.id}::${it.link}`, feedId: meta.id, title: it.title, link: it.link,
     timeFormatted: it.timestamp ? agoLabel(it.timestamp) : "", timestamp: it.timestamp || 0,
     desc: it.desc || "", videos: [], creator: "", categories: [], source: it.source || meta.name,
-    badge: meta.badge, accent: meta.accent, imageUrl: it.thumbnail || "",
+    badge: meta.badge, accent: meta.accent, imageUrl: it.thumbnail || "", breaking: !!it.breaking,
     contentHtml: it.desc ? sanitizeArticleHtml(`<p>${String(it.desc).replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>`) : "",
     noFullText: !!meta.noFullText,
     readMins: 1, lang: "en", originalLang: "en",
@@ -580,6 +582,24 @@ export function NewsView() {
   const [localVia, setLocalVia] = useState("");
   // API providers (TheNewsAPI, TMDB, NASA ...): each feed whose url is "@provider:<id>" is fetched in the main
   // process (key, cache and cap live there) and merged into the wire. A provider with no key returns nothing.
+  // Breaking-news alerts (core/alerts.js): several independent outlets on one event, within hours. One banner at a
+  // time, kept until read or dismissed; a red one also raises a desktop notification, once per story.
+  const [clock, setClock] = useState(() => Date.now());
+  const [alertsSeen, setAlertsSeen] = useState(() => { try { return JSON.parse(localStorage.getItem("nn.alertsSeen") || "[]"); } catch { return []; } });
+  const [demoAlert, setDemoAlert] = useState(null);
+  useEffect(() => { const t = setInterval(() => setClock(Date.now()), 60000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    const on = () => { setDemoAlert({ key: "demo", level: "red", demo: true, headline: "Sample alert: this is how a major breaking story appears", sourceCount: 5, timestamp: Date.now() }); };
+    window.addEventListener("nn:alert-demo", on);
+    return () => window.removeEventListener("nn:alert-demo", on);
+  }, []);
+  const markSeen = useCallback((key) => {
+    setAlertsSeen((prev) => {
+      const next = [key, ...prev.filter((k) => k !== key)].slice(0, 60);
+      try { localStorage.setItem("nn.alertsSeen", JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, []);
   const providerRef = useRef({});
   const loadProviders = useCallback(async () => {
     const feeds = FEEDS.filter((f) => f.url && f.url.startsWith("@provider:"));
@@ -773,6 +793,24 @@ export function NewsView() {
     ro.observe(tb); ro.observe(kb);
     return () => ro.disconnect();
   }, [mobileReading]);
+
+  const alerts = useMemo(() => findAlerts(withLibrary, { now: clock }), [withLibrary, clock]);
+  const activeAlert = demoAlert || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
+  useEffect(() => {
+    if (!activeAlert || activeAlert.demo || activeAlert.level !== "red") return;
+    let told = [];
+    try { told = JSON.parse(localStorage.getItem("nn.alertsTold") || "[]"); } catch { /* none yet */ }
+    if (told.includes(activeAlert.key)) return;
+    try { localStorage.setItem("nn.alertsTold", JSON.stringify([activeAlert.key, ...told].slice(0, 60))); } catch { /* storage unavailable */ }
+    invoke("notify", { title: "RED ALERT \u2014 NouGenNews", body: activeAlert.headline }).catch(() => {});
+  }, [activeAlert?.key]);
+  const dismissAlert = () => { if (activeAlert?.demo) setDemoAlert(null); else if (activeAlert) markSeen(activeAlert.key); };
+  const readAlert = () => {
+    if (!activeAlert) return;
+    if (activeAlert.demo) { setDemoAlert(null); return; }
+    markSeen(activeAlert.key);
+    readStory(activeAlert.story);
+  };
 
   const feedCounts = useMemo(() => {
     const c = { all: articles.length, library: 0 };
@@ -1072,6 +1110,7 @@ export function NewsView() {
       )}
 
       {/* ─── TOP TELEMETRY & FILTER BAR ─── */}
+      <BreakingAlert alert={activeAlert} onRead={readAlert} onDismiss={dismissAlert} />
       {!mobileReading && <Masthead storyCount={articles.length} libraryCount={withLibrary.filter((a) => a.libraryHits?.length).length} ticker={(intro) => <BreakingTicker intro={intro} stories={withLibrary} terms={libraryTerms} onOpen={(a) => readStory(a)} />} />}
       <div
         className="news-toolbar"

@@ -104,6 +104,7 @@ const webz = {
       items.push({
         title, link: p.url, source: clean(th.site_full || th.site), desc: clean(p.text).slice(0, 320),
         thumbnail: isHttp(th.main_image) ? th.main_image : "", timestamp: Date.parse(p.published || p.crawled) || 0,
+        breaking: p.breaking === true,
       });
     }
     return items;

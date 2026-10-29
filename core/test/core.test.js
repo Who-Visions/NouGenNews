@@ -49,3 +49,13 @@ test("an edition fills lead, secondary and section blocks without repeats", () =
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(ed.secondary.length, 4);
 });
+
+import { pruneTerms } from "../library.js";
+test("extractTerms drops folder names and chart titles", () => {
+  assert.deepEqual(extractTerms(["Anime", "Home Movies", "Anime Related 1: Home Movies", "The Greatest TV Shows of the Noughties", "Frieren"]), ["Frieren"]);
+});
+test("pruneTerms drops a term that matches too much of the wire", () => {
+  const stories = Array.from({ length: 100 }, (_, i) => ({ id: String(i), title: i < 50 ? "Matter of fact" : "Frieren returns" }));
+  assert.deepEqual(pruneTerms(stories, ["Matter", "Frieren"]), []);
+  assert.deepEqual(pruneTerms(stories.slice(40), ["Matter", "Frieren"], { maxShare: 0.9 }), ["Matter", "Frieren"]);
+});

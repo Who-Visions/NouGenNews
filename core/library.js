@@ -21,7 +21,11 @@ export function normalizeTitle(raw) {
     .trim();
 }
 
-const STOP = new Set(["the", "a", "an", "of", "and", "part", "movie", "film", "show", "series"]);
+// Folder and category names a library carries that are not titles ("Anime", "Home Movies"): never a search term.
+const STOP = new Set(["the", "a", "an", "of", "and", "part", "movie", "movies", "film", "films", "show", "shows", "series", "anime", "tv", "tv shows", "cartoons", "cartoon", "kids", "documentary", "documentaries", "specials", "special", "collection", "related", "home", "home movies", "misc", "other", "new", "unknown", "season", "seasons", "super", "stand up"]);
+const MAX_WORDS = 6;
+// Chart names and numbered folders ("Anime Related 1", "The Greatest TV Shows of ...") are not titles.
+const JUNK = /related \d|^the (?:best|greatest|top)\b/i;
 
 // The distinct, searchable terms from a list of raw library titles. A term this short or this common
 // would match half the wire, so it is dropped.
@@ -30,7 +34,7 @@ export function extractTerms(rawTitles, { minLength = 4 } = {}) {
   for (const raw of rawTitles || []) {
     const t = normalizeTitle(raw);
     const key = t.toLowerCase();
-    if (t.length < minLength || STOP.has(key) || seen.has(key)) continue;
+    if (t.length < minLength || STOP.has(key) || t.split(" ").length > MAX_WORDS || JUNK.test(t) || seen.has(key)) continue;
     seen.set(key, t);
   }
   return [...seen.values()];
@@ -47,4 +51,13 @@ export function matchStory(story, terms) {
 // A Google News RSS search for one term: gives a title its own live feed beyond the fixed sources.
 export function termFeedUrl(term) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(`"${term}"`)}&hl=en-US&gl=US&ceid=US:en`;
+}
+
+// Drops terms that match too much of the wire to mean anything (a title that is also a common word).
+// A term may hit at most maxShare of the stories, and never fewer than minAllowed of them.
+export function pruneTerms(stories, terms, { maxShare = 0.04, minAllowed = 4 } = {}) {
+  const limit = Math.max(minAllowed, Math.floor((stories || []).length * maxShare));
+  const counts = new Map(terms.map((t) => [t, 0]));
+  for (const s of stories || []) for (const t of matchStory(s, terms)) counts.set(t, counts.get(t) + 1);
+  return terms.filter((t) => counts.get(t) <= limit);
 }

@@ -4,6 +4,8 @@ import { optimizeLowCacheUrl, sanitizeArticleHtml } from "../lib/articleHtml.js"
 import { NewsHero } from "./NewsHero.jsx";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
+import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
+import { scoreStory } from "../../core/edition.js";
 import "./NewsView.css";
 import {
   articleLang,
@@ -446,6 +448,11 @@ function LowCacheThumb({ article, size = "sm", priority = false }) {
 export function NewsView() {
   const [activeFeed, setActiveFeed] = useState("all");
   const [menuOpen, setMenuOpen] = useState(false);
+  // Titles the reader owns (NouGenFlix library) lift related stories; none found means no boost.
+  const [rawTerms, setRawTerms] = useState([]);
+  useEffect(() => {
+    invoke("library_titles").then((r) => setRawTerms(extractTerms(r?.titles))).catch(() => {});
+  }, []);
   useEffect(() => {
     const open = () => { if (currentArticleRef.current?.link) openInApp(currentArticleRef.current.link); };
     window.addEventListener("nn:browse-current", open);
@@ -585,9 +592,16 @@ export function NewsView() {
   }, [fetchAllFeeds]);
 
   // Keep a stable list of articles matching the current feed + search query
+  // A title that is also a common word would match half the wire: those terms are dropped against what is loaded.
+  const libraryTerms = useMemo(() => pruneTerms(articles, rawTerms), [articles, rawTerms]);
+  const withLibrary = useMemo(
+    () => (libraryTerms.length ? articles.map((a) => ({ ...a, libraryHits: matchStory(a, libraryTerms) })) : articles),
+    [articles, libraryTerms]
+  );
   const searchFiltered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return articles.filter((a) => {
+    const kept = withLibrary.filter((a) => {
+      if (activeFeed === "library") return !!a.libraryHits?.length;
       if (activeFeed !== "all" && a.feedId !== activeFeed) return false;
       if (!q) return true;
       return (
@@ -597,7 +611,10 @@ export function NewsView() {
         a.categories.some((c) => c.toLowerCase().includes(q))
       );
     });
-  }, [articles, activeFeed, search]);
+    if (!libraryTerms.length || (activeFeed !== "all" && activeFeed !== "library")) return kept;
+    const now = Date.now();
+    return kept.map((a) => [a, scoreStory(a, { now, terms: libraryTerms })]).sort((x, y) => y[1] - x[1]).map((x) => x[0]);
+  }, [withLibrary, libraryTerms, activeFeed, search]);
 
   // Dynamically resolve wire headlines when wireLang is "ht", "en", or "es"
   useEffect(() => {
@@ -797,7 +814,7 @@ export function NewsView() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         feeds={FEEDS}
-        counts={Object.fromEntries(FEEDS.map((f) => [f.id, f.id === "all" ? articles.length : articles.filter((a) => a.feedId === f.id).length]))}
+        counts={{ ...Object.fromEntries(FEEDS.map((f) => [f.id, f.id === "all" ? articles.length : articles.filter((a) => a.feedId === f.id).length])), library: withLibrary.filter((a) => a.libraryHits?.length).length }}
         activeFeed={activeFeed}
         onPick={setActiveFeed}
         wireLang={wireLang}
@@ -1296,6 +1313,7 @@ export function NewsView() {
 
                     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: TOKENS.textMuted }}>
                       {item.videos?.length ? <span style={{ color: item.accent, fontWeight: 700 }}>▶ Video</span> : null}
+                      {item.libraryHits?.length ? <span title={item.libraryHits.join(", ")} style={{ color: TOKENS.accentPrimary, fontWeight: 700 }}>♥ In your library</span> : null}
                       <span>{item.readMins} min read</span>
                       {item.categories[0] && (
                         <>

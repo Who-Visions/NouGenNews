@@ -61,6 +61,7 @@ export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wir
     </li>
   );
   const all = feeds.find((f) => f.id === "all");
+  const mine = { id: "library", icon: "♥", name: "In your library" };
 
   return (
     <div className="nt-scrim" onClick={onClose}>
@@ -71,6 +72,7 @@ export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wir
         </header>
         <ul className="nt-tree" role="tree">
           {all && leaf(all)}
+          {(counts.library ?? 0) > 0 && leaf(mine)}
           {GROUPS.map((g) => {
             const items = feeds.filter((f) => g.badges.includes(f.badge));
             if (!items.length) return null;

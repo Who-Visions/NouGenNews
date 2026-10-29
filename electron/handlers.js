@@ -7,6 +7,8 @@ const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
+  // Titles the reader owns (NouGenFlix library), for lifting related stories. Read-only.
+  library_titles: () => require("./library").libraryTitles(app),
   restart: () => { app.relaunch(); app.exit(0); },
   // The whole story behind a headline, with the videos the page carries (electron/article.js).
   article_fetch: (args = {}) => require("./article").articleFetch(args.url || ""),

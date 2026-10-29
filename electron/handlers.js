@@ -17,6 +17,9 @@ const handlers = {
     return true;
   },
   // Any registered API provider (electron/providers.js): cached on disk, capped, keyed from the environment.
+  // YouTube channels (core/feeds.js "@youtube"): the latest videos of every channel in the list; no key needed.
+  youtube_feed: () => require("./youtube").fetchYoutube({ userDir: app.getPath("userData") }).then((r) => ({ items: r.items, channels: r.channels })),
+  youtube_add: (args = {}) => ({ channels: require("./youtube").addChannel(app.getPath("userData"), String(args.ref || "").slice(0, 200)) }),
   provider_feed: (args = {}) => require("./providers").fetchProvider({
     id: String(args.id || "").slice(0, 30),
     file: path.join(app.getPath("userData"), "provider-cache.json"),

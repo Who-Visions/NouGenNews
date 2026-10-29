@@ -201,6 +201,18 @@ export const FEEDS = [
     lang: "en",
   },
   {
+    id: "youtube",
+    name: "YouTube news",
+    desc: "The latest videos from the news channels you follow",
+    url: "@youtube",
+    icon: "▶",
+    badge: "YouTube",
+    section: "Top stories",
+    accent: "#e8b86d",
+    lang: "en",
+    noFullText: true,
+  },
+  {
     id: "events",
     name: "Biggest stories today",
     desc: "The day's biggest events, ranked by how many articles cover them (Event Registry)",

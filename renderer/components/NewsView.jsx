@@ -300,7 +300,7 @@ function serpStory(it, meta) {
   return {
     id: `${meta.id}::${it.link}`, feedId: meta.id, title: it.title, link: it.link,
     timeFormatted: it.timestamp ? agoLabel(it.timestamp) : "", timestamp: it.timestamp || 0,
-    desc: it.desc || "", videos: [], creator: "", categories: [], source: it.source || meta.name,
+    desc: it.desc || "", videos: it.videos || [], creator: "", categories: [], source: it.source || meta.name,
     badge: meta.badge, accent: meta.accent, imageUrl: it.thumbnail || "", breaking: !!it.breaking, reportCount: it.reportCount || 0,
     contentHtml: it.desc ? sanitizeArticleHtml(`<p>${String(it.desc).replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>`) : "",
     noFullText: !!meta.noFullText,
@@ -616,10 +616,10 @@ export function NewsView() {
   }, []);
   const providerRef = useRef({});
   const loadProviders = useCallback(async () => {
-    const feeds = FEEDS.filter((f) => f.url && f.url.startsWith("@provider:"));
+    const feeds = FEEDS.filter((f) => f.url && (f.url.startsWith("@provider:") || f.url === "@youtube"));
     const results = await Promise.all(feeds.map(async (f) => {
       try {
-        const r = await invoke("provider_feed", { id: f.url.slice("@provider:".length) });
+        const r = f.url === "@youtube" ? await invoke("youtube_feed") : await invoke("provider_feed", { id: f.url.slice("@provider:".length) });
         return [f.id, r && r.items ? r.items.map((it) => serpStory(it, f)) : []];
       } catch { return [f.id, []]; }
     }));

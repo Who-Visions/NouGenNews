@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
-import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, stripImages, dropAdLabels } from "../lib/articleHtml.js";
+import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, dropAdLabels } from "../lib/articleHtml.js";
 import { TailCarousel } from "./TailCarousel.jsx";
 import { BreakingTicker } from "./BreakingTicker.jsx";
 import { FrontSections } from "./FrontSections.jsx";
@@ -9,6 +9,7 @@ import { SourceMenus } from "./SourceMenus.jsx";
 import { LangMenu } from "./LangMenu.jsx";
 import { NewsHero } from "./NewsHero.jsx";
 import { Ago } from "./Ago.jsx";
+import { imagesFromXmlItem, imagesFromHtml, bestImage } from "../../core/images.js";
 import { VideoDock, useWide } from "./VideoDock.jsx";
 import { clampTs } from "../lib/age.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
@@ -184,14 +185,11 @@ async function resolveOgImageLowCache(articleUrl, parentSignal) {
         bytesRead += value.byteLength;
         headChunk += decoder.decode(value, { stream: true });
 
-        const ogMatch =
-          headChunk.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-          headChunk.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
-          headChunk.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+        const found = bestImage(imagesFromHtml(headChunk, articleUrl));
 
-        if (ogMatch && ogMatch[1]) {
+        if (found) {
           ctrl.abort();
-          const optimized = optimizeLowCacheUrl(ogMatch[1], 640);
+          const optimized = optimizeLowCacheUrl(found, 640);
           imageLRU.set(articleUrl, optimized);
           return optimized;
         }
@@ -266,7 +264,7 @@ function cleanPlainText(str) {
     .trim();
 }
 
-function extractXmlImage(itemXml) {
+function extractXmlImageLegacy(itemXml) {
   const mediaMatch = itemXml.match(/<media:(?:content|thumbnail)[^>]+url=["']([^"']+)["']/i);
   if (mediaMatch) return optimizeLowCacheUrl(mediaMatch[1], 640);
 
@@ -279,6 +277,12 @@ function extractXmlImage(itemXml) {
     return optimizeLowCacheUrl(imgMatch[1], 640);
   }
   return null;
+}
+
+// Every way a feed item can carry a picture is read (core/images.js); the best one wins.
+function extractXmlImage(itemXml) {
+  const best = bestImage(imagesFromXmlItem(itemXml));
+  return best ? optimizeLowCacheUrl(best, 640) : extractXmlImageLegacy(itemXml);
 }
 
 function estimateReadingMinutes(htmlOrText) {
@@ -913,7 +917,8 @@ export function NewsView() {
         const html = got && got.html ? sanitizeArticleHtml(got.html) : "";
         const seen = new Set((a.videos || []).map((v) => v.id || v.url));
         const videos = [...(a.videos || []), ...((got && got.videos) || []).filter((v) => !seen.has(v.id || v.url))];
-        setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, full: true, videos, ...(html ? { contentHtml: html, readMins: estimateReadingMinutes(html) } : {}) } : x)));
+        const lead = got && got.image && !a.imageUrl ? { imageUrl: got.image } : {};
+        setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, full: true, videos, ...lead, ...(html ? { contentHtml: html, readMins: estimateReadingMinutes(html) } : {}) } : x)));
       })
       .catch(() => { if (live) setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, full: true } : x))); })
       .finally(() => { if (live) setFetchingFull(false); });
@@ -969,10 +974,13 @@ export function NewsView() {
   const articleBody = useMemo(() => dropDuplicateImages(dropTrailingImages(dropAdLabels(tail.body)), currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
   // With room beside the article, its videos dock to the right instead of sitting in the text.
   const wideEnough = useWide(1500);
-  // The main picture under the headline always stays; the carousel holds the pictures from the body.
-  const photos = useMemo(() => collectPhotos(articleBody), [articleBody]);
-  const docked = wideEnough && (!!currentArticle?.videos?.length || photos.length > 1);
-  const shownBody = useMemo(() => (docked && photos.length > 1 ? stripImages(articleBody) : articleBody), [docked, photos.length, articleBody]);
+  // Two ways to read: "view" docks the videos and a large photo carousel beside the story; "read" is the plain magazine column.
+  const [readerMode, setReaderModeState] = useState(() => { try { return localStorage.getItem("nn.readerMode") === "read" ? "read" : "view"; } catch { return "view"; } });
+  const setReaderMode = useCallback((m) => { setReaderModeState(m); try { localStorage.setItem("nn.readerMode", m); } catch { /* storage unavailable */ } }, []);
+  // Every picture of the story goes to the carousel (the lead first) and also stays where it is: under the headline and in the text.
+  const photos = useMemo(() => collectPhotos(articleBody, currentArticle?.imageUrl), [articleBody, currentArticle?.imageUrl]);
+  const docked = wideEnough && readerMode === "view" && (!!currentArticle?.videos?.length || photos.length > 1);
+  const shownBody = articleBody;
 
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.scrollTop = 0;
@@ -1033,6 +1041,7 @@ export function NewsView() {
       if (!filtered.length) return;
       const idx = filtered.findIndex((a) => a.id === currentArticle?.id);
       if (e.key === "Enter") { e.preventDefault(); readStory(currentArticle || filtered[0]); return; }
+      if (e.key === "v" || e.key === "V") { e.preventDefault(); setReaderMode(readerMode === "view" ? "read" : "view"); return; }
       if (e.key === "l" || e.key === "L") { e.preventDefault(); listenTo(currentArticle || filtered[0]); return; }
       if (e.key === "ArrowDown" || e.key === "j" || e.key === "J") {
         e.preventDefault();
@@ -1046,7 +1055,7 @@ export function NewsView() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtered, currentArticle?.id, helpOpen, mobileReading, wireLang, fetchAllFeeds, readStory, listenTo]);
+  }, [filtered, currentArticle?.id, helpOpen, mobileReading, wireLang, fetchAllFeeds, readStory, listenTo, readerMode, setReaderMode]);
 
   // The stories the hero can play: the ones with a video, newest first.
   const playable = useMemo(() => {
@@ -1745,6 +1754,9 @@ export function NewsView() {
                 dangerouslySetInnerHTML={{ __html: shownBody }}
               />
               <div className="news-reader-bar">
+                <button type="button" className="nh-btn" aria-pressed={readerMode === "view"} title="Switch between the magazine column and the photo gallery view" onClick={() => setReaderMode(readerMode === "view" ? "read" : "view")}>
+                  {readerMode === "view" ? "Magazine" : "Gallery"} <kbd>V</kbd>
+                </button>
                 <button type="button" className="nh-btn" onClick={() => listenTo(currentArticle)}>
                   {speaking && speech.mode === "single" && speech.articleId === currentArticle.id ? "Stop listening" : "Listen"} <kbd>L</kbd>
                 </button>
@@ -1757,7 +1769,7 @@ export function NewsView() {
                 {tail.items.length ? <TailCarousel items={tail.items} onOpen={openInApp} /> : <span className="mono">J next · K prev · Esc back</span>}
               </div>
             </article>
-            {docked ? <VideoDock videos={currentArticle.videos} photos={photos} embedPort={embedPort} autoplay={loadAutoplay()} label={currentArticle.title} /> : null}
+            {docked ? <VideoDock large videos={currentArticle.videos} photos={photos} embedPort={embedPort} autoplay={loadAutoplay()} label={currentArticle.title} /> : null}
             </div>
           ) : (
             <div

@@ -4,18 +4,18 @@ import "./VideoDock.css";
 
 // A story's videos, docked beside the article instead of in the middle of it: one player that stays in view while the
 // text scrolls, and a strip to pick another video. YouTube plays through the app's loopback embed page, files directly.
-export function VideoDock({ videos, photos = [], embedPort, autoplay = false, label = "" }) {
+export function VideoDock({ videos, photos = [], embedPort, autoplay = false, label = "", large = false }) {
   const [at, setAt] = useState(0);
   const [failed, setFailed] = useState(() => new Set());
   useEffect(() => { setAt(0); }, [videos]);
   const list = (videos || []).slice(0, 8).filter((v) => !failed.has(v.id || v.url));
-  if (!list.length) return photos.length > 1 ? <aside className="vdock" aria-label="Photos"><PhotoCarousel photos={photos} /></aside> : null;
+  if (!list.length) return photos.length > 1 ? <aside className={`vdock${large ? " vdock--large" : ""}`} aria-label="Photos"><PhotoCarousel photos={photos} /></aside> : null;
   const v = list[Math.min(at, list.length - 1)];
   const src = v.kind === "youtube"
     ? (embedPort && embedPort !== "web" ? `http://localhost:${embedPort}/embed?id=${v.id}${autoplay ? "&autoplay=1" : ""}` : `https://www.youtube.com/embed/${v.id}?playsinline=1${autoplay ? "&autoplay=1" : ""}`)
     : "";
   return (
-    <aside className="vdock" aria-label="Videos">
+    <aside className={`vdock${large ? " vdock--large" : ""}`} aria-label="Videos">
       <div className="vdock__head mono"><span>Video</span>{list.length > 1 ? <span>{Math.min(at, list.length - 1) + 1} / {list.length}</span> : null}</div>
       <div className="vdock__player">
         {v.kind === "youtube" ? (

@@ -63,7 +63,16 @@ async function articleFetch(raw, http = fetchSafe) {
   if (u.protocol !== "https:" || !isPublicHost(u.hostname)) throw new Error("Article error: public https pages only");
   const res = await http(u.toString(), { headers: { Accept: "text/html", "User-Agent": "Mozilla/5.0 NouGenNews" } });
   if (!res.ok) throw new Error(`Article error: HTTP ${res.status}`);
-  return extractArticle((await res.text()).slice(0, MAX_BYTES), u.toString());
+  const html = (await res.text()).slice(0, MAX_BYTES);
+  const out = extractArticle(html, u.toString());
+  // The page's best picture however it names it (Open Graph, Twitter, JSON-LD, its own images); the same reader as feeds use.
+  try {
+    const { imagesFromHtml, bestImage } = await import("../core/images.js");
+    const found = imagesFromHtml(html, u.toString());
+    out.image = bestImage(found);
+    out.images = found.slice(0, 12).map((c) => c.url);
+  } catch { out.image = ""; out.images = []; }
+  return out;
 }
 
 module.exports = { articleFetch, extractArticle, findVideos };

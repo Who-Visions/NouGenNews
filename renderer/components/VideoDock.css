@@ -1,4 +1,4 @@
-.reader-with-dock { display: flex; align-items: flex-start; gap: 28px; max-width: 1160px; margin: 0 auto; }
+.reader-with-dock { display: flex; align-items: flex-start; gap: 28px; max-width: 1280px; margin: 0 auto; }
 .reader-with-dock > article { flex: 1 1 0; min-width: 0; margin: 0 !important; }
 .vdock { position: sticky; top: clamp(60px, 16vh, 200px); margin-top: clamp(60px, 16vh, 200px); flex: 0 0 360px; width: 360px; display: flex; flex-direction: column; gap: 8px; }
 .vdock__head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--nn-dim, #8f8a80); }
@@ -10,3 +10,7 @@
 .vdock__thumb:hover img, .vdock__thumb.is-on img { opacity: 1; }
 .vdock__thumb.is-on { border-color: var(--nn-accent, #e8b86d); }
 .vdock :focus-visible { outline: 2px solid var(--nn-accent, #e8b86d); outline-offset: 2px; }
+
+/* Gallery view: a wider dock and a taller photo frame. */
+.vdock--large { flex-basis: 480px; width: 480px; }
+.vdock--large .pcar__frame { height: clamp(300px, 50vh, 540px); }

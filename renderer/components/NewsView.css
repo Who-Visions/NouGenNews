@@ -198,3 +198,8 @@
   .nh-title--line { white-space: normal; }
   .nh-title__text { padding-right: 0; }
 }
+
+/* Story-card info row: one line, extra text trimmed, so a narrow list never stacks it into three lines. */
+.news-card-meta { flex-wrap: nowrap; min-width: 0; white-space: nowrap; overflow: hidden; }
+.news-card-meta > * { flex: none; }
+.news-card-meta > :last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

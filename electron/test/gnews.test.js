@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { resolveStoryUrl, articleId, parseSignature, parseResolved, batchBody } = require("../gnews");
+const { resolveStoryUrl, articleId, parseSignature, parseResolved, batchBody, resetBackoff } = require("../gnews");
 
 const LINK = "https://news.google.com/rss/articles/CBMiabc123_-XYZ?oc=5";
 const res = (text, ok = true) => ({ ok, text: async () => text });
@@ -47,4 +47,24 @@ test("resolveStoryUrl makes the two requests, returns the real address, and reme
 test("any failure falls back to the original link", async () => {
   assert.equal(await resolveStoryUrl("https://news.google.com/rss/articles/CBMfail", async () => { throw new Error("offline"); }), "https://news.google.com/rss/articles/CBMfail");
   assert.equal(await resolveStoryUrl("https://example.com/x", async () => { throw new Error("never called"); }), "https://example.com/x");
+});
+
+test("a 429 falls back at once and no further requests are made for a while", async () => {
+  resetBackoff();
+  let calls = 0;
+  const http = async () => { calls += 1; return { ok: false, status: 429, text: async () => "" }; };
+  const a = "https://news.google.com/rss/articles/CBMone";
+  assert.equal(await resolveStoryUrl(a, http), a);
+  assert.equal(calls, 1);
+  assert.equal(await resolveStoryUrl("https://news.google.com/rss/articles/CBMtwo", http), "https://news.google.com/rss/articles/CBMtwo");
+  assert.equal(calls, 1, "backed off: no second request");
+  resetBackoff();
+});
+
+test("the requests are made without the fetch helper's retries", async () => {
+  resetBackoff();
+  const seen = [];
+  const http = async (url, opts, extra) => { seen.push(extra); return { ok: false, status: 500, text: async () => "" }; };
+  await resolveStoryUrl("https://news.google.com/rss/articles/CBMthree", http);
+  assert.deepEqual(seen[0], { retries: false, timeoutMs: 8000 });
 });

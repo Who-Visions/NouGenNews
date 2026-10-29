@@ -8,6 +8,11 @@ const { fetchSafe } = require("./safe");
 const ID = /^https:\/\/news\.google\.com\/(?:rss\/)?articles\/([A-Za-z0-9_-]+)/;
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
 const cache = new Map();
+// Google answers a burst of lookups with 429. After one, no more are sent for a while: the caller falls back
+// to the original link at once instead of waiting through retries.
+const BACKOFF_MS = 2 * 60 * 1000;
+let blockedUntil = 0;
+const ONCE = { retries: false, timeoutMs: 8000 };
 
 const articleId = (url) => { const m = ID.exec(String(url || "")); return m ? m[1] : null; };
 
@@ -42,8 +47,10 @@ async function resolveStoryUrl(url, http = fetchSafe) {
   const id = articleId(url);
   if (!id) return String(url || "");
   if (cache.has(id)) return cache.get(id);
+  if (Date.now() < blockedUntil) return String(url);
   try {
-    const page = await http(`https://news.google.com/articles/${id}?hl=en-US&gl=US&ceid=US:en`, { headers: { "User-Agent": UA } });
+    const page = await http(`https://news.google.com/articles/${id}?hl=en-US&gl=US&ceid=US:en`, { headers: { "User-Agent": UA } }, ONCE);
+    if (page.status === 429) { blockedUntil = Date.now() + BACKOFF_MS; return String(url); }
     if (!page.ok) return String(url);
     const sig = parseSignature(await page.text());
     if (!sig) return String(url);
@@ -51,7 +58,8 @@ async function resolveStoryUrl(url, http = fetchSafe) {
       method: "POST",
       headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
       body: batchBody(id, sig),
-    });
+    }, ONCE);
+    if (res.status === 429) { blockedUntil = Date.now() + BACKOFF_MS; return String(url); }
     if (!res.ok) return String(url);
     const real = parseResolved(await res.text());
     if (real) cache.set(id, real);
@@ -61,4 +69,7 @@ async function resolveStoryUrl(url, http = fetchSafe) {
   }
 }
 
-module.exports = { resolveStoryUrl, articleId, parseSignature, parseResolved, batchBody };
+// For tests: lets the back-off be cleared between cases.
+const resetBackoff = () => { blockedUntil = 0; cache.clear(); };
+
+module.exports = { resetBackoff, resolveStoryUrl, articleId, parseSignature, parseResolved, batchBody };

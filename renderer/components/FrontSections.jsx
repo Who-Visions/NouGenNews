@@ -19,8 +19,8 @@ export function FrontSections({ stories, terms, counts, onRead, onPickSection })
           </header>
           <div className="fs__grid">
             {sec.stories.map((s) => (
-              <button type="button" key={s.id} className="fs__card" onClick={() => onRead(s)}>
-                {s.imageUrl ? <img src={hiResUrl(s.imageUrl, 560)} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => { if (e.currentTarget.src !== s.imageUrl) e.currentTarget.src = s.imageUrl; }} /> : <span className="fs__noimg" />}
+              <button type="button" key={s.id} className={`fs__card${s.imageUrl ? "" : " fs__card--text"}`} onClick={() => onRead(s)}>
+                {s.imageUrl ? <img src={hiResUrl(s.imageUrl, 560)} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => { if (e.currentTarget.src !== s.imageUrl) e.currentTarget.src = s.imageUrl; }} /> : null}
                 <span className="fs__meta">
                   <b>{s.source}</b><span>{s.readMins} min read</span>
                   {s.libraryHits?.length ? <em title={s.libraryHits.join(", ")}>&#9829; In your library</em> : null}

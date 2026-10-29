@@ -1,0 +1,182 @@
+/* News tab. Tokens follow NouGenDesign nougen-core (designs/nougen-core/tokens.css): matte graphite,
+   fine dividers, amber used sparingly, 4px corners. No gradients, glass or glow. Motion is scroll-driven
+   CSS where the browser supports it and off entirely under prefers-reduced-motion. */
+.news-view-container {
+  --nn-bg: #141414;
+  --nn-panel: #202020;
+  --nn-panel-2: #282828;
+  --nn-hover: #333333;
+  --nn-line: rgba(119, 119, 119, 0.3);
+  --nn-line-strong: rgba(119, 119, 119, 0.55);
+  --nn-text: #f2eee6;
+  --nn-muted: #bdb8ad;
+  --nn-dim: #8f8a80;
+  --nn-accent: #e8b86d;
+  --nn-accent-ink: #141414;
+  --nn-mono: Consolas, "JetBrains Mono", ui-monospace, monospace;
+  --nn-radius: 4px;
+  --nn-fast: 120ms ease-out;
+  color: var(--nn-text);
+  background: var(--nn-bg);
+}
+.news-view-container .mono { font-family: var(--nn-mono); font-variant-numeric: tabular-nums; }
+.news-view-container kbd {
+  font: 600 10px/1 var(--nn-mono);
+  color: var(--nn-muted);
+  border: 1px solid var(--nn-line-strong);
+  border-radius: 3px;
+  padding: 2px 4px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.news-view-container :where(button, input, select, a, [tabindex]):focus-visible { outline: 2px solid var(--nn-accent); outline-offset: 2px; }
+
+/* Scrollbars: thin, matte, visible only where there is something to scroll. */
+.news-view-container ::-webkit-scrollbar, .news-view-container::-webkit-scrollbar { width: 8px; height: 8px; }
+.news-view-container ::-webkit-scrollbar-track { background: transparent; }
+.news-view-container ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; border: 2px solid var(--nn-bg); }
+.news-view-container ::-webkit-scrollbar-thumb:hover { background: #555; }
+.news-view-container ::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── Hero carousel (above the fold) ─────────────────────────────────────────── */
+.news-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 5fr);
+  grid-template-rows: auto auto;
+  gap: 16px 24px;
+  padding: 16px 0 18px;
+  border-bottom: 1px solid var(--nn-line);
+  margin-bottom: 16px;
+}
+.nh-frame {
+  grid-row: 1 / 3;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 1px solid var(--nn-line);
+  border-radius: var(--nn-radius);
+  overflow: hidden;
+  animation: nh-in 180ms ease-out;
+}
+@keyframes nh-in { from { opacity: 0.4; } to { opacity: 1; } }
+.nh-player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+.nh-poster { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: #000; cursor: pointer; display: block; }
+.nh-poster img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 400ms ease-out; }
+.nh-poster:hover img { transform: scale(1.02); }
+.nh-poster-blank { position: absolute; inset: 0; background: var(--nn-panel-2); }
+.nh-play {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 64px; height: 64px; display: grid; place-items: center;
+  font-size: 24px; color: var(--nn-accent-ink); background: var(--nn-accent);
+  border-radius: var(--nn-radius); opacity: 0.92;
+}
+.nh-poster:hover .nh-play { opacity: 1; }
+.nh-tag {
+  position: absolute; left: 10px; top: 10px;
+  font: 600 11px/1 var(--nn-mono); letter-spacing: 0.04em;
+  color: var(--nn-accent); background: rgba(20, 20, 20, 0.9);
+  border: 1px solid var(--nn-line-strong); border-radius: 3px; padding: 5px 7px;
+}
+
+.nh-copy { grid-column: 2; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.nh-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 11px; color: var(--nn-muted); }
+.nh-source { color: var(--nn-accent); font-weight: 600; }
+.nh-count { margin-left: auto; color: var(--nn-dim); }
+.nh-title { font-size: clamp(20px, 2vw, 28px); line-height: 1.2; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.nh-dek { margin: 0; font-size: 14px; line-height: 1.55; color: var(--nn-muted); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.nh-byline { margin: 0; font-size: 12px; color: var(--nn-dim); }
+.nh-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.nh-btn {
+  font: 600 12px/1 inherit; color: var(--nn-text);
+  background: var(--nn-panel-2); border: 1px solid var(--nn-line-strong); border-radius: var(--nn-radius);
+  padding: 9px 12px; cursor: pointer; min-height: 32px;
+  transition: background var(--nn-fast), border-color var(--nn-fast);
+}
+.nh-btn:hover { background: var(--nn-hover); }
+.nh-btn-primary { background: var(--nn-accent); color: var(--nn-accent-ink); border-color: var(--nn-accent); }
+.nh-btn-primary:hover { background: #f0c67e; }
+.nh-btn-primary kbd { color: var(--nn-accent-ink); border-color: rgba(20, 20, 20, 0.4); }
+.nh-nav { display: flex; align-items: center; gap: 6px; }
+.nh-arrow { width: 28px; height: 28px; border: 1px solid var(--nn-line-strong); border-radius: var(--nn-radius); background: var(--nn-panel); color: var(--nn-text); font-size: 18px; line-height: 1; cursor: pointer; }
+.nh-arrow:hover { background: var(--nn-hover); }
+.nh-hint { font-size: 10px; color: var(--nn-dim); margin-left: 4px; }
+
+/* Up-next strip: compact thumbs with the progress bar on the active one. */
+.nh-strip { grid-column: 1 / 3; list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 10px; overflow-x: auto; }
+.nh-thumb {
+  position: relative; display: block; width: 100%; padding: 0; text-align: left; cursor: pointer;
+  background: var(--nn-panel); border: 1px solid var(--nn-line); border-radius: var(--nn-radius); overflow: hidden;
+  color: var(--nn-muted); transition: border-color var(--nn-fast);
+}
+.nh-thumb:hover { border-color: var(--nn-line-strong); }
+.nh-thumb.on { border-color: var(--nn-accent); color: var(--nn-text); }
+.nh-thumb img, .nh-thumb .nh-poster-blank { position: static; display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.nh-thumb-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.35; padding: 7px 8px 9px; }
+.nh-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--nn-line-strong); }
+.nh-progress-bar { display: block; height: 100%; width: 0; background: var(--nn-accent); }
+.nh-progress-bar.run { animation: nh-fill linear forwards; }
+@keyframes nh-fill { from { width: 0; } to { width: 100%; } }
+
+/* ── Toolbar and the wire (below the fold) ──────────────────────────────────── */
+.news-toolbar { position: sticky; top: 0; z-index: 3; background: var(--nn-bg); }
+.news-feed-list { scroll-padding-block: 8px; }
+.news-feed-list [role="option"] { position: relative; }
+.news-feed-list [role="option"][aria-selected="true"]::before {
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--nn-accent); border-radius: 1px;
+}
+.news-article-canvas article { max-width: 68ch; }
+.news-article-canvas .article-native-content { font-size: 15px; line-height: 1.7; }
+.news-article-canvas .article-native-content img, .news-article-canvas .article-native-content video { max-width: 100%; height: auto; border-radius: var(--nn-radius); }
+.news-article-canvas .article-native-content a { color: var(--nn-accent); text-decoration: underline; text-decoration-color: var(--nn-line-strong); }
+.news-article-canvas .article-native-content blockquote { margin: 1em 0; padding: 0 0 0 14px; border-left: 2px solid var(--nn-line-strong); color: var(--nn-muted); }
+
+/* Reader footer: pinned to the bottom of the reader column. */
+.news-reader-bar {
+  position: sticky; bottom: -28px; margin: 24px -40px -28px; padding: 10px 40px;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  background: var(--nn-panel); border-top: 1px solid var(--nn-line);
+  font-size: 12px;
+}
+.news-reader-bar .spacer { flex: 1; }
+.news-reader-bar .mono { color: var(--nn-dim); font-size: 11px; }
+
+/* Keyboard strip, docked at the bottom of the tab. */
+.news-keys {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  margin-top: 10px; padding: 6px 0 0; border-top: 1px solid var(--nn-line);
+  font: 11px/1.4 var(--nn-mono); color: var(--nn-dim);
+}
+.news-keys b { color: var(--nn-muted); font-weight: 600; }
+.news-keys .spacer { flex: 1; }
+.news-keys button { background: none; border: 1px solid var(--nn-line-strong); border-radius: 3px; color: var(--nn-muted); font: inherit; padding: 2px 6px; cursor: pointer; }
+
+/* Help sheet (the ? key). A plain panel, not a modal window. */
+.news-help { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; background: rgba(20, 20, 20, 0.85); }
+.news-help-panel { width: min(560px, 92%); background: var(--nn-panel); border: 1px solid var(--nn-line-strong); border-radius: var(--nn-radius); padding: 18px 20px; }
+.news-help-panel h3 { margin: 0 0 12px; font-size: 14px; }
+.news-help-panel dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+.news-help-panel dt { font-family: var(--nn-mono); color: var(--nn-accent); white-space: nowrap; }
+.news-help-panel dd { margin: 0; color: var(--nn-muted); }
+.news-help-panel p { margin: 12px 0 0; font-size: 11px; color: var(--nn-dim); }
+
+/* ── Scroll-driven motion: depth on the hero as it leaves, rise-in on wire rows as they arrive. ── */
+@supports (animation-timeline: scroll()) {
+  .news-view-container { scroll-timeline: --news-page block; }
+  .nh-frame { animation: nh-in 180ms ease-out, nh-depth linear both; animation-timeline: auto, --news-page; animation-range: normal, 0 60vh; }
+  @keyframes nh-depth { to { transform: translateY(18px) scale(0.985); opacity: 0.6; } }
+  .news-feed-list [role="option"] { animation: nn-rise linear both; animation-timeline: view(); animation-range: entry 0% entry 40%; }
+  @keyframes nn-rise { from { opacity: 0.35; transform: translateY(6px); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .news-view-container *, .news-view-container *::before, .news-view-container *::after { animation: none !important; transition: none !important; }
+  .nh-progress-bar.run { width: 100%; }
+}
+
+/* Narrow: hero stacks, strip scrolls, the split pane stacks (the mobile reading toggle already exists). */
+@media (max-width: 900px) {
+  .news-hero { grid-template-columns: 1fr; }
+  .nh-frame { grid-row: auto; }
+  .nh-copy { grid-column: 1; }
+  .nh-strip { grid-column: 1; grid-auto-columns: 150px; }
+  .news-reader-bar { margin: 24px -16px -16px; padding: 10px 16px; }
+}

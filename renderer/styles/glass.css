@@ -1,0 +1,58 @@
+/* Black liquid glass: a pure black field, panels as thin translucent glass with a blur, a bright
+   top edge and a soft inner shadow. Operator-directed override of the matte nougen-core surfaces;
+   amber stays the one accent. */
+:root {
+  --bg: #000000;
+  --panel: rgba(255, 255, 255, 0.05);
+  --panel-2: rgba(255, 255, 255, 0.08);
+  --panel-hover: rgba(255, 255, 255, 0.13);
+  --panel-solid: #0a0a0a;
+  --line: rgba(255, 255, 255, 0.14);
+  --glass-blur: blur(28px) saturate(180%);
+  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(255, 255, 255, 0.04), 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+body, .app-shell { background: #000; }
+.app-shell .news-view-container {
+  --nn-bg: #000000;
+  --nn-panel: rgba(255, 255, 255, 0.05);
+  --nn-panel-2: rgba(255, 255, 255, 0.08);
+  --nn-hover: rgba(255, 255, 255, 0.13);
+  --nn-line: rgba(255, 255, 255, 0.12);
+  --nn-line-strong: rgba(255, 255, 255, 0.22);
+  background: #000;
+}
+.app-shell .news-toolbar { background: #000; box-shadow: 0 1px 0 var(--line); }
+/* Refracting glass is kept to a few surfaces (hero, reader bar, menus, drawer). The displacement is only on surfaces that open
+   on demand (menu, drawer, help). The 363 list cards and every button stay flat translucent: a backdrop filter on each would cost scroll speed for nothing. */
+.app-shell .news-help-panel {
+  backdrop-filter: url(#nn-liquid) blur(10px) saturate(160%);
+  -webkit-backdrop-filter: url(#nn-liquid) blur(10px) saturate(160%);
+  box-shadow: var(--glass-edge);
+}
+/* Always-on surfaces use plain blur: the displacement filter re-runs every scroll frame (measured ~5x slower p95). */
+.app-shell .news-hero, .app-shell .news-reader-bar { box-shadow: var(--glass-edge); }
+.app-shell .news-feed-list > *, .app-shell .news-article-canvas, .app-shell .nh-thumb, .app-shell .nh-btn, .app-shell .nh-arrow {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.browser-sidebar { box-shadow: var(--glass-edge); }
+.app-shell .nh-btn-primary { box-shadow: var(--glass-edge); }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-color: #000; }
+@media (prefers-reduced-transparency: reduce), (prefers-reduced-motion: reduce) {
+  .app-shell *, .nt-drawer, .menubar__list { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+}
+.no-glass .app-shell *, .no-glass .nt-drawer, .no-glass .menubar__list { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+/* Bars that sit over scrolling text stay near-opaque so the text beneath never reads through. */
+.app-shell .news-reader-bar { background: rgba(0, 0, 0, 0.9); }
+.app-shell .news-help-panel { background: rgba(10, 10, 10, 0.94); }
+
+/* Toolbar: one command row (menu, title, briefs, language, search, sync) over one scrolling row of source chips. */
+.app-shell .news-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding-top: 10px; margin-bottom: 10px !important; padding-bottom: 8px !important; }
+.app-shell .news-filter-strip { display: contents !important; }
+.app-shell .news-toolbar > .news-search-actions { order: 2; margin-left: auto; flex-wrap: nowrap !important; }
+.app-shell .news-filter-strip > :not(.news-chips) { order: 1; }
+.app-shell .news-burger { padding: 4px 9px; font-size: 15px; line-height: 1; }
+.app-shell .news-burger kbd { display: none; }
+.app-shell .news-chips { order: 3; flex: 1 0 100%; display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.app-shell .news-chips > button { flex: none; white-space: nowrap; padding: 3px 9px !important; font-size: 12px !important; gap: 6px !important; border-radius: 4px !important; }
+.app-shell .news-chips::-webkit-scrollbar { height: 4px; }
+.app-shell .news-search-actions .news-search-box { width: 220px !important; }

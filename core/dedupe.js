@@ -7,6 +7,8 @@ export function canonicalUrl(u) {
   try {
     const x = new URL(String(u || ""));
     if (!/^https?:$/.test(x.protocol)) return "";
+    // A bare site, or a search page (where the query IS the identity), says nothing about which article it is.
+    if (!x.pathname || x.pathname === "/" || /^[/]search[/]?$/.test(x.pathname)) return "";
     return (x.hostname.replace(/^www\./, "") + x.pathname.replace(/\/+$/, "")).toLowerCase();
   } catch {
     return "";

@@ -162,7 +162,39 @@ const newsdata = {
   },
 };
 
-const REGISTRY = { thenewsapi, tmdb, nasa, webz, newsapi, newsdata };
+// Event Registry: the day's biggest events, each with the number of articles covering it. That count is the
+// corroboration the alert detector wants, and it ranks "what the world is reading" better than recency does. One call
+// costs 5 of the free plan's 2,000 monthly tokens, so it is refreshed every 4 hours and capped by request count.
+const eventregistry = {
+  id: "eventregistry",
+  env: "EVENTREGISTRY_API_KEY",
+  ttlMs: 4 * 3600 * 1000,
+  cap: { period: "month", max: 250 }, // 250 calls x 5 tokens = 1,250 of the 2,000 tokens
+  async run({ key, get, now }) {
+    const since = new Date(now() - 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const d = await get("https://eventregistry.org/api/v1/event/getEvents", {}, {
+      apiKey: key, resultType: "events", eventsPage: 1, eventsCount: 30, eventsSortBy: "size", eventsSortByAsc: false,
+      lang: "eng", dateStart: since, minArticlesInEvent: 8, includeEventSummary: true, includeEventCategories: true,
+    });
+    const items = [];
+    ((d && d.events && d.events.results) || []).forEach((e, i) => {
+      const title = clean(e.title && e.title.eng);
+      if (!title || !e.totalArticleCount) return;
+      items.push({
+        title,
+        // An event has no single article address; the search for its headline lists the coverage.
+        link: `https://news.google.com/search?${new URLSearchParams({ q: title, hl: "en-US", gl: "US", ceid: "US:en" })}`,
+        source: `${e.totalArticleCount} articles`, desc: clean(e.summary && e.summary.eng),
+        thumbnail: "", reportCount: e.totalArticleCount,
+        // Ranked by coverage: stamped "now", two minutes apart in size order, so the biggest sorts first.
+        timestamp: now() - i * 120000,
+      });
+    });
+    return items;
+  },
+};
+
+const REGISTRY = { thenewsapi, tmdb, nasa, webz, newsapi, newsdata, eventregistry };
 
 // ---- shared cache, caps and the fetch wrapper ------------------------------------------------------------------
 
@@ -195,10 +227,13 @@ async function fetchProvider({ id, env = process.env, file, http = fetchSafe, no
   if (use.used >= p.cap.max) return stale;
 
   // Every request goes through here: it is counted before it is sent, and stops at the cap.
-  const get = async (url, headers = {}) => {
+  const get = async (url, headers = {}, body) => {
     if (use.used >= p.cap.max) throw new Error("cap reached");
     use.used += 1;
-    const res = await http(url, { headers: { Accept: "application/json", ...headers } }, { retries: false, timeoutMs: 15000 });
+    const init = body === undefined
+      ? { headers: { Accept: "application/json", ...headers } }
+      : { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) };
+    const res = await http(url, init, { retries: false, timeoutMs: 20000 });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   };

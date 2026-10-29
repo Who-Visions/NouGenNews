@@ -75,7 +75,8 @@ export function findAlerts(stories, { now = Date.now(), windowMs = WINDOW_MS } =
   const alerts = [];
   for (const g of groups.values()) {
     const sources = new Set(g.map((c) => sourceKey(c.s)).filter(Boolean));
-    const n = sources.size;
+    // A story that carries its own coverage count (an Event Registry event) counts as that many sources.
+    const n = Math.max(sources.size, ...g.map((c) => c.s.reportCount || 0));
     const kind = g[0].kind;
     const national = g.filter((c) => !isLocal(c.s));
     const flagged = g.some((c) => c.s.breaking);

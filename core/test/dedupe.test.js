@@ -38,3 +38,10 @@ test("order of first appearance is kept", () => {
   const out = dedupeStories([s("a", "First story about something long", "https://a.test/1"), s("b", "Second story about another thing", "https://b.test/2"), s("c", "First story about something long", "https://c.test/3")]);
   assert.deepEqual(out.map((x) => x.id), ["a", "b"]);
 });
+
+test("search-page links are not an identity: different searches are different stories", () => {
+  const a = { id: "a", title: "Big event one", link: "https://news.google.com/search?q=big+event+one", timestamp: 1 };
+  const b = { id: "b", title: "Another event two", link: "https://news.google.com/search?q=another+event+two", timestamp: 1 };
+  assert.equal(canonicalUrl(a.link), "");
+  assert.equal(dedupeStories([a, b]).length, 2);
+});

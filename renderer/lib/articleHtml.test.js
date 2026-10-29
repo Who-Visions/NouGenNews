@@ -104,3 +104,21 @@ test("dropDuplicateImages leaves text and unique pictures untouched", () => {
   const two = '<img src="https://s.test/1.jpg"><img src="https://s.test/2.jpg">';
   assert.equal(dropDuplicateImages(two, "", doc), two);
 });
+
+import { dropTrailingImages } from "./articleHtml.js";
+test("dropTrailingImages removes a captionless related-story picture at the end of the body", () => {
+  const text = "<p>Patrick Stewart, an actor known for his roles, has died at the age of 86, his family announced.</p><p>He died after a brief and poignant journey, according to a statement.</p>";
+  const out = dropTrailingImages(text + '<a href="https://x.test/related"><img src="https://s.test/mugshot.jpg"></a>', doc);
+  assert.equal(out, text);
+  const two = dropTrailingImages(text + '<p><img src="https://s.test/a.jpg"></p><figure><img src="https://s.test/b.jpg"></figure>', doc);
+  assert.equal(two, text);
+});
+test("dropTrailingImages keeps captioned pictures, pictures inside the text, and image-only pages", () => {
+  const text = "<p>A long enough paragraph of real story text that comes before the picture, easily past eighty characters in all.</p>";
+  const captioned = text + '<figure><img src="https://s.test/a.jpg"><figcaption>Sir Example in 2019 at the awards ceremony</figcaption></figure>';
+  assert.equal(dropTrailingImages(captioned, doc), captioned);
+  const inside = '<p>' + "x".repeat(100) + '</p><img src="https://s.test/a.jpg"><p>More text after the picture.</p>';
+  assert.equal(dropTrailingImages(inside, doc), inside);
+  const only = '<img src="https://s.test/a.jpg">';
+  assert.equal(dropTrailingImages(only, doc), only);
+});

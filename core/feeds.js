@@ -190,6 +190,19 @@ export const FEEDS = [
     lang: "en",
   },
   {
+    id: "events",
+    name: "Biggest stories today",
+    desc: "The day's biggest events, ranked by how many articles cover them (Event Registry)",
+    url: "@provider:eventregistry",
+    icon: "\uD83C\uDF0D",
+    badge: "Event",
+    section: "Top stories",
+    accent: "#e8b86d",
+    lang: "en",
+    wire: false, // not a news item: shown only in its own menu, kept out of All Wire
+    noFullText: true,
+  },
+  {
     id: "trending",
     name: "Trending on screen",
     desc: "Film and TV trending this week (TMDB)",
@@ -199,6 +212,7 @@ export const FEEDS = [
     section: "TV & Film",
     accent: "#e8b86d",
     lang: "en",
+    wire: false, // not a news item: shown only in its own menu, kept out of All Wire
     noFullText: true,
   },
   {
@@ -211,6 +225,7 @@ export const FEEDS = [
     section: "Tech",
     accent: "#e8b86d",
     lang: "en",
+    wire: false, // not a news item: shown only in its own menu, kept out of All Wire
     noFullText: true,
   },
 ];

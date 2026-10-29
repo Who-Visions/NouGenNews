@@ -180,3 +180,33 @@ export function dropDuplicateImages(html, leadSrc = "", doc = typeof document !=
   }
   return removed ? host.innerHTML : source;
 }
+
+// Scraped pages often end the article block with a "related story" thumbnail: a picture (usually linked) with no
+// caption, after the last paragraph. Real story pictures come before the text ends or carry a caption. This drops
+// image-only blocks from the very end of the body, as long as real text precedes them.
+export function dropTrailingImages(html, doc = typeof document !== "undefined" ? document : null) {
+  const source = String(html || "");
+  if (!doc || !source || !/<img/i.test(source)) return source;
+  const host = doc.createElement("div");
+  host.innerHTML = source;
+  const nodes = () => [...host.childNodes].filter((n) => n.nodeType === 1 || (n.nodeType === 3 && n.textContent.trim()));
+  const textBefore = (node) => {
+    let n = 0;
+    for (const c of host.childNodes) {
+      if (c === node) break;
+      n += (c.textContent || "").trim().length;
+    }
+    return n;
+  };
+  let removed = 0;
+  for (;;) {
+    const list = nodes();
+    const last = list[list.length - 1];
+    if (!last || last.nodeType !== 1 || !last.querySelector("img") && last.tagName !== "IMG") break;
+    const caption = (last.textContent || "").trim();
+    if (caption.length > 25 || textBefore(last) < 80) break;
+    last.remove();
+    removed += 1;
+  }
+  return removed ? host.innerHTML : source;
+}

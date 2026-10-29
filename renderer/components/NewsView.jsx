@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
-import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages } from "../lib/articleHtml.js";
+import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages } from "../lib/articleHtml.js";
 import { TailCarousel } from "./TailCarousel.jsx";
 import { BreakingTicker } from "./BreakingTicker.jsx";
 import { FrontSections } from "./FrontSections.jsx";
@@ -97,7 +97,7 @@ function ArticleVideos({ videos, embedPort, autoplay = false }) {
               allowFullScreen
             />
           ) : (
-            <video src={v.url} controls preload="metadata" playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+            <video src={v.url} controls preload="metadata" playsInline onError={(e) => { const box = e.currentTarget.parentElement; if (box) box.style.display = "none"; }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
           )}
         </div>
       ))}
@@ -295,12 +295,16 @@ function serpStory(it, meta) {
     id: `${meta.id}::${it.link}`, feedId: meta.id, title: it.title, link: it.link,
     timeFormatted: it.timestamp ? agoLabel(it.timestamp) : "", timestamp: it.timestamp || 0,
     desc: it.desc || "", videos: [], creator: "", categories: [], source: it.source || meta.name,
-    badge: meta.badge, accent: meta.accent, imageUrl: it.thumbnail || "", breaking: !!it.breaking,
+    badge: meta.badge, accent: meta.accent, imageUrl: it.thumbnail || "", breaking: !!it.breaking, reportCount: it.reportCount || 0,
     contentHtml: it.desc ? sanitizeArticleHtml(`<p>${String(it.desc).replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>`) : "",
     noFullText: !!meta.noFullText,
     readMins: 1, lang: "en", originalLang: "en",
   };
 }
+
+// Whether a story belongs in the main wire (some sources are shown only in their own menu: core/feeds.js `wire: false`).
+const WIRE_OFF = new Set(FEEDS.filter((f) => f.wire === false).map((f) => f.id));
+const inWire = (a) => !WIRE_OFF.has(a.feedId);
 
 // One copy of every story, however many sources carried it, then playable first and newest first.
 const mergeWire = (list) => dedupeStories(list).sort(byPlayableThenNew);
@@ -740,6 +744,7 @@ export function NewsView() {
   const searchFiltered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const kept = withLibrary.filter((a) => {
+      if ((activeFeed === "all" || activeFeed === "library") && !inWire(a)) return false;
       if (activeFeed === "library") return !!a.libraryHits?.length;
       if (activeFeed.startsWith("section:")) return FEEDS.find((f) => f.id === a.feedId)?.section === activeFeed.slice(8);
       if (activeFeed !== "all" && a.feedId !== activeFeed) return false;
@@ -824,13 +829,14 @@ export function NewsView() {
   };
 
   const feedCounts = useMemo(() => {
-    const c = { all: articles.length, library: 0 };
+    const c = { all: 0, library: 0 };
     for (const a of withLibrary) {
       c[a.feedId] = (c[a.feedId] || 0) + 1;
-      if (a.libraryHits?.length) c.library += 1;
+      if (inWire(a)) c.all += 1;
+      if (inWire(a) && a.libraryHits?.length) c.library += 1;
     }
     return c;
-  }, [articles.length, withLibrary]);
+  }, [withLibrary]);
 
   const sectionCounts = useMemo(() => {
     const c = {};
@@ -921,7 +927,7 @@ export function NewsView() {
   // Site furniture after the story becomes the footer carousel instead of part of the page.
   const tail = useMemo(() => splitTail(currentArticle?.contentHtml || ""), [currentArticle?.contentHtml]);
   // Each picture once: the lead picture and repeats inside the body are dropped from the body.
-  const articleBody = useMemo(() => dropDuplicateImages(tail.body, currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
+  const articleBody = useMemo(() => dropDuplicateImages(dropTrailingImages(tail.body), currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
 
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.scrollTop = 0;
@@ -1127,7 +1133,7 @@ export function NewsView() {
 
       {/* ─── TOP TELEMETRY & FILTER BAR ─── */}
       <BreakingAlert alert={activeAlert} onRead={readAlert} onDismiss={dismissAlert} />
-      {!mobileReading && <Masthead storyCount={articles.length} libraryCount={withLibrary.filter((a) => a.libraryHits?.length).length} ticker={(intro) => <BreakingTicker intro={intro} stories={withLibrary} terms={libraryTerms} onOpen={(a) => readStory(a)} />} />}
+      {!mobileReading && <Masthead storyCount={withLibrary.filter(inWire).length} libraryCount={withLibrary.filter((a) => inWire(a) && a.libraryHits?.length).length} ticker={(intro) => <BreakingTicker intro={intro} stories={withLibrary.filter(inWire)} terms={libraryTerms} onOpen={(a) => readStory(a)} />} />}
       <div
         className="news-toolbar"
         style={{
@@ -1303,7 +1309,7 @@ export function NewsView() {
 
       {activeFeed === "all" && !search.trim() && !mobileReading && (
         <FrontSections
-          stories={withLibrary}
+          stories={withLibrary.filter(inWire)}
           terms={libraryTerms}
           counts={sectionCounts}
           onRead={(s) => readStory(s)}

@@ -164,3 +164,25 @@ test("NewsData: two pages, top outlets asked for, UTC dates parsed, duplicates a
   assert.equal(r.items[0].timestamp, Date.UTC(2026, 9, 29, 8, 18));
   assert.equal(r.items[1].desc, "");
 });
+
+test("Event Registry: POSTs the key in the body, ranks events by coverage, keeps the article count", async () => {
+  let seen = null;
+  const http = async (url, init) => {
+    seen = { url, init };
+    return reply({ events: { results: [
+      { uri: "eng-1", title: { eng: "Big event" }, summary: { eng: "It happened." }, totalArticleCount: 375 },
+      { uri: "eng-2", title: { eng: "Second event" }, totalArticleCount: 120 },
+      { uri: "eng-3", title: {}, totalArticleCount: 99 },
+    ] } });
+  };
+  const r = await fetchProvider({ id: "eventregistry", env: { EVENTREGISTRY_API_KEY: "ER" }, file: tmp(), http, now: () => NOW });
+  assert.equal(seen.init.method, "POST");
+  assert.equal(JSON.parse(seen.init.body).apiKey, "ER");
+  assert.equal(seen.url.includes("ER"), false, "the key is in the body, not the address");
+  assert.deepEqual(r.items.map((i) => i.title), ["Big event", "Second event"]);
+  assert.equal(r.items[0].reportCount, 375);
+  assert.ok(r.items[0].timestamp > r.items[1].timestamp);
+  assert.equal(JSON.stringify(r).includes('"ER"'), false);
+  assert.equal(REGISTRY.eventregistry.cap.period, "month");
+  assert.ok(REGISTRY.eventregistry.cap.max * 5 < 2000, "stays inside the plan's tokens");
+});

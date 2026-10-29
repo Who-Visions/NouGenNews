@@ -74,3 +74,11 @@ test("red outranks amber, then more sources, then newer", () => {
   const a = findAlerts(stories, { now: NOW });
   assert.deepEqual(a.map((x) => x.level), ["red", "amber"]);
 });
+
+test("a single story that carries its own coverage count (an event of hundreds of articles) raises a red alert", () => {
+  const a = findAlerts([s("5 hundred articles", "Sir Example Person dies at 86", 20, { reportCount: 375, feedId: "events" })], { now: NOW });
+  assert.equal(a.length, 1);
+  assert.equal(a[0].level, "red");
+  assert.equal(a[0].sourceCount, 375);
+  assert.equal(findAlerts([s("small event", "Sir Example Person dies at 86", 20, { reportCount: 2, feedId: "events" })], { now: NOW }).length, 0);
+});

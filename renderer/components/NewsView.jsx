@@ -895,7 +895,7 @@ export function NewsView() {
       className={`news-view-container ${mobileReading ? "mobile-reading-active" : ""}`}
       style={{
         padding: "0 28px 12px",
-        height: "calc(100dvh - 116px)",
+        height: "100dvh",
         display: "flex",
         flexDirection: "column",
         color: TOKENS.textPrimary,
@@ -1280,7 +1280,7 @@ export function NewsView() {
         className="news-split-pane"
         style={{
           flex: "0 0 auto",
-          height: "calc(100dvh - 190px)",
+          height: "calc(100dvh - 74px)",
           display: "grid",
           gridTemplateColumns: "400px 1fr",
           gap: 18,

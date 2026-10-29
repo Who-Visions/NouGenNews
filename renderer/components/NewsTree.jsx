@@ -28,7 +28,7 @@ export function applyGlass(on) {
 }
 
 // A file-explorer style drawer: the wire, then topic folders holding their sources, then Settings.
-export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wireLang, langs, onLang }) {
+export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wireLang, langs, onLang, localLabel }) {
   const [closed, setClosed] = useState({});
   const [glass, setGlass] = useState(loadGlass);
   const [autoplay, setAutoplay] = useState(loadAutoplay);
@@ -75,6 +75,7 @@ export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wir
         <ul className="nt-tree" role="tree">
           {all && leaf(all)}
           {(counts.library ?? 0) > 0 && leaf(mine)}
+          {(counts.local ?? 0) > 0 && leaf({ id: "local", icon: "\uD83D\uDCCD", name: localLabel || "Near you" })}
           {GROUPS.map((g) => {
             const items = feeds.filter((f) => g.badges.includes(f.badge));
             if (!items.length) return null;

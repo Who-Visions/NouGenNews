@@ -48,18 +48,18 @@ async function locate(city) {
   if (!hit) throw new Error(`no place named ${c}`);
   if (typeof hit.latitude !== "number") throw new Error("place has no latitude");
   if (typeof hit.longitude !== "number") throw new Error("place has no longitude");
-  return [hit.latitude, hit.longitude, hit.name || c];
+  return [hit.latitude, hit.longitude, hit.name || c, hit.admin1 || ""];
 }
 
 async function fetchWeather(city) {
-  const [lat, lon, place] = await locate(city);
+  const [lat, lon, place, region] = await locate(city);
   const v = await getJson("https://api.open-meteo.com/v1/forecast", {
     latitude: String(lat),
     longitude: String(lon),
     current: "temperature_2m,weather_code,is_day",
     temperature_unit: "fahrenheit",
   });
-  return parseForecast(v, place);
+  return { ...parseForecast(v, place), region };
 }
 
 async function homeWeather({ city }) {

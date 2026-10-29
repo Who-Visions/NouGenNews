@@ -12,6 +12,8 @@ import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
 import { scoreStory } from "../../core/edition.js";
+import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
+import { loadCity } from "./CornerClock.jsx";
 import "./NewsView.css";
 import {
   articleLang,
@@ -274,12 +276,15 @@ function estimateReadingMinutes(htmlOrText) {
   return Math.max(1, Math.round(words / 200));
 }
 
+// Stories the app can play first, then newest first.
+const byPlayableThenNew = (a, b) => ((b.videos?.length ? 1 : 0) - (a.videos?.length ? 1 : 0)) || (b.timestamp || 0) - (a.timestamp || 0);
+
 function parseFeedXml(xml, feedMeta) {
   const items = [];
   const itemMatches = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
 
   for (const item of itemMatches) {
-    const title = cleanPlainText((item.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || "");
+    const rawTitle = cleanPlainText((item.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || "");
     const link = cleanPlainText((item.match(/<link>([\s\S]*?)<\/link>/i) || [])[1] || "");
     const guid = cleanPlainText((item.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i) || [])[1] || link);
     const dateRaw = cleanPlainText((item.match(/<pubDate>([\s\S]*?)<\/pubDate>/i) || [])[1] || "");
@@ -294,9 +299,11 @@ function parseFeedXml(xml, feedMeta) {
       if (c && categories.length < 3) categories.push(c);
     }
 
-    const descPlain = cleanPlainText(descRaw).replace(/The post .* first appeared on .*/i, "");
+    const publisher = feedMeta.id === LOCAL_ID ? cleanPlainText((item.match(/<source[^>]*>([\s\S]*?)<\/source>/i) || [])[1] || "") : "";
+    const title = stripPublisher(rawTitle, publisher);
+    const descPlain = feedMeta.id === LOCAL_ID ? "" : cleanPlainText(descRaw).replace(/The post .* first appeared on .*/i, "");
     const videos = findVideos(item);
-    const contentHtml = sanitizeArticleHtml(encodedRaw || descRaw);
+    const contentHtml = feedMeta.id === LOCAL_ID ? "" : sanitizeArticleHtml(encodedRaw || descRaw);
     const initialImage = extractXmlImage(item);
     if (initialImage && link) imageLRU.set(link, initialImage);
 
@@ -333,7 +340,7 @@ function parseFeedXml(xml, feedMeta) {
         videos,
         creator,
         categories,
-        source: feedMeta.name,
+        source: publisher || feedMeta.name,
         badge: feedMeta.badge,
         accent: feedMeta.accent,
         imageUrl: initialImage,
@@ -473,7 +480,7 @@ export function NewsView() {
     invoke("library_titles").then((r) => setRawTerms(extractTerms(r?.titles))).catch(() => {});
   }, []);
   useEffect(() => {
-    const open = () => { if (currentArticleRef.current?.link) openInApp(currentArticleRef.current.link); };
+    const open = () => { openStory(currentArticleRef.current); };
     window.addEventListener("nn:browse-current", open);
     return () => window.removeEventListener("nn:browse-current", open);
   }, []);
@@ -542,13 +549,45 @@ export function NewsView() {
 
   const speaking = speech.status !== "idle";
 
+  // Near you: the feed for the reader's city (with its state, from the weather lookup), kept apart from the
+  // fixed sources so a city change reloads only these stories.
+  const localRef = useRef([]);
+  const placeRef = useRef("");
+  const [city, setCity] = useState(loadCity);
+  const [place, setPlace] = useState("");
+  const loadLocal = useCallback(async (query) => {
+    if (!query) return;
+    const meta = { ...FEEDS.find((x) => x.id === LOCAL_ID), url: localFeedUrl(query) };
+    try {
+      const raw = await invoke("rss_raw_fetch", { feedUrl: meta.url });
+      const items = parseFeedXml(typeof raw === "string" ? raw : raw?.xml || "", meta).slice(0, 30);
+      localRef.current = items;
+      setArticles((prev) => prev.filter((a) => a.feedId !== LOCAL_ID).concat(items).sort(byPlayableThenNew));
+      setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: true, count: items.length } }));
+    } catch (e) {
+      setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: false, error: e?.message || "Failed" } }));
+    }
+  }, []);
+  useEffect(() => {
+    const on = () => setCity(loadCity());
+    window.addEventListener("nn:city", on);
+    return () => window.removeEventListener("nn:city", on);
+  }, []);
+  useEffect(() => {
+    if (!city) return undefined;
+    let live = true;
+    const use = (q) => { if (!live) return; placeRef.current = q; setPlace(q); loadLocal(q); };
+    invoke("weather", { city }).then((w) => use(localQuery(w?.place || city, w?.region))).catch(() => use(city));
+    return () => { live = false; };
+  }, [city, loadLocal]);
+
   const fetchAllFeeds = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
     setLoading(true);
-    const activeTargets = FEEDS.filter((f) => f.url);
+    const activeTargets = FEEDS.filter((f) => f.url && f.url !== "@local");
     const healthMap = {};
 
     try {
@@ -591,9 +630,10 @@ export function NewsView() {
       });
 
       // Stories the app can play come first, then newest first.
-      aggregated.sort((a, b) => ((b.videos?.length ? 1 : 0) - (a.videos?.length ? 1 : 0)) || (b.timestamp || 0) - (a.timestamp || 0));
+      aggregated = aggregated.concat(localRef.current).sort(byPlayableThenNew);
       setFeedHealth(healthMap);
       setArticles(aggregated);
+      if (placeRef.current) loadLocal(placeRef.current);
       setSelectedArticleId((prev) => prev || aggregated[0]?.id || null);
       setLastUpdated(
         new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -718,7 +758,7 @@ export function NewsView() {
   const [fetchingFull, setFetchingFull] = useState(false);
   useEffect(() => {
     const a = rawCurrentArticle;
-    if (!a || a.full || !a.link) return undefined;
+    if (!a || a.full || !a.link || a.feedId === LOCAL_ID) return undefined;
     let live = true;
     setFetchingFull(true);
     invoke("article_fetch", { url: a.link })
@@ -786,8 +826,14 @@ export function NewsView() {
 
   // Keyboard: J/K or arrows step the wire, Enter opens the story, / searches, 1-9 pick a topic, Space and
   // Left/Right drive the hero, L listens, T cycles translation, R syncs, ? shows this list, Esc backs out.
+  const openStory = useCallback((a) => {
+    if (!a?.link) return;
+    if (a.feedId !== LOCAL_ID) { openInApp(a.link); return; }
+    invoke("resolve_story_url", { url: a.link }).then((u) => openInApp(u || a.link)).catch(() => openInApp(a.link));
+  }, []);
   const readStory = useCallback((a) => {
     if (!a) return;
+    if (a.feedId === LOCAL_ID) { openStory(a); return; }
     speechRef.current?.stop();
     setArticleLangOverride(null);
     setSelectedArticleId(a.id);
@@ -871,6 +917,7 @@ export function NewsView() {
         onClose={() => setMenuOpen(false)}
         feeds={FEEDS}
         counts={feedCounts}
+        localLabel={place.split(",")[0]}
         activeFeed={activeFeed}
         onPick={setActiveFeed}
         wireLang={wireLang}
@@ -1063,7 +1110,7 @@ export function NewsView() {
           )}
 
 
-          <SourceMenus feeds={FEEDS} counts={feedCounts} activeFeed={activeFeed} onPick={setActiveFeed} />
+          <SourceMenus feeds={FEEDS} counts={feedCounts} activeFeed={activeFeed} onPick={setActiveFeed} localLabel={place.split(",")[0]} />
         </div>
 
         {/* Search, Dynamic Translate & Action Controls */}
@@ -1441,7 +1488,7 @@ export function NewsView() {
 
                   <a
                     href={currentArticle.link}
-                    onClick={(e) => { e.preventDefault(); openInApp(currentArticle.link); }}
+                    onClick={(e) => { e.preventDefault(); openStory(currentArticle); }}
                     style={{
                       color: TOKENS.textSecondary,
                       fontSize: 12,
@@ -1540,7 +1587,7 @@ export function NewsView() {
                   const i = TRANSLATE_LANGS.findIndex((l) => l.code === effectiveArticleLang);
                   setArticleLangOverride(TRANSLATE_LANGS[(i + 1) % TRANSLATE_LANGS.length].code);
                 }}>Translate <kbd>T</kbd></button>
-                <button type="button" className="nh-btn" onClick={() => openInApp(currentArticle.link)}>Open source in app</button>
+                <button type="button" className="nh-btn" onClick={() => openStory(currentArticle)}>Open source in app</button>
                 <span className="spacer" />
                 {tail.items.length ? <TailCarousel items={tail.items} onOpen={openInApp} /> : <span className="mono">J next · K prev · Esc back</span>}
               </div>

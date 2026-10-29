@@ -7,6 +7,8 @@ const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
+  // The real article address behind a Google News link, so the side browser opens the publisher's page.
+  resolve_story_url: (args = {}) => require("./gnews").resolveStoryUrl(String(args.url || "")),
   // Opens the Windows cast flyout so the whole window can be mirrored to a TV (electron/cast.js).
   cast_screen: () => require("./cast").castScreen(),
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80) }),

@@ -3,14 +3,14 @@ import "./SourceMenus.css";
 
 // The source strip as dropdowns: All Wire and In your library, then one menu per print section holding
 // its sources. Clicking a section's name shows the whole section; the caret opens the list.
-export function SourceMenus({ feeds, counts, activeFeed, onPick }) {
+export function SourceMenus({ feeds, counts, activeFeed, onPick, localLabel }) {
   const [open, setOpen] = useState(null);
   const ref = useRef(null);
 
   const sections = useMemo(() => {
     const map = new Map();
     for (const f of feeds) {
-      if (f.id === "all" || !f.section) continue;
+      if (f.id === "all" || f.id === "local" || !f.section) continue;
       if (!map.has(f.section)) map.set(f.section, []);
       map.get(f.section).push(f);
     }
@@ -38,6 +38,11 @@ export function SourceMenus({ feeds, counts, activeFeed, onPick }) {
       {(counts.library ?? 0) > 0 && (
         <button type="button" title="Stories about titles in your library" className={`sm__btn${activeFeed === "library" ? " is-active" : ""}`} onClick={() => pick("library")}>
           <span className="sm__heart" aria-hidden="true">&#9829;</span> Library <span className="sm__n mono">{counts.library}</span>
+        </button>
+      )}
+      {(counts.local ?? 0) > 0 && (
+        <button type="button" title="News about your city (change it in Settings)" className={`sm__btn${activeFeed === "local" ? " is-active" : ""}`} onClick={() => pick("local")}>
+          <span aria-hidden="true">&#128205;</span> {localLabel || "Near you"} <span className="sm__n mono">{counts.local}</span>
         </button>
       )}
       {sections.map(([name, items], i) => (

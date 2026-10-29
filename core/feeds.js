@@ -133,4 +133,15 @@ export const FEEDS = [
     accent: "#e8b86d",
     lang: "en",
   },
+  {
+    id: "local",
+    name: "Near you",
+    desc: "News about your city (set the city in Settings)",
+    url: "@local", // resolved from the city setting at run time (core/local.js)
+    icon: "\uD83D\uDCCD",
+    badge: "Local",
+    section: "Near you",
+    accent: "#e8b86d",
+    lang: "en",
+  },
 ];

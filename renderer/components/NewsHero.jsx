@@ -4,6 +4,7 @@
 // video plays. Left/Right arrows step it; the parent owns the rest of the keyboard.
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { HeroScroller } from "./HeroScroller.jsx";
+import { HeroTitle } from "./HeroTitle.jsx";
 
 const DWELL_MS = 16000;
 
@@ -97,7 +98,7 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
           <span>{item.readMins} min read</span>
           <span className="nh-count">{safe + 1} / {count}</span>
         </div>
-        <h2 className="nh-title">{item.title}</h2>
+        <HeroTitle title={item.title} key={item.id} />
         {item.desc ? <HeroScroller text={heroText(item)} resetKey={item.id} /> : null}
         {item.creator ? <p className="nh-byline">By {item.creator}</p> : null}
         <div className="nh-actions">

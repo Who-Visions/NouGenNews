@@ -82,11 +82,15 @@ function findVideos(text) {
 }
 
 // The story's videos, played in the app: YouTube through the loopback embed page (electron/embed.js), files directly.
-function ArticleVideos({ videos, embedPort, autoplay = false }) {
-  if (!videos || !videos.length) return null;
+function ArticleVideos({ videos, embedPort, autoplay = false, fallback = null }) {
+  const [failed, setFailed] = useState(() => new Set());
+  if (!videos || !videos.length) return fallback;
+  const shown = videos.slice(0, 3);
+  // Every player failed (a stream this app cannot play): show the story's picture instead of nothing.
+  if (shown.every((v) => failed.has(v.id || v.url))) return fallback;
   return (
     <div className="article-videos" style={{ display: "grid", gap: 12, marginBottom: 18 }}>
-      {videos.slice(0, 3).map((v) => (
+      {shown.filter((v) => !failed.has(v.id || v.url)).map((v) => (
         <div key={v.id || v.url} style={{ position: "relative", aspectRatio: "16 / 9", background: "#000", borderRadius: TOKENS.radiusLg, overflow: "hidden" }}>
           {v.kind === "youtube" ? (
             <iframe
@@ -97,7 +101,7 @@ function ArticleVideos({ videos, embedPort, autoplay = false }) {
               allowFullScreen
             />
           ) : (
-            <video src={v.url} controls preload="metadata" playsInline onError={(e) => { const box = e.currentTarget.parentElement; if (box) box.style.display = "none"; }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+            <video src={v.url} controls preload="metadata" playsInline onError={() => setFailed((p) => new Set(p).add(v.id || v.url))} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
           )}
         </div>
       ))}
@@ -1670,7 +1674,7 @@ export function NewsView() {
               )}
 
               {currentArticle.videos?.length ? (
-                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} />
+                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />
               ) : (
                 /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
                 <LowCacheThumb article={currentArticle} size="lg" priority={true} />

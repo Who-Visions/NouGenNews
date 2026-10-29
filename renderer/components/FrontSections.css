@@ -8,7 +8,7 @@
 .fs__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
 .fs__card { display: flex; flex-direction: column; gap: 8px; padding: 12px; text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--nn-panel, rgba(255, 255, 255, 0.05)); border: 1px solid var(--nn-line, rgba(255, 255, 255, 0.12)); border-radius: 4px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14); }
 .fs__card:hover { background: var(--nn-hover, rgba(255, 255, 255, 0.13)); }
-.fs__card img, .fs__noimg { width: 100%; aspect-ratio: 16 / 9; max-height: 230px; object-fit: cover; border-radius: 3px; background: #0a0a0a; display: block; }
+.fs__card img, .fs__noimg { width: 100%; aspect-ratio: 16 / 9; max-height: 230px; object-fit: cover; object-position: 50% 28%; border-radius: 3px; background: #0a0a0a; display: block; }
 .fs__meta { display: flex; gap: 10px; align-items: center; font: 600 10px/1 var(--font-mono, Consolas, monospace); letter-spacing: 0.06em; text-transform: uppercase; color: var(--nn-dim, #8f8a80); }
 .fs__meta b { color: var(--nn-accent, #e8b86d); }
 .fs__meta em { margin-left: auto; font-style: normal; color: var(--nn-accent, #e8b86d); }

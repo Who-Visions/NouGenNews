@@ -30,6 +30,28 @@ export function optimizeLowCacheUrl(rawUrl, width = 760) {
   }
 }
 
+// A picture for a spot that shows it at `width` CSS pixels. WordPress hosts hand out size variants
+// ("photo-150x150.jpg"); the suffix is dropped to get the full original, then the CDN is asked for twice the
+// width (a crisp image on a dense screen) instead of stretching a thumbnail. Other hosts are left as given.
+export function hiResUrl(rawUrl, width = 700) {
+  if (!rawUrl) return "";
+  try {
+    const u = new URL(String(rawUrl).replace(/&amp;/g, "&").trim());
+    if (!/^https?:$/.test(u.protocol)) return String(rawUrl);
+    const wp = u.hostname.endsWith("wp.com") || u.pathname.includes("/wp-content/uploads/");
+    if (!wp) return u.toString();
+    u.pathname = u.pathname.replace(/-\d{2,4}x\d{2,4}(\.[A-Za-z0-9]+)$/, "$1");
+    u.searchParams.delete("resize");
+    u.searchParams.delete("fit");
+    u.searchParams.set("w", String(Math.round(width * 2)));
+    u.searchParams.set("strip", "all");
+    u.searchParams.set("quality", "85");
+    return u.toString();
+  } catch {
+    return String(rawUrl);
+  }
+}
+
 export function makeSanitizer(win) {
   const purify = DOMPurify(win);
   purify.addHook("afterSanitizeAttributes", (node) => {

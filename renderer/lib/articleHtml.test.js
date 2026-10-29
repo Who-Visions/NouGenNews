@@ -67,3 +67,17 @@ test("splitTail ignores a tail-looking heading at the very top and non-web links
   const { items } = splitTail('<p>a</p><h2>More</h2><a href="javascript:alert(1)">bad</a>', doc);
   assert.equal(items.length, 0);
 });
+
+import { hiResUrl } from "./articleHtml.js";
+test("hiResUrl drops WordPress size suffixes and asks the CDN for twice the width", () => {
+  const out = new URL(hiResUrl("https://i0.wp.com/site.test/wp-content/uploads/2026/10/photo-150x150.jpg?resize=150%2C150&w=760&strip=all&quality=75", 340));
+  assert.equal(out.pathname, "/site.test/wp-content/uploads/2026/10/photo.jpg");
+  assert.equal(out.searchParams.get("w"), "680");
+  assert.equal(out.searchParams.get("quality"), "85");
+  assert.equal(out.searchParams.has("resize"), false);
+});
+test("hiResUrl leaves other hosts and bad input alone", () => {
+  assert.equal(hiResUrl("https://cdn.test/a-150x150.jpg"), "https://cdn.test/a-150x150.jpg");
+  assert.equal(hiResUrl(""), "");
+  assert.equal(hiResUrl("javascript:alert(1)"), "javascript:alert(1)");
+});

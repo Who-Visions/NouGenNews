@@ -6,7 +6,7 @@
   animation: tail-in 220ms ease-out;
 }
 .tail__item:hover { background: var(--nn-hover, rgba(255, 255, 255, 0.13)); }
-.tail__item img { width: 52px; height: 28px; object-fit: cover; border-radius: 3px; flex: none; }
+.tail__item img { width: 52px; height: 28px; object-fit: cover; object-position: 50% 28%; border-radius: 3px; flex: none; }
 .tail__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tail__step { flex: none; width: 22px; height: 28px; font-size: 16px; line-height: 1; color: var(--nn-muted, #bdb8ad); background: transparent; border: 0; cursor: pointer; }
 .tail__step:hover { color: var(--nn-accent, #e8b86d); }
@@ -23,7 +23,7 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 12px 32px rgba(0, 0, 0, 0.7);
   animation: tail-in 160ms ease-out; pointer-events: none;
 }
-.tail__cardimg { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.tail__cardimg { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: 50% 28%; display: block; background: #050505; }
 .tail__cardbody { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; white-space: normal; }
 .tail__cardbody b { font-size: 14px; line-height: 1.3; color: var(--nn-text, #f2eee6); }
 .tail__cardbody p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--nn-muted, #bdb8ad); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }

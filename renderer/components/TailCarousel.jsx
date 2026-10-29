@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
+import { hiResUrl } from "../lib/articleHtml.js";
 import "./TailCarousel.css";
 
 // A short brief for a promo, from the first paragraphs of its page. Fetched once on hover and kept.
@@ -15,6 +16,12 @@ async function loadBrief(url) {
     .catch(() => ({ text: "" }));
   briefs.set(url, p);
   return p;
+}
+// A promo picture at the sharpest size its host can give; if that fails, the original src.
+function Pic({ src, width, className }) {
+  const [url, setUrl] = useState(() => hiResUrl(src, width));
+  useEffect(() => { setUrl(hiResUrl(src, width)); }, [src, width]);
+  return <img className={className} src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => { if (url !== src) setUrl(src); }} />;
 }
 const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
 
@@ -56,12 +63,12 @@ export function TailCarousel({ items, onOpen, intervalMs = 6500 }) {
       {count > 1 && <button type="button" className="tail__step" onClick={() => step(-1)} aria-label="Previous">&#8249;</button>}
       <div className="tail__slot" onMouseEnter={showCard} onMouseLeave={hideCard}>
         <button type="button" key={it.href} className="tail__item" onClick={() => onOpen(it.href)} title={it.title} aria-describedby={open ? "tail-card" : undefined}>
-          {it.img ? <img src={it.img} alt="" loading="lazy" referrerPolicy="no-referrer" /> : null}
+          {it.img ? <Pic src={it.img} width={56} /> : null}
           <span className="tail__title">{it.title}</span>
         </button>
         {open && (
           <div className="tail__card" id="tail-card" role="tooltip">
-            {it.img ? <img className="tail__cardimg" src={it.img} alt="" referrerPolicy="no-referrer" /> : null}
+            {it.img ? <Pic className="tail__cardimg" src={it.img} width={340} /> : null}
             <div className="tail__cardbody">
               <b>{it.title}</b>
               <p>{open.loading ? "Loading a preview\u2026" : open.text || "No preview available. Click to open it."}</p>

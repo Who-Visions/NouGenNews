@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
 import { CornerClock } from "./CornerClock.jsx";
+import { CastButton } from "./CastButton.jsx";
 import "./MenuBar.css";
 
 // Each item presses the key the news view already listens for, so menu and keyboard never drift apart.
@@ -13,6 +14,7 @@ const MENUS = [
     { label: "Open source in app", keys: "", run: browse },
     { label: "Sync feeds", keys: "R", run: press("r") },
     { sep: true },
+    { label: "Cast screen to a TV\u2026", keys: "", run: () => window.dispatchEvent(new CustomEvent("nn:cast")) },
     { label: "Restart app", keys: "", run: () => invoke("restart") },
     { label: "Exit", keys: "", run: () => invoke("quit").catch(() => window.close()) },
   ] },
@@ -85,6 +87,7 @@ export function MenuBar() {
         </div>
       ))}
       <CornerClock />
+      <CastButton />
       <button type="button" className="menubar__restart" title="Restart the app" onClick={() => invoke("restart")}>&#8635; Restart</button>
     </div>
   );

@@ -7,6 +7,8 @@ const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
+  // Opens the Windows cast flyout so the whole window can be mirrored to a TV (electron/cast.js).
+  cast_screen: () => require("./cast").castScreen(),
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80) }),
   // Titles the reader owns (NouGenFlix library), for lifting related stories. Read-only.
   library_titles: () => require("./library").libraryTitles(app),

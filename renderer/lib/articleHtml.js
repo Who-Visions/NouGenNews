@@ -251,3 +251,25 @@ export function stripImages(html, doc = typeof document !== "undefined" ? docume
   }
   return host.innerHTML;
 }
+
+// Ad slots leave their label behind ("Advertisement", repeated once per slot) when the ad itself does not load. A
+// block whose only text is such labels is not story, so it is removed; blocks that carry a picture are left alone.
+const AD_LABELS = /^(?:(?:advertisement|advertising|sponsored(?: content)?|story continues(?: below)?|scroll to continue(?: reading)?|continue reading below)[\s:.—-]*)+$/i;
+// Short blocks that are the page's own controls, not the story: a comment count, a copy-link confirmation, a share or
+// follow prompt.
+const PAGE_CHROME = /\bcomments?\s*\(\d+\)|\bcopied!|\bleave a comment\b|\bshare (?:this|on|via)\b|\bfollow us on\b/i;
+export function dropAdLabels(html, doc = typeof document !== "undefined" ? document : null) {
+  const source = String(html || "");
+  if (!doc || !source || !(/advertis|sponsored|continues|scroll to continue|continue reading/i.test(source) || PAGE_CHROME.test(source))) return source;
+  const host = doc.createElement("div");
+  host.innerHTML = source;
+  let removed = 0;
+  for (const el of [...host.querySelectorAll("p, div, span, aside, li, h2, h3, h4, section")]) {
+    if (!host.contains(el) || el.querySelector("video")) continue;
+    const text = (el.textContent || "").trim();
+    const media = !!el.querySelector("img");
+    // A byline block keeps its small avatar in the same element; only an ad label must be free of pictures.
+    if ((!media && AD_LABELS.test(text)) || (text.length < 160 && PAGE_CHROME.test(text))) { el.remove(); removed += 1; }
+  }
+  return removed ? host.innerHTML : source;
+}

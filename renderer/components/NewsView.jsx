@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
-import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, stripImages } from "../lib/articleHtml.js";
+import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, stripImages, dropAdLabels } from "../lib/articleHtml.js";
 import { TailCarousel } from "./TailCarousel.jsx";
 import { BreakingTicker } from "./BreakingTicker.jsx";
 import { FrontSections } from "./FrontSections.jsx";
@@ -966,10 +966,10 @@ export function NewsView() {
   // Site furniture after the story becomes the footer carousel instead of part of the page.
   const tail = useMemo(() => splitTail(currentArticle?.contentHtml || ""), [currentArticle?.contentHtml]);
   // Each picture once: the lead picture and repeats inside the body are dropped from the body.
-  const articleBody = useMemo(() => dropDuplicateImages(dropTrailingImages(tail.body), currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
+  const articleBody = useMemo(() => dropDuplicateImages(dropTrailingImages(dropAdLabels(tail.body)), currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
   // With room beside the article, its videos dock to the right instead of sitting in the text.
   const wideEnough = useWide(1500);
-  // The lead picture stays above the story, so the carousel holds the pictures from the body.
+  // The main picture under the headline always stays; the carousel holds the pictures from the body.
   const photos = useMemo(() => collectPhotos(articleBody), [articleBody]);
   const docked = wideEnough && (!!currentArticle?.videos?.length || photos.length > 1);
   const shownBody = useMemo(() => (docked && photos.length > 1 ? stripImages(articleBody) : articleBody), [docked, photos.length, articleBody]);

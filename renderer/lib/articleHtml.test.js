@@ -138,3 +138,17 @@ test("stripImages removes pictures and the wrappers that held only them", async 
   const out = stripImages('<p>keep</p><figure><img src="https://x.test/a.jpg"></figure><p><a href="https://x.test"><img src="https://x.test/b.jpg"></a></p><p>also keep</p>', doc);
   assert.equal(out, "<p>keep</p><p>also keep</p>");
 });
+
+test("dropAdLabels removes blocks that hold only leftover ad labels", async () => {
+  const { dropAdLabels } = await import("./articleHtml.js");
+  const doc = new JSDOM("").window.document;
+  const out = dropAdLabels("<p>Story text.</p><p>AdvertisementAdvertisementAdvertisement</p><div><span>Advertisement</span><span>Advertisement</span></div><p>The advertisement industry grew.</p>", doc);
+  assert.equal(out, "<p>Story text.</p><p>The advertisement industry grew.</p>");
+});
+
+test("dropAdLabels also removes short page-control blocks (comment count, copied, share prompt)", async () => {
+  const { dropAdLabels } = await import("./articleHtml.js");
+  const doc = new JSDOM("").window.document;
+  const out = dropAdLabels("<p>By Sam Published October 29, 2026 | Comments (29) | Copied!</p><p>Share this story</p><p>He said the comments (29 of them) were fair and the report ran long enough to count as a real paragraph of story text here.</p>", doc);
+  assert.equal(out, "<p>He said the comments (29 of them) were fair and the report ran long enough to count as a real paragraph of story text here.</p>");
+});

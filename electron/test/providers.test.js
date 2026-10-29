@@ -186,3 +186,15 @@ test("Event Registry: POSTs the key in the body, ranks events by coverage, keeps
   assert.equal(REGISTRY.eventregistry.cap.period, "month");
   assert.ok(REGISTRY.eventregistry.cap.max * 5 < 2000, "stays inside the plan's tokens");
 });
+
+test("a relaunch refetches a cache older than the launch window once, then trusts the normal window", async () => {
+  const file = tmp();
+  let n = 0;
+  const registry = { launchprobe: { id: "launchprobe", env: "K", ttlMs: 6 * 3600 * 1000, cap: { period: "day", max: 100 }, async run() { n += 1; return [{ title: "t", link: "https://x.test/" + n }]; } } };
+  fs.writeFileSync(file, JSON.stringify({ entries: { launchprobe: { at: NOW - 30 * 60 * 1000, items: [{ title: "old", link: "https://x.test/old" }] } }, usage: {} }));
+  const first = await fetchProvider({ id: "launchprobe", env: { K: "k" }, file, now: () => NOW, registry });
+  assert.equal(first.items[0].link, "https://x.test/1");
+  const second = await fetchProvider({ id: "launchprobe", env: { K: "k" }, file, now: () => NOW + 60000, registry });
+  assert.equal(second.cached, true);
+  assert.equal(n, 1);
+});

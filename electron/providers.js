@@ -229,6 +229,10 @@ function save(file, data) {
   try { fs.writeFileSync(file, JSON.stringify(data)); } catch { /* a cache that cannot be written only costs a request */ }
 }
 
+// Providers read since this process started (a relaunch refreshes each one once, see fetchProvider).
+const launched = new Set();
+const LAUNCH_FRESH_MS = 10 * 60 * 1000;
+
 // { items, cached, stale } or null. Never throws; never returns the key.
 async function fetchProvider({ id, env = process.env, file, http = fetchSafe, now = Date.now, registry = REGISTRY }) {
   const p = registry[id];
@@ -239,12 +243,17 @@ async function fetchProvider({ id, env = process.env, file, http = fetchSafe, no
   data.usage = data.usage || {};
   const hit = data.entries[id];
   const stale = hit ? { items: hit.items, cached: true, stale: true } : null;
-  if (hit && t - hit.at < p.ttlMs) return { items: hit.items, cached: true };
+  const pk = periodKey(p.cap.period, t);
+  const use = data.usage[id] && data.usage[id].period === pk ? data.usage[id] : { period: pk, used: 0 };
+  // The first read after the app starts is judged against a short freshness window, so a relaunch never opens on
+  // hours-old stories; a provider that has used more than half of its allowance keeps its normal window.
+  const firstRead = !launched.has(id);
+  launched.add(id);
+  const fresh = firstRead && use.used < p.cap.max / 2 ? Math.min(p.ttlMs, LAUNCH_FRESH_MS) : p.ttlMs;
+  if (hit && t - hit.at < fresh) return { items: hit.items, cached: true };
   const key = env[p.env] || "";
   if (!key) return stale;
 
-  const pk = periodKey(p.cap.period, t);
-  const use = data.usage[id] && data.usage[id].period === pk ? data.usage[id] : { period: pk, used: 0 };
   data.usage[id] = use;
   if (use.used >= p.cap.max) return stale;
 

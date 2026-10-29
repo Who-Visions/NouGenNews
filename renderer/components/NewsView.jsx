@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
-import { optimizeLowCacheUrl, sanitizeArticleHtml } from "../lib/articleHtml.js";
+import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail } from "../lib/articleHtml.js";
+import { TailCarousel } from "./TailCarousel.jsx";
 import { NewsHero } from "./NewsHero.jsx";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
@@ -723,6 +724,8 @@ export function NewsView() {
     return wireTranslatedMap[`${rawCurrentArticle.id}::${effectiveArticleLang}`] || rawCurrentArticle;
   }, [rawCurrentArticle, effectiveArticleLang, articleTranslation, wireTranslatedMap]);
   currentArticleRef.current = currentArticle;
+  // Site furniture after the story becomes the footer carousel instead of part of the page.
+  const tail = useMemo(() => splitTail(currentArticle?.contentHtml || ""), [currentArticle?.contentHtml]);
 
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.scrollTop = 0;
@@ -1570,7 +1573,7 @@ export function NewsView() {
                   e.preventDefault();
                   openInApp(a.getAttribute("href"));
                 }}
-                dangerouslySetInnerHTML={{ __html: currentArticle.contentHtml }}
+                dangerouslySetInnerHTML={{ __html: tail.body }}
               />
               <div className="news-reader-bar">
                 <button type="button" className="nh-btn" onClick={() => listenTo(currentArticle)}>
@@ -1582,7 +1585,7 @@ export function NewsView() {
                 }}>Translate <kbd>T</kbd></button>
                 <button type="button" className="nh-btn" onClick={() => openInApp(currentArticle.link)}>Open source in app</button>
                 <span className="spacer" />
-                <span className="mono">J next · K prev · Esc back</span>
+                {tail.items.length ? <TailCarousel items={tail.items} onOpen={openInApp} /> : <span className="mono">J next · K prev · Esc back</span>}
               </div>
             </article>
           ) : (

@@ -22,26 +22,25 @@ body, .app-shell { background: #000; }
   background: #000;
 }
 .app-shell .news-toolbar { background: #000; box-shadow: 0 1px 0 var(--line); }
-.app-shell .news-feed-list > *,
-.app-shell .news-article-canvas,
-.app-shell .news-help-panel,
-.app-shell .news-reader-bar,
-.app-shell .news-hero,
-.app-shell .nh-thumb,
-.app-shell .nh-btn,
-.app-shell .nh-arrow,
-.browser-sidebar {
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+/* Refracting glass is kept to a few surfaces (hero, reader bar, menus, drawer). The displacement is only on surfaces that open
+   on demand (menu, drawer, help). The 363 list cards and every button stay flat translucent: a backdrop filter on each would cost scroll speed for nothing. */
+.app-shell .news-help-panel {
+  backdrop-filter: url(#nn-liquid) blur(10px) saturate(160%);
+  -webkit-backdrop-filter: url(#nn-liquid) blur(10px) saturate(160%);
   box-shadow: var(--glass-edge);
 }
-.app-shell .news-help-panel { background: rgba(20, 20, 20, 0.6); }
+/* Always-on surfaces use plain blur: the displacement filter re-runs every scroll frame (measured ~5x slower p95). */
+.app-shell .news-hero, .app-shell .news-reader-bar { box-shadow: var(--glass-edge); }
+.app-shell .news-feed-list > *, .app-shell .news-article-canvas, .app-shell .nh-thumb, .app-shell .nh-btn, .app-shell .nh-arrow {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.browser-sidebar { box-shadow: var(--glass-edge); }
 .app-shell .nh-btn-primary { box-shadow: var(--glass-edge); }
 ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-color: #000; }
-@media (prefers-reduced-transparency: reduce) {
-  .app-shell * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+@media (prefers-reduced-transparency: reduce), (prefers-reduced-motion: reduce) {
+  .app-shell *, .nt-drawer, .menubar__list { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 }
-.no-glass .app-shell * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.no-glass .app-shell *, .no-glass .nt-drawer, .no-glass .menubar__list { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 /* Bars that sit over scrolling text stay near-opaque so the text beneath never reads through. */
 .app-shell .news-reader-bar { background: rgba(0, 0, 0, 0.9); }
 .app-shell .news-help-panel { background: rgba(10, 10, 10, 0.94); }

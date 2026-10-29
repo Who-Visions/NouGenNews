@@ -7,6 +7,7 @@ const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
+  restart: () => { app.relaunch(); app.exit(0); },
   // The whole story behind a headline, with the videos the page carries (electron/article.js).
   article_fetch: (args = {}) => require("./article").articleFetch(args.url || ""),
   // Feeds are fetched here because a page cannot read another site's feed (CORS). Public https only.

@@ -12,6 +12,7 @@ const MENUS = [
     { label: "Open source in app", keys: "", run: browse },
     { label: "Sync feeds", keys: "R", run: press("r") },
     { sep: true },
+    { label: "Restart app", keys: "", run: () => invoke("restart") },
     { label: "Exit", keys: "", run: () => invoke("quit").catch(() => window.close()) },
   ] },
   { name: "View", items: [
@@ -82,6 +83,7 @@ export function MenuBar() {
           )}
         </div>
       ))}
+      <button type="button" className="menubar__restart" title="Restart the app" onClick={() => invoke("restart")}>&#8635; Restart</button>
     </div>
   );
 }

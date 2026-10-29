@@ -666,6 +666,22 @@ export function NewsView() {
     return searchFiltered.map((a) => wireTranslatedMap[`${a.id}::${wireLang}`] || a);
   }, [searchFiltered, wireLang, wireTranslatedMap]);
 
+  // The story pane fills exactly what the sticky toolbar and the key bar leave: both are measured, not guessed.
+  useEffect(() => {
+    const root = document.querySelector(".news-view-container");
+    const tb = root?.querySelector(".news-toolbar");
+    const kb = root?.querySelector(".news-keys");
+    if (!root || !tb || !kb) return undefined;
+    const apply = () => {
+      root.style.setProperty("--tb", `${Math.round(tb.getBoundingClientRect().height + 10)}px`);
+      root.style.setProperty("--kb", `${Math.round(kb.getBoundingClientRect().height + 14)}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(tb); ro.observe(kb);
+    return () => ro.disconnect();
+  }, [mobileReading]);
+
   const feedCounts = useMemo(() => {
     const c = { all: articles.length, library: 0 };
     for (const a of withLibrary) {
@@ -955,7 +971,7 @@ export function NewsView() {
       )}
 
       {/* ─── TOP TELEMETRY & FILTER BAR ─── */}
-      {!mobileReading && <Masthead storyCount={articles.length} libraryCount={withLibrary.filter((a) => a.libraryHits?.length).length} />}
+      {!mobileReading && <Masthead storyCount={articles.length} libraryCount={withLibrary.filter((a) => a.libraryHits?.length).length} ticker={(intro) => <BreakingTicker intro={intro} stories={withLibrary} terms={libraryTerms} onOpen={(a) => readStory(a)} />} />}
       <div
         className="news-toolbar"
         style={{
@@ -1049,8 +1065,6 @@ export function NewsView() {
 
           <SourceMenus feeds={FEEDS} counts={feedCounts} activeFeed={activeFeed} onPick={setActiveFeed} />
         </div>
-
-        <BreakingTicker stories={withLibrary} terms={libraryTerms} onOpen={(a) => readStory(a)} />
 
         {/* Search, Dynamic Translate & Action Controls */}
         <div className="news-search-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -1146,7 +1160,7 @@ export function NewsView() {
         className="news-split-pane"
         style={{
           flex: "0 0 auto",
-          height: "calc(100% - 74px)",
+          height: "calc(100% - var(--tb, 74px) - var(--kb, 44px))",
           display: "grid",
           gridTemplateColumns: "400px 1fr",
           gap: 18,

@@ -11,3 +11,6 @@
 .bt :focus-visible { outline: 2px solid var(--nn-accent, #e8b86d); outline-offset: -2px; }
 @keyframes bt-scroll { to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .bt__row { animation: none; } .bt__track { overflow-x: auto; mask-image: none; -webkit-mask-image: none; } .bt__row [aria-hidden="true"] { display: none; } }
+.bt__intro { flex: none; padding: 0 22px 0 0; font: 600 11px/30px var(--font-mono, Consolas, monospace); letter-spacing: 0.08em; text-transform: uppercase; color: var(--nn-dim, #8f8a80); }
+.bt__intro::after { content: ""; display: inline-block; width: 4px; height: 4px; margin-left: 22px; vertical-align: middle; border-radius: 50%; background: var(--nn-line-strong, rgba(255, 255, 255, 0.22)); }
+.mast .bt { order: 0; flex: none; width: 100%; border-top: 0; margin-bottom: 4px; }

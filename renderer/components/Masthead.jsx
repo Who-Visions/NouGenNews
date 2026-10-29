@@ -3,7 +3,7 @@ import "./Masthead.css";
 
 // The nameplate of the edition: title between double rules, then a dateline (edition, date, count).
 // The date is the reader's local day, spelled out like a newspaper's.
-export function Masthead({ storyCount, libraryCount }) {
+export function Masthead({ storyCount, libraryCount, ticker }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
@@ -17,11 +17,13 @@ export function Masthead({ storyCount, libraryCount }) {
       <div className="mast__rule" />
       <h1 className="mast__title">NouGenNews</h1>
       <div className="mast__rule mast__rule--double" />
-      <div className="mast__line">
-        <span>{edition}</span>
-        <span className="mast__day">{day}</span>
-        <span>{storyCount} dispatches{libraryCount ? ` · ${libraryCount} from your library` : ""}</span>
-      </div>
+      {ticker ? ticker([edition, day, `${storyCount} dispatches${libraryCount ? ` \u00b7 ${libraryCount} from your library` : ""}`]) : (
+        <div className="mast__line">
+          <span>{edition}</span>
+          <span className="mast__day">{day}</span>
+          <span>{storyCount} dispatches</span>
+        </div>
+      )}
     </header>
   );
 }

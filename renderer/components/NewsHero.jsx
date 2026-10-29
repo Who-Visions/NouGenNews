@@ -12,7 +12,7 @@ const DWELL_MS = 16000;
 function heroText(item) {
   try {
     const doc = new DOMParser().parseFromString(item.contentHtml || "", "text/html");
-    const paras = [...doc.querySelectorAll("p")].map((p) => p.textContent.replace(/\s+/g, " ").trim()).filter((t) => t.length > 30 && !/pic.twitter.com|https?://t.co//i.test(t));
+    const paras = [...doc.querySelectorAll("p")].map((p) => p.textContent.replace(/\s+/g, " ").trim()).filter((t) => t.length > 30 && !/pic[.]twitter[.]com|https?:[/][/]t[.]co[/]/i.test(t));
     const body = paras.join("\n\n");
     if (body.length > (item.desc || "").length + 40) return body.slice(0, 1600);
   } catch { /* fall back to the summary */ }

@@ -19,6 +19,11 @@ const handlers = {
   // Any registered API provider (electron/providers.js): cached on disk, capped, keyed from the environment.
   // YouTube channels (core/feeds.js "@youtube"): the latest videos of every channel in the list; no key needed.
   youtube_feed: () => require("./youtube").fetchYoutube({ userDir: app.getPath("userData") }).then((r) => ({ items: r.items, channels: r.channels })),
+  // A video written up as a news article by NouGen (transcript via nougentube, local Ollama writer, the video's source links).
+  tube_article: (args = {}) => require("./tubenews").tubeArticle({
+    id: String(args.id || ""), title: String(args.title || "").slice(0, 300), desc: String(args.desc || "").slice(0, 6000), channel: String(args.channel || "").slice(0, 100),
+    userDir: app.getPath("userData"), nougenDir: process.env.NOUGEN_DIR || path.resolve(__dirname, "..", "..", "NouGen"),
+  }),
   youtube_add: (args = {}) => ({ channels: require("./youtube").addChannel(app.getPath("userData"), String(args.ref || "").slice(0, 200)) }),
   provider_feed: (args = {}) => require("./providers").fetchProvider({
     id: String(args.id || "").slice(0, 30),

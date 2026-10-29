@@ -28,7 +28,7 @@ function parseAtom(xml, channelName = "") {
     const published = Date.parse(tag(e, "published")) || 0;
     out.push({
       title: tag(e, "title"), link: `https://www.youtube.com/watch?v=${videoId}`, source: name,
-      desc: tag(e, "media:description").slice(0, 400), thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+      desc: tag(e, "media:description").slice(0, 400), ytDesc: tag(e, "media:description").slice(0, 6000), ytId: videoId, thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
       timestamp: published, videos: [{ kind: "youtube", id: videoId }],
     });
   }

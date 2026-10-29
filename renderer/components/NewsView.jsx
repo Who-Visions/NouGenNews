@@ -303,7 +303,7 @@ function serpStory(it, meta) {
     desc: it.desc || "", videos: it.videos || [], creator: "", categories: [], source: it.source || meta.name,
     badge: meta.badge, accent: meta.accent, imageUrl: it.thumbnail || "", breaking: !!it.breaking, reportCount: it.reportCount || 0,
     contentHtml: it.desc ? sanitizeArticleHtml(`<p>${String(it.desc).replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>`) : "",
-    noFullText: !!meta.noFullText,
+    noFullText: !!meta.noFullText, ytId: it.ytId || "", ytDesc: it.ytDesc || "",
     readMins: 1, lang: "en", originalLang: "en",
   };
 }
@@ -880,6 +880,27 @@ export function NewsView() {
   // The whole story, not the feed's summary. Fetched once per article; the article in the list is
   // replaced so translation, read-aloud and the video order all see the full text.
   const [fetchingFull, setFetchingFull] = useState(false);
+  // A YouTube story is written up as an article: NouGen reads the transcript and the video's own source links.
+  const [writing, setWriting] = useState(false);
+  useEffect(() => {
+    const a = rawCurrentArticle;
+    if (!a || !a.ytId || a.written || a.writeFailed) return undefined;
+    let live = true;
+    setWriting(true);
+    invoke("tube_article", { id: a.ytId, title: a.title, desc: a.ytDesc || a.desc, channel: a.source })
+      .then((r) => {
+        if (!live) return;
+        if (r && r.html) {
+          const html = sanitizeArticleHtml(r.html);
+          setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, written: true, full: true, contentHtml: html, desc: r.dek || x.desc, readMins: estimateReadingMinutes(html), writtenBy: r.model || "" } : x)));
+        } else {
+          setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, writeFailed: (r && r.error) || "unavailable" } : x)));
+        }
+      })
+      .catch(() => { if (live) setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, writeFailed: "unavailable" } : x))); })
+      .finally(() => { if (live) setWriting(false); });
+    return () => { live = false; };
+  }, [rawCurrentArticle?.id, rawCurrentArticle?.written, rawCurrentArticle?.writeFailed]);
   useEffect(() => {
     const a = rawCurrentArticle;
     if (!a || a.full || !a.link || a.noFullText || (a.feedId === LOCAL_ID && isGoogleLink(a.link))) return undefined;
@@ -1692,6 +1713,9 @@ export function NewsView() {
                 /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
                 <LowCacheThumb article={currentArticle} size="lg" priority={true} />
               )}
+              {writing && !currentArticle.written ? (
+                <p style={{ fontSize: 12, color: TOKENS.textMuted, margin: "0 0 10px" }}>NouGen is writing this story from the video…</p>
+              ) : null}
               {fetchingFull && !currentArticle.full ? (
                 <p style={{ fontSize: 12, color: TOKENS.textMuted, margin: "0 0 10px" }}>Loading the full story…</p>
               ) : null}

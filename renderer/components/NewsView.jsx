@@ -6,6 +6,7 @@ import { BreakingTicker } from "./BreakingTicker.jsx";
 import { FrontSections } from "./FrontSections.jsx";
 import { Masthead } from "./Masthead.jsx";
 import { SourceMenus } from "./SourceMenus.jsx";
+import { LangMenu } from "./LangMenu.jsx";
 import { NewsHero } from "./NewsHero.jsx";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
@@ -1053,54 +1054,7 @@ export function NewsView() {
 
         {/* Search, Dynamic Translate & Action Controls */}
         <div className="news-search-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <div
-            data-testid="wire-translate-group"
-            title="Dynamically translate all wire headlines & dispatches (Kreyòl ↔ English ↔ Español)"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              background: "rgba(255,255,255,0.03)",
-              border: `1px solid ${TOKENS.borderSubtle}`,
-              borderRadius: TOKENS.radiusSm,
-              padding: "2px 4px",
-            }}
-          >
-            <span style={{ fontSize: 10, color: TOKENS.textMuted, padding: "0 4px", fontWeight: 700 }}>
-              {translatingWire ? "⟳" : "🌐"}
-            </span>
-            {TRANSLATE_LANGS.map((l) => {
-              const active = wireLang === l.code;
-              return (
-                <button
-                  key={l.code}
-                  type="button"
-                  data-testid={`wire-lang-${l.code}`}
-                  onClick={() => {
-                    speechRef.current?.stop();
-                    setArticleLangOverride(null);
-                    setWireLang(l.code);
-                  }}
-                  style={{
-                    background: active ? TOKENS.accentMuted : "transparent",
-                    color: active ? "#fff" : TOKENS.textSecondary,
-                    border: active ? `1px solid ${TOKENS.borderFocus}` : "1px solid transparent",
-                    borderRadius: 4,
-                    padding: "3px 7px",
-                    fontSize: 11,
-                    fontWeight: active ? 700 : 500,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <span>{l.flag}</span>
-                  <span>{l.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <LangMenu langs={TRANSLATE_LANGS} value={wireLang} busy={translatingWire} onPick={(code) => { speechRef.current?.stop(); setArticleLangOverride(null); setWireLang(code); }} />
 
           <div className="news-search-box" style={{ position: "relative", width: 200 }}>
             <input

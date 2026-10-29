@@ -85,7 +85,16 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
           <span className="nh-count">{safe + 1} / {count}</span>
         </div>
         <h2 className="nh-title">{item.title}</h2>
-        {item.desc ? <p className="nh-dek">{item.desc}</p> : null}
+        {item.desc ? (
+          <div className="nh-crawl" style={{ "--crawl-s": `${Math.max(16, Math.round(item.desc.length * 0.16))}s` }}>
+            <div className="nh-crawl__plane">
+              <div className="nh-crawl__text" key={item.id}>
+                <p className="nh-crawl__kicker">{item.source}</p>
+                <p>{item.desc}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {item.creator ? <p className="nh-byline">By {item.creator}</p> : null}
         <div className="nh-actions">
           <button type="button" className="nh-btn nh-btn-primary" onClick={() => onRead(item)}>Read <kbd>Enter</kbd></button>

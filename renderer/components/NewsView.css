@@ -85,6 +85,22 @@
 .nh-title { font-size: clamp(20px, 2vw, 28px); line-height: 1.2; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
 .nh-dek { margin: 0; font-size: 14px; line-height: 1.55; color: var(--nn-muted); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .nh-byline { margin: 0; font-size: 12px; color: var(--nn-dim); }
+
+/* The hero's summary as an opening crawl: the text climbs a tilted plane and fades into the distance.
+   It pauses on hover, loops, and is a plain clamped paragraph under reduced motion. */
+.nh-crawl { --crawl-h: 230px; position: relative; height: var(--crawl-h); overflow: hidden; perspective: 340px; perspective-origin: 50% 100%; -webkit-mask-image: linear-gradient(to top, #000 50%, transparent 100%); mask-image: linear-gradient(to top, #000 50%, transparent 100%); }
+.nh-crawl__plane { height: 100%; transform: rotateX(28deg); transform-origin: 50% 100%; }
+.nh-crawl__text { padding: 0 6%; text-align: justify; font-size: 17px; line-height: 1.55; letter-spacing: 0.02em; color: var(--nn-accent); animation: nh-crawl var(--crawl-s, 24s) linear infinite; animation-delay: calc(var(--crawl-s, 24s) * -0.14); }
+.nh-crawl__text p { margin: 0 0 1em; }
+.nh-crawl__kicker { text-align: center; font: 700 11px/1 var(--nn-mono); letter-spacing: 0.18em; text-transform: uppercase; }
+.nh-crawl:hover .nh-crawl__text { animation-play-state: paused; }
+@keyframes nh-crawl { from { transform: translateY(calc(var(--crawl-h) * 0.72)); } to { transform: translateY(-100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .nh-crawl { height: auto; perspective: none; -webkit-mask-image: none; mask-image: none; }
+  .nh-crawl__plane { transform: none; }
+  .nh-crawl__text { animation: none; padding: 0; text-align: left; font-size: 14px; color: var(--nn-muted); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .nh-crawl__kicker { display: none; }
+}
 .nh-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
 .nh-btn {
   font: 600 12px/1 inherit; color: var(--nn-text);

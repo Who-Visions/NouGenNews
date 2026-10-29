@@ -13,7 +13,7 @@ import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
 import { scoreStory } from "../../core/edition.js";
 import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
-import { loadCity } from "./CornerClock.jsx";
+import { loadCity, loadRegion, loadMetro, loadScope } from "./CornerClock.jsx";
 import "./NewsView.css";
 import {
   articleLang,
@@ -607,7 +607,9 @@ export function NewsView() {
     if (!city) return undefined;
     let live = true;
     const use = (q) => { if (!live) return; placeRef.current = q; setPlace(q); loadLocal(q); };
-    invoke("weather", { city }).then((w) => use(localQuery(w?.place || city, w?.region))).catch(() => use(city));
+    // Metro scope searches the wider metro area (Miami for West Palm Beach); city scope only the city itself.
+    const metro = loadScope() === "metro" ? loadMetro() : "";
+    invoke("weather", { city, region: loadRegion() }).then((w) => use(localQuery(metro || w?.place || city, w?.region))).catch(() => use(city));
     return () => { live = false; };
   }, [city, loadLocal]);
 

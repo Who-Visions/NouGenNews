@@ -40,19 +40,20 @@ const getJson = async (url, params) => {
   return res.json();
 };
 
-async function locate(city) {
+async function locate(city, region = "") {
   const c = String(city || "").trim();
   if (!c) throw new Error("a city is required");
-  const v = await getJson("https://geocoding-api.open-meteo.com/v1/search", { name: c, count: "1" });
-  const hit = (v.results || [])[0];
+  const v = await getJson("https://geocoding-api.open-meteo.com/v1/search", { name: c, count: region ? "10" : "1" });
+  const want = String(region || "").trim().toLowerCase();
+  const hit = (want && (v.results || []).find((r) => String(r.admin1 || "").toLowerCase() === want)) || (v.results || [])[0];
   if (!hit) throw new Error(`no place named ${c}`);
   if (typeof hit.latitude !== "number") throw new Error("place has no latitude");
   if (typeof hit.longitude !== "number") throw new Error("place has no longitude");
   return [hit.latitude, hit.longitude, hit.name || c, hit.admin1 || ""];
 }
 
-async function fetchWeather(city) {
-  const [lat, lon, place, region] = await locate(city);
+async function fetchWeather(city, wantRegion = "") {
+  const [lat, lon, place, region] = await locate(city, wantRegion);
   const v = await getJson("https://api.open-meteo.com/v1/forecast", {
     latitude: String(lat),
     longitude: String(lon),
@@ -62,10 +63,10 @@ async function fetchWeather(city) {
   return { ...parseForecast(v, place), region };
 }
 
-async function homeWeather({ city }) {
-  const key = String(city || "").trim().toLowerCase();
+async function homeWeather({ city, region = "" }) {
+  const key = `${String(city || "").trim().toLowerCase()}|${String(region || "").trim().toLowerCase()}`;
   if (cache && cache.key === key && Date.now() - cache.at < TTL_MS) return cache.weather;
-  const weather = await fetchWeather(city);
+  const weather = await fetchWeather(city, region);
   cache = { key, at: Date.now(), weather };
   return weather;
 }

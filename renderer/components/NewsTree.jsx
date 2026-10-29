@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { loadCity, saveCity, defaultCity } from "./CornerClock.jsx";
+import { loadCity, saveCity, defaultCity, loadMetro, loadScope, saveScope } from "./CornerClock.jsx";
+import { invoke } from "../lib/bridge.js";
 import "./NewsTree.css";
 
 // Topic folders, by the badge each feed carries.
@@ -33,6 +34,15 @@ export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wir
   const [glass, setGlass] = useState(loadGlass);
   const [autoplay, setAutoplay] = useState(loadAutoplay);
   const [city, setCityText] = useState(loadCity);
+  const [where, setWhere] = useState({ busy: false, note: "" });
+  const [scope, setScopeState] = useState(loadScope);
+  const [metro, setMetro] = useState(loadMetro);
+  const locate = async () => {
+    setWhere({ busy: true, note: "" });
+    const r = await invoke("locate_me").catch(() => null);
+    if (r && r.ok) { saveCity(r.city, r.region, r.metro); setCityText(r.city); setMetro(r.metro || ""); setWhere({ busy: false, note: `${r.city}, ${r.region}${r.metro ? ` \u00b7 metro ${r.metro}` : ""}` }); }
+    else setWhere({ busy: false, note: r?.reason || "Could not find your location." });
+  };
   const changeAutoplay = (on) => {
     setAutoplay(on);
     try { localStorage.setItem(AUTOPLAY_KEY, on ? "on" : "off"); } catch { /* storage unavailable */ }
@@ -100,6 +110,15 @@ export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wir
                     <input type="checkbox" checked={glass} onChange={(e) => setGlass(e.target.checked)} />
                     Glass blur
                   </label>
+                  <div className="nt-row">
+                    <button type="button" className="nt-chip" onClick={locate} disabled={where.busy}>{where.busy ? "Locating\u2026" : "Use my location"}</button>
+                    {where.note ? <span className="nt-note" role="status">{where.note}</span> : null}
+                  </div>
+                </li>
+                <li className="nt-row nt-langs" role="group" aria-label="Near you covers">
+                  <span className="nt-note">Near you covers</span>
+                  <button type="button" className={`nt-chip${scope === "metro" ? " is-active" : ""}`} onClick={() => { saveScope("metro"); setScopeState("metro"); }} title="The whole metro area: a wider net of news">Metro{metro ? ` (${metro})` : ""}</button>
+                  <button type="button" className={`nt-chip${scope === "city" ? " is-active" : ""}`} onClick={() => { saveScope("city"); setScopeState("city"); }} title="Only your own city">City only</button>
                 </li>
                 <li>
                   <label className="nt-row">
@@ -110,7 +129,7 @@ export function NewsTree({ open, onClose, feeds, counts, activeFeed, onPick, wir
                 <li>
                   <label className="nt-row">
                     City
-                    <input className="nt-input" type="text" value={city} maxLength={60} onChange={(e) => setCityText(e.target.value)} onBlur={() => saveCity(city.trim() === defaultCity() ? "" : city.trim())} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} aria-label="City for the weather" />
+                    <input className="nt-input" type="text" value={city} maxLength={60} onChange={(e) => setCityText(e.target.value)} onBlur={() => { saveCity(city.trim() === defaultCity() ? "" : city.trim(), "", ""); setMetro(""); }} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} aria-label="City for the weather" />
                   </label>
                 </li>
                 <li className="nt-row nt-langs" role="group" aria-label="Translate headlines">

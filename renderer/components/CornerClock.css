@@ -4,3 +4,6 @@
 .cc__wx { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; color: var(--accent, #e8b86d); }
 .cc__wx i { font-style: normal; }
 @media (max-width: 900px) { .cc > :nth-child(n+3):not(.cc__wx) { display: none; } }
+.cc__locate { padding: 2px 8px; font: 600 10px/1.4 var(--font-mono, Consolas, monospace); letter-spacing: 0.04em; color: var(--accent, #e8b86d); background: transparent; border: 1px solid var(--accent, #e8b86d); border-radius: 4px; cursor: pointer; }
+.cc__locate:hover:not(:disabled) { background: rgba(232, 184, 109, 0.16); }
+.cc__locate:disabled { opacity: 0.6; cursor: progress; }

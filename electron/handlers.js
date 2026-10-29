@@ -19,7 +19,9 @@ const handlers = {
   resolve_story_url: (args = {}) => require("./gnews").resolveStoryUrl(String(args.url || "")),
   // Opens the Windows cast flyout so the whole window can be mirrored to a TV (electron/cast.js).
   cast_screen: () => require("./cast").castScreen(),
-  weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80) }),
+  weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),
+  // The reader's own place from Windows' location service, only when they ask (electron/geo.js).
+  locate_me: () => require("./geo").locateMe(),
   // Titles the reader owns (NouGenFlix library), for lifting related stories. Read-only.
   library_titles: () => require("./library").libraryTitles(app),
   restart: () => { app.relaunch(); app.exit(0); },

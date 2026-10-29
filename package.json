@@ -5,7 +5,7 @@
   "scripts": {
     "start": "electron .",
     "build": "vite build",
-    "test": "node --test \"electron/test/*.test.js\" \"renderer/lib/*.test.js\"",
+    "test": "node --test \"electron/test/*.test.js\" \"renderer/lib/*.test.js\" \"core/test/*.test.js\"",
     "next:dev": "npx cross-env NODE_OPTIONS='--openssl-legacy-provider --max-old-space-size=4096' next dev -p 3000",
     "next:build": "npx cross-env NODE_OPTIONS='--openssl-legacy-provider --max-old-space-size=4096' next build",
     "next:start": "npx cross-env NODE_OPTIONS='--openssl-legacy-provider --max-old-space-size=4096' next start -p 3000",

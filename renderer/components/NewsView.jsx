@@ -3,6 +3,7 @@ import { invoke } from "../lib/bridge.js";
 import { optimizeLowCacheUrl, sanitizeArticleHtml } from "../lib/articleHtml.js";
 import { NewsHero } from "./NewsHero.jsx";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
+import { FEEDS } from "../../core/feeds.js";
 import "./NewsView.css";
 import {
   articleLang,
@@ -96,129 +97,6 @@ const openInApp = (url) => {
   if (/^https?:\/\//i.test(String(url || ""))) window.dispatchEvent(new CustomEvent("nn:browse", { detail: { url } }));
 };
 
-// ─── FEED REGISTRY ───────────────────────────────────────────────────────────
-const FEEDS = [
-  {
-    id: "all",
-    name: "All Wire",
-    desc: "TV, film, comics, anime, games, AI and tech in one stream",
-    url: null,
-    icon: "🌐",
-    badge: "",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "deadline",
-    name: "Deadline",
-    desc: "Film and TV industry news",
-    url: "https://deadline.com/feed/",
-    icon: "🎬",
-    badge: "TV & Film",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "tvline",
-    name: "TVLine",
-    desc: "TV news, premieres and renewals",
-    url: "https://www.tvline.com/feed/",
-    icon: "📺",
-    badge: "TV",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "slashfilm",
-    name: "/Film",
-    desc: "Movie news and trailers",
-    url: "https://www.slashfilm.com/feed/",
-    icon: "🍿",
-    badge: "Movies",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "comicbook",
-    name: "ComicBook.com",
-    desc: "Comics, superheroes and fandom",
-    url: "https://comicbook.com/feed/",
-    icon: "🦸",
-    badge: "Comics",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "ann",
-    name: "Anime News Network",
-    desc: "Anime and manga news",
-    url: "https://www.animenewsnetwork.com/all/rss.xml",
-    icon: "🎌",
-    badge: "Anime",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "cartoonbrew",
-    name: "Cartoon Brew",
-    desc: "Animation and cartoons",
-    url: "https://www.cartoonbrew.com/feed",
-    icon: "✏️",
-    badge: "Cartoons",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "creativebloq",
-    name: "Creative Bloq",
-    desc: "Art, design and AI art",
-    url: "https://www.creativebloq.com/feeds/all",
-    icon: "🎨",
-    badge: "AI Art",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "decoder",
-    name: "The Decoder",
-    desc: "AI models, tools and research",
-    url: "https://the-decoder.com/feed/",
-    icon: "🤖",
-    badge: "AI",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "ars",
-    name: "Ars Technica",
-    desc: "Technology news and analysis",
-    url: "https://feeds.arstechnica.com/arstechnica/index",
-    icon: "💻",
-    badge: "Tech",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "gsmarena",
-    name: "GSMArena",
-    desc: "Smartphone news and reviews",
-    url: "https://www.gsmarena.com/rss-news-reviews.php3",
-    icon: "📱",
-    badge: "Phones",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-  {
-    id: "kotaku",
-    name: "Kotaku",
-    desc: "Video game news",
-    url: "https://kotaku.com/rss",
-    icon: "🎮",
-    badge: "Games",
-    accent: "#e8b86d",
-    lang: "en",
-  },
-];
 
 // ─── LOW-CACHE BOUNDED LRU IMAGE STORE (MAX 60 KEYS, ZERO DISK BLOAT) ────────
 class LowCacheImageLRU {

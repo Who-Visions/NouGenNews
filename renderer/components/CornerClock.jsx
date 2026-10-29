@@ -61,6 +61,14 @@ export function CornerClock() {
     else window.dispatchEvent(new CustomEvent("nn:menu-note", { detail: r?.reason || "Could not find your location. Type your city in Settings." }));
   };
 
+  // First launch: find the place without being asked. Windows' own location setting is the gate (if it is off,
+  // nothing is found and the chip stays); the attempt is made once, so a refusal is never repeated at every start.
+  useEffect(() => {
+    let tried = false;
+    try { tried = localStorage.getItem("nn.locTried") === "1"; localStorage.setItem("nn.locTried", "1"); } catch { /* storage unavailable */ }
+    if (!hasChosenCity() && !tried) useMyLocation();
+  }, []);
+
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 15000);
     const onCity = () => { setCity(loadCity()); setChosen(hasChosenCity()); };

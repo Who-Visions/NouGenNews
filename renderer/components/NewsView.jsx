@@ -5,6 +5,7 @@ import { TailCarousel } from "./TailCarousel.jsx";
 import { BreakingTicker } from "./BreakingTicker.jsx";
 import { FrontSections } from "./FrontSections.jsx";
 import { Masthead } from "./Masthead.jsx";
+import { SourceMenus } from "./SourceMenus.jsx";
 import { NewsHero } from "./NewsHero.jsx";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
@@ -664,6 +665,15 @@ export function NewsView() {
     return searchFiltered.map((a) => wireTranslatedMap[`${a.id}::${wireLang}`] || a);
   }, [searchFiltered, wireLang, wireTranslatedMap]);
 
+  const feedCounts = useMemo(() => {
+    const c = { all: articles.length, library: 0 };
+    for (const a of withLibrary) {
+      c[a.feedId] = (c[a.feedId] || 0) + 1;
+      if (a.libraryHits?.length) c.library += 1;
+    }
+    return c;
+  }, [articles.length, withLibrary]);
+
   const sectionCounts = useMemo(() => {
     const c = {};
     for (const a of withLibrary) {
@@ -843,7 +853,7 @@ export function NewsView() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         feeds={FEEDS}
-        counts={{ ...Object.fromEntries(FEEDS.map((f) => [f.id, f.id === "all" ? articles.length : articles.filter((a) => a.feedId === f.id).length])), library: withLibrary.filter((a) => a.libraryHits?.length).length }}
+        counts={feedCounts}
         activeFeed={activeFeed}
         onPick={setActiveFeed}
         wireLang={wireLang}
@@ -1038,59 +1048,7 @@ export function NewsView() {
           )}
 
 
-          <div className="news-chips">
-          {FEEDS.map((f) => {
-            const active = activeFeed === f.id;
-            const health = feedHealth[f.id];
-            const count =
-              f.id === "all"
-                ? articles.length
-                : articles.filter((a) => a.feedId === f.id).length;
-
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => {
-                  speechRef.current?.stop();
-                  setActiveFeed(f.id);
-                  const first = articles.find((a) => f.id === "all" || a.feedId === f.id);
-                  if (first) setSelectedArticleId(first.id);
-                }}
-                style={{
-                  background: active ? TOKENS.accentMuted : TOKENS.surfaceInteractive,
-                  color: active ? "#fff" : TOKENS.textSecondary,
-                  border: active
-                    ? `1px solid ${TOKENS.borderFocus}`
-                    : `1px solid ${TOKENS.borderSubtle}`,
-                  borderRadius: TOKENS.radiusSm,
-                  padding: "5px 11px",
-                  fontSize: 12,
-                  fontWeight: active ? 600 : 500,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  transition: `all ${TOKENS.transitionFast}`,
-                }}
-              >
-                <span>{f.icon}</span>
-                <span>{f.name}</span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    padding: "1px 5px",
-                    borderRadius: 4,
-                    background: active ? "rgba(244,63,94,0.25)" : "rgba(255,255,255,0.06)",
-                    color: health?.ok === false ? "#f87171" : TOKENS.textSecondary,
-                  }}
-                >
-                  {health?.ok === false ? "ERR" : count}
-                </span>
-              </button>
-            );
-          })}
-          </div>
+          <SourceMenus feeds={FEEDS} counts={feedCounts} activeFeed={activeFeed} onPick={setActiveFeed} />
         </div>
 
         <BreakingTicker stories={withLibrary} terms={libraryTerms} onOpen={(a) => readStory(a)} />

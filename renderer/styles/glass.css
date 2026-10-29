@@ -49,7 +49,8 @@ body, .app-shell { background: #000; }
 .app-shell .news-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding-top: 10px; margin-bottom: 10px !important; padding-bottom: 8px !important; }
 .app-shell .news-filter-strip { display: contents !important; }
 .app-shell .news-toolbar > .news-search-actions { order: 2; margin-left: auto; flex-wrap: nowrap !important; }
-.app-shell .news-filter-strip > :not(.news-chips) { order: 1; }
+.app-shell .news-filter-strip > :not(.news-chips):not(.sm) { order: 1; }
+.app-shell .news-toolbar { justify-content: flex-start !important; }
 .app-shell .news-burger { padding: 4px 9px; font-size: 15px; line-height: 1; }
 .app-shell .news-burger kbd { display: none; }
 .app-shell .news-chips { order: 3; flex: 1 0 100%; display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }

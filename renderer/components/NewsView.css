@@ -203,3 +203,7 @@
 .news-card-meta { flex-wrap: nowrap; min-width: 0; white-space: nowrap; overflow: hidden; }
 .news-card-meta > * { flex: none; }
 .news-card-meta > :last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* The hero's tag for an alert story: red for a red alert, gold for a breaking one. */
+.nh-tag--red { background: #b3121a; color: #fff; border-color: #ff4b4b; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.nh-tag--amber { background: #e8b86d; color: #141414; border-color: #8a5a00; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }

@@ -733,6 +733,10 @@ export function NewsView() {
     () => (libraryTerms.length ? articles.map((a) => ({ ...a, libraryHits: matchStory(a, libraryTerms) })) : articles),
     [articles, libraryTerms]
   );
+  const alerts = useMemo(() => findAlerts(withLibrary, { now: clock }), [withLibrary, clock]);
+  const activeAlert = demoAlert || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
+  // A real alert's story leads everything: the hero, the top of the list, and the story that opens in the reader.
+  const alertLead = activeAlert && !activeAlert.demo && activeAlert.story ? activeAlert : null;
   const searchFiltered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const kept = withLibrary.filter((a) => {
@@ -747,10 +751,14 @@ export function NewsView() {
         a.categories.some((c) => c.toLowerCase().includes(q))
       );
     });
-    if (!libraryTerms.length || (activeFeed !== "all" && activeFeed !== "library" && !activeFeed.startsWith("section:"))) return kept;
-    const now = Date.now();
-    return kept.map((a) => [a, scoreStory(a, { now, terms: libraryTerms })]).sort((x, y) => y[1] - x[1]).map((x) => x[0]);
-  }, [withLibrary, libraryTerms, activeFeed, search]);
+    const ranked = !libraryTerms.length || (activeFeed !== "all" && activeFeed !== "library" && !activeFeed.startsWith("section:"))
+      ? kept
+      : kept.map((a) => [a, scoreStory(a, { now: Date.now(), terms: libraryTerms })]).sort((x, y) => y[1] - x[1]).map((x) => x[0]);
+    if (!alertLead || activeFeed !== "all" || q) return ranked;
+    const ids = new Set(alertLead.stories.map((s) => s.id));
+    const first = ranked.find((a) => a.id === alertLead.story.id);
+    return [...(first ? [first] : []), ...ranked.filter((a) => ids.has(a.id) && a !== first), ...ranked.filter((a) => !ids.has(a.id))];
+  }, [withLibrary, libraryTerms, activeFeed, search, alertLead]);
 
   // Dynamically resolve wire headlines when wireLang is "ht", "en", or "es"
   useEffect(() => {
@@ -798,8 +806,6 @@ export function NewsView() {
     return () => ro.disconnect();
   }, [mobileReading]);
 
-  const alerts = useMemo(() => findAlerts(withLibrary, { now: clock }), [withLibrary, clock]);
-  const activeAlert = demoAlert || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
   useEffect(() => {
     if (!activeAlert || activeAlert.demo || activeAlert.level !== "red") return;
     let told = [];
@@ -808,6 +814,7 @@ export function NewsView() {
     try { localStorage.setItem("nn.alertsTold", JSON.stringify([activeAlert.key, ...told].slice(0, 60))); } catch { /* storage unavailable */ }
     invoke("notify", { title: "RED ALERT \u2014 NouGenNews", body: activeAlert.headline }).catch(() => {});
   }, [activeAlert?.key]);
+  useEffect(() => { if (alertLead) setSelectedArticleId(alertLead.story.id); }, [alertLead?.key]);
   const dismissAlert = () => { if (activeAlert?.demo) setDemoAlert(null); else if (activeAlert) markSeen(activeAlert.key); };
   const readAlert = () => {
     if (!activeAlert) return;
@@ -991,7 +998,12 @@ export function NewsView() {
   }, [filtered, currentArticle?.id, helpOpen, mobileReading, wireLang, fetchAllFeeds, readStory, listenTo]);
 
   // The stories the hero can play: the ones with a video, newest first.
-  const playable = useMemo(() => filtered.filter((a) => a.videos && a.videos.length).slice(0, 6), [filtered]);
+  const playable = useMemo(() => {
+    const withVideo = filtered.filter((a) => a.videos && a.videos.length);
+    if (!alertLead || activeFeed !== "all" || search.trim()) return withVideo.slice(0, 6);
+    const lead = filtered.find((a) => a.id === alertLead.story.id) || alertLead.story;
+    return [{ ...lead, alertLevel: alertLead.level }, ...withVideo.filter((a) => a.id !== lead.id)].slice(0, 6);
+  }, [filtered, alertLead, activeFeed, search]);
 
   return (
     <div
@@ -1278,6 +1290,7 @@ export function NewsView() {
 
       {playable.length > 0 && !mobileReading && (
         <NewsHero
+          key={alertLead ? alertLead.key : "hero"}
           ref={heroRef}
           items={playable}
           embedPort={embedPort}

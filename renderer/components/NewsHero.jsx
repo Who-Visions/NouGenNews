@@ -81,10 +81,10 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
         {playing && video ? (
           <Player video={video} embedPort={embedPort} />
         ) : (
-          <button type="button" className="nh-poster" onClick={() => setPlaying(true)} aria-label={`Play video: ${item.title}`}>
+          <button type="button" className="nh-poster" onClick={() => (video ? setPlaying(true) : onRead(item))} aria-label={video ? `Play video: ${item.title}` : `Read: ${item.title}`}>
             {item.imageUrl ? <img src={item.imageUrl} alt="" loading="eager" decoding="async" referrerPolicy="no-referrer" /> : <span className="nh-poster-blank" />}
-            <span className="nh-play" aria-hidden="true">▶</span>
-            <span className="nh-tag">▶ Video</span>
+            {video ? <span className="nh-play" aria-hidden="true">▶</span> : null}
+            {item.alertLevel ? <span className={`nh-tag nh-tag--${item.alertLevel}`}>{item.alertLevel === "red" ? "Red alert" : "Breaking"}</span> : video ? <span className="nh-tag">▶ Video</span> : null}
           </button>
         )}
       </div>
@@ -103,7 +103,7 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
         {item.creator ? <p className="nh-byline">By {item.creator}</p> : null}
         <div className="nh-actions">
           <button type="button" className="nh-btn nh-btn-primary" onClick={() => onRead(item)}>Read <kbd>Enter</kbd></button>
-          <button type="button" className="nh-btn" onClick={() => setPlaying((p) => !p)}>{playing ? "Stop" : "Play"} <kbd>Space</kbd></button>
+          {video ? <button type="button" className="nh-btn" onClick={() => setPlaying((p) => !p)}>{playing ? "Stop" : "Play"} <kbd>Space</kbd></button> : null}
           <button type="button" className="nh-btn" onClick={() => onListen(item)}>{listening ? "Stop listening" : "Listen"} <kbd>L</kbd></button>
           <button type="button" className="nh-btn" onClick={() => onSource(item.link)}>Open source in app</button>
         </div>

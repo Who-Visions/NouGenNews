@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
-import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages } from "../lib/articleHtml.js";
+import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, stripImages } from "../lib/articleHtml.js";
 import { TailCarousel } from "./TailCarousel.jsx";
 import { BreakingTicker } from "./BreakingTicker.jsx";
 import { FrontSections } from "./FrontSections.jsx";
@@ -9,6 +9,7 @@ import { SourceMenus } from "./SourceMenus.jsx";
 import { LangMenu } from "./LangMenu.jsx";
 import { NewsHero } from "./NewsHero.jsx";
 import { Ago } from "./Ago.jsx";
+import { VideoDock, useWide } from "./VideoDock.jsx";
 import { clampTs } from "../lib/age.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
@@ -966,6 +967,12 @@ export function NewsView() {
   const tail = useMemo(() => splitTail(currentArticle?.contentHtml || ""), [currentArticle?.contentHtml]);
   // Each picture once: the lead picture and repeats inside the body are dropped from the body.
   const articleBody = useMemo(() => dropDuplicateImages(dropTrailingImages(tail.body), currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
+  // With room beside the article, its videos dock to the right instead of sitting in the text.
+  const wideEnough = useWide(1500);
+  // The lead picture stays above the story, so the carousel holds the pictures from the body.
+  const photos = useMemo(() => collectPhotos(articleBody), [articleBody]);
+  const docked = wideEnough && (!!currentArticle?.videos?.length || photos.length > 1);
+  const shownBody = useMemo(() => (docked && photos.length > 1 ? stripImages(articleBody) : articleBody), [docked, photos.length, articleBody]);
 
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.scrollTop = 0;
@@ -1504,6 +1511,7 @@ export function NewsView() {
           }}
         >
           {currentArticle ? (
+            <div className={docked ? "reader-with-dock" : undefined}>
             <article style={{ maxWidth: 740, margin: "0 auto" }}>
               <button
                 type="button"
@@ -1707,7 +1715,7 @@ export function NewsView() {
                 </div>
               )}
 
-              {currentArticle.videos?.length ? (
+              {currentArticle.videos?.length && !docked ? (
                 <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />
               ) : (
                 /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
@@ -1734,7 +1742,7 @@ export function NewsView() {
                   e.preventDefault();
                   openInApp(a.getAttribute("href"));
                 }}
-                dangerouslySetInnerHTML={{ __html: articleBody }}
+                dangerouslySetInnerHTML={{ __html: shownBody }}
               />
               <div className="news-reader-bar">
                 <button type="button" className="nh-btn" onClick={() => listenTo(currentArticle)}>
@@ -1749,6 +1757,8 @@ export function NewsView() {
                 {tail.items.length ? <TailCarousel items={tail.items} onOpen={openInApp} /> : <span className="mono">J next · K prev · Esc back</span>}
               </div>
             </article>
+            {docked ? <VideoDock videos={currentArticle.videos} photos={photos} embedPort={embedPort} autoplay={loadAutoplay()} label={currentArticle.title} /> : null}
+            </div>
           ) : (
             <div
               style={{

@@ -122,3 +122,19 @@ test("dropTrailingImages keeps captioned pictures, pictures inside the text, and
   const only = '<img src="https://s.test/a.jpg">';
   assert.equal(dropTrailingImages(only, doc), only);
 });
+
+test("collectPhotos lists the lead first, then body pictures once each, skipping icons", async () => {
+  const { collectPhotos } = await import("./articleHtml.js");
+  const doc = new JSDOM("").window.document;
+  const html = '<p>a</p><img src="https://x.test/a-300x200.jpg" alt="A"><figure><img src="https://x.test/b.jpg"><figcaption>Cap B</figcaption></figure><img src="https://x.test/a.jpg"><img src="https://x.test/icon.png" width="16" height="16"><img src="data:image/png;base64,AAAA">';
+  const p = collectPhotos(html, "https://x.test/lead.jpg", doc);
+  assert.deepEqual(p.map((x) => x.src), ["https://x.test/lead.jpg", "https://x.test/a-300x200.jpg", "https://x.test/b.jpg"]);
+  assert.equal(p[2].alt, "Cap B");
+});
+
+test("stripImages removes pictures and the wrappers that held only them", async () => {
+  const { stripImages } = await import("./articleHtml.js");
+  const doc = new JSDOM("").window.document;
+  const out = stripImages('<p>keep</p><figure><img src="https://x.test/a.jpg"></figure><p><a href="https://x.test"><img src="https://x.test/b.jpg"></a></p><p>also keep</p>', doc);
+  assert.equal(out, "<p>keep</p><p>also keep</p>");
+});

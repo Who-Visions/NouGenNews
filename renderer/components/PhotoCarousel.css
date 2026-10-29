@@ -1,0 +1,15 @@
+.pcar { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.pcar__frame { position: relative; height: 240px; display: grid; place-items: center; background: #050505; border: 1px solid var(--nn-line, rgba(255, 255, 255, 0.12)); border-radius: 6px; overflow: hidden; }
+.pcar__img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; display: block; animation: pcar-in 360ms ease-out; }
+.pcar__step { position: absolute; top: 50%; transform: translateY(-50%); width: 28px; height: 44px; font-size: 22px; line-height: 1; color: #f2eee6; background: rgba(0, 0, 0, 0.55); border: 0; cursor: pointer; opacity: 0; transition: opacity 160ms; }
+.pcar__step--prev { left: 0; border-radius: 0 4px 4px 0; }
+.pcar__step--next { right: 0; border-radius: 4px 0 0 4px; }
+.pcar:hover .pcar__step, .pcar__step:focus-visible { opacity: 1; }
+.pcar__bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 16px; }
+.pcar__cap { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--nn-dim, #8f8a80); }
+.pcar__dots { display: flex; gap: 5px; flex: none; }
+.pcar__dots button { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.28); cursor: pointer; }
+.pcar__dots button.is-on { background: var(--nn-accent, #e8b86d); }
+.pcar :focus-visible { outline: 2px solid var(--nn-accent, #e8b86d); outline-offset: 2px; }
+@keyframes pcar-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pcar__img { animation: none; } }

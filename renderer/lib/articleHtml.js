@@ -210,3 +210,44 @@ export function dropTrailingImages(html, doc = typeof document !== "undefined" ?
   }
   return removed ? host.innerHTML : source;
 }
+
+// Every distinct picture of a story, lead first, for the photo carousel: the lead picture, then the pictures in the
+// body in order. Duplicates (by imageKey) and icon-sized images (declared under 120px) are skipped.
+export function collectPhotos(html, leadSrc = "", doc = typeof document !== "undefined" ? document : null, max = 12) {
+  const out = [];
+  const seen = new Set();
+  const add = (src, alt) => {
+    const s = String(src || "").trim();
+    if (!/^https?:\/\//i.test(s)) return;
+    const k = imageKey(s);
+    if (!k || seen.has(k) || out.length >= max) return;
+    seen.add(k);
+    out.push({ src: s, alt: String(alt || "").trim() });
+  };
+  add(leadSrc, "");
+  if (!doc || !html) return out;
+  const host = doc.createElement("div");
+  host.innerHTML = String(html);
+  for (const img of host.querySelectorAll("img")) {
+    const w = Number(img.getAttribute("width")) || 0;
+    const h = Number(img.getAttribute("height")) || 0;
+    if ((w && w < 120) || (h && h < 120)) continue;
+    add(img.getAttribute("src"), img.getAttribute("alt") || img.closest("figure")?.querySelector("figcaption")?.textContent);
+  }
+  return out;
+}
+
+// Removes every picture from a body (and the figure or link left holding only that picture), for the case where the
+// pictures are shown in the photo carousel instead.
+export function stripImages(html, doc = typeof document !== "undefined" ? document : null) {
+  const source = String(html || "");
+  if (!doc || !source || !/<img/i.test(source)) return source;
+  const host = doc.createElement("div");
+  host.innerHTML = source;
+  for (const img of [...host.querySelectorAll("img")]) {
+    let node = img;
+    while (node.parentElement && node.parentElement !== host && /^(A|FIGURE|P|SPAN|DIV)$/.test(node.parentElement.tagName) && !node.parentElement.textContent.replace(node.textContent, "").trim() && node.parentElement.querySelectorAll("img").length === 1) node = node.parentElement;
+    node.remove();
+  }
+  return host.innerHTML;
+}

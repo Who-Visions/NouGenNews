@@ -132,7 +132,37 @@ const newsapi = {
   },
 };
 
-const REGISTRY = { thenewsapi, tmdb, nasa, webz, newsapi };
+// NewsData.io: US news from the highest-ranked outlets in four categories. The free plan delays articles by 12 hours
+// and returns 10 per request, so two requests are made per refresh; like NewsAPI it is background, not breaking.
+const newsdata = {
+  id: "newsdata",
+  env: "NEWSDATA_API_KEY",
+  ttlMs: 6 * 3600 * 1000,
+  cap: { period: "day", max: 40 }, // the free plan allows 200 credits a day
+  async run({ key, get }) {
+    const base = { apikey: key, language: "en", country: "us", category: "top,world,entertainment,technology", prioritydomain: "top" };
+    const items = [];
+    const seen = new Set();
+    let page = "";
+    for (let i = 0; i < 2; i++) {
+      const d = await get(`https://newsdata.io/api/1/latest?${new URLSearchParams(page ? { ...base, page } : base)}`);
+      for (const a of (d && d.results) || []) {
+        if (!a.title || !isHttp(a.link) || a.duplicate || seen.has(a.link)) continue;
+        seen.add(a.link);
+        // pubDate is UTC without a zone marker: "2026-10-29 08:18:00".
+        items.push({
+          title: clean(a.title), link: a.link, source: clean(a.source_name || a.source_id), desc: clean(a.description),
+          thumbnail: isHttp(a.image_url) ? a.image_url : "", timestamp: Date.parse(String(a.pubDate || "").replace(" ", "T") + "Z") || 0,
+        });
+      }
+      page = d && d.nextPage;
+      if (!page) break;
+    }
+    return items;
+  },
+};
+
+const REGISTRY = { thenewsapi, tmdb, nasa, webz, newsapi, newsdata };
 
 // ---- shared cache, caps and the fetch wrapper ------------------------------------------------------------------
 

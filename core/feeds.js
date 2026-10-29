@@ -179,6 +179,17 @@ export const FEEDS = [
     lang: "en",
   },
   {
+    id: "latest",
+    name: "Latest (12 h delay)",
+    desc: "US news from top-ranked outlets via NewsData.io; the free plan delays it by 12 hours",
+    url: "@provider:newsdata",
+    icon: "\u23F1",
+    badge: "Latest",
+    section: "Top stories",
+    accent: "#e8b86d",
+    lang: "en",
+  },
+  {
     id: "trending",
     name: "Trending on screen",
     desc: "Film and TV trending this week (TMDB)",

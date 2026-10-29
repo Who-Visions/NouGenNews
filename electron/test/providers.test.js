@@ -145,3 +145,22 @@ test("NewsAPI: mainstream headlines, the publisher suffix and removed articles d
   assert.equal(REGISTRY.newsapi.cap.period, "day");
   assert.ok(REGISTRY.newsapi.cap.max < 100);
 });
+
+test("NewsData: two pages, top outlets asked for, UTC dates parsed, duplicates and non-web links dropped", async () => {
+  const urls = [];
+  const http = async (url) => {
+    urls.push(url);
+    const second = url.includes("page=PAGE2");
+    return reply({ status: "success", nextPage: second ? null : "PAGE2", results: second
+      ? [{ title: "Second page story", link: "https://pub.test/b", source_name: "Pub", pubDate: "2026-10-29 07:00:00", description: null }]
+      : [{ title: "First story", link: "https://pub.test/a", source_name: "Pub", pubDate: "2026-10-29 08:18:00", description: "d", image_url: "https://img.test/a.jpg" },
+         { title: "Marked duplicate", link: "https://pub.test/c", duplicate: true, pubDate: "2026-10-29 08:18:00" },
+         { title: "Bad link", link: "javascript:alert(1)" }] });
+  };
+  const r = await fetchProvider({ id: "newsdata", env: { NEWSDATA_API_KEY: "N" }, file: tmp(), http, now: () => NOW });
+  assert.equal(urls.length, 2);
+  assert.match(urls[0], /prioritydomain=top/);
+  assert.deepEqual(r.items.map((i) => i.title), ["First story", "Second page story"]);
+  assert.equal(r.items[0].timestamp, Date.UTC(2026, 9, 29, 8, 18));
+  assert.equal(r.items[1].desc, "");
+});

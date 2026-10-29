@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
 import { optimizeLowCacheUrl, sanitizeArticleHtml } from "../lib/articleHtml.js";
 import { NewsHero } from "./NewsHero.jsx";
+import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import "./NewsView.css";
 import {
   articleLang,
@@ -67,7 +68,7 @@ function findVideos(text) {
 }
 
 // The story's videos, played in the app: YouTube through the loopback embed page (electron/embed.js), files directly.
-function ArticleVideos({ videos, embedPort }) {
+function ArticleVideos({ videos, embedPort, autoplay = false }) {
   if (!videos || !videos.length) return null;
   return (
     <div className="article-videos" style={{ display: "grid", gap: 12, marginBottom: 18 }}>
@@ -76,7 +77,7 @@ function ArticleVideos({ videos, embedPort }) {
           {v.kind === "youtube" ? (
             <iframe
               title="Video"
-              src={embedPort && embedPort !== "web" ? `http://localhost:${embedPort}/embed?id=${v.id}` : `https://www.youtube.com/embed/${v.id}?playsinline=1`}
+              src={embedPort && embedPort !== "web" ? `http://localhost:${embedPort}/embed?id=${v.id}${autoplay ? "&autoplay=1" : ""}` : `https://www.youtube.com/embed/${v.id}?playsinline=1${autoplay ? "&autoplay=1" : ""}`}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -566,6 +567,13 @@ function LowCacheThumb({ article, size = "sm", priority = false }) {
 // ─── MAIN ELEVATED COMPONENT ─────────────────────────────────────────────────
 export function NewsView() {
   const [activeFeed, setActiveFeed] = useState("all");
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    const open = () => { if (currentArticleRef.current?.link) openInApp(currentArticleRef.current.link); };
+    window.addEventListener("nn:browse-current", open);
+    return () => window.removeEventListener("nn:browse-current", open);
+  }, []);
+  const currentArticleRef = useRef(null);
   const [articles, setArticles] = useState([]);
   const [feedHealth, setFeedHealth] = useState({});
   const [loading, setLoading] = useState(true);
@@ -819,6 +827,7 @@ export function NewsView() {
     }
     return wireTranslatedMap[`${rawCurrentArticle.id}::${effectiveArticleLang}`] || rawCurrentArticle;
   }, [rawCurrentArticle, effectiveArticleLang, articleTranslation, wireTranslatedMap]);
+  currentArticleRef.current = currentArticle;
 
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.scrollTop = 0;
@@ -852,6 +861,7 @@ export function NewsView() {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === "/") { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
+      if (e.key === "m" || e.key === "M") { e.preventDefault(); setMenuOpen((o) => !o); return; }
       if (e.key === "?") { e.preventDefault(); setHelpOpen((o) => !o); return; }
       if (e.key === "r" || e.key === "R") { e.preventDefault(); fetchAllFeeds(); return; }
       if (/^[1-9]$/.test(e.key)) {
@@ -895,7 +905,7 @@ export function NewsView() {
       className={`news-view-container ${mobileReading ? "mobile-reading-active" : ""}`}
       style={{
         padding: "0 28px 12px",
-        height: "100dvh",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
         color: TOKENS.textPrimary,
@@ -905,6 +915,17 @@ export function NewsView() {
         position: "relative",
       }}
     >
+      <NewsTree
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        feeds={FEEDS}
+        counts={Object.fromEntries(FEEDS.map((f) => [f.id, f.id === "all" ? articles.length : articles.filter((a) => a.feedId === f.id).length]))}
+        activeFeed={activeFeed}
+        onPick={setActiveFeed}
+        wireLang={wireLang}
+        langs={TRANSLATE_LANGS}
+        onLang={(c) => { setArticleLangOverride(null); setWireLang(c); }}
+      />
       {helpOpen && (
         <div className="news-help" role="dialog" aria-label="Keyboard shortcuts" onClick={() => setHelpOpen(false)}>
           <div className="news-help-panel" onClick={(e) => e.stopPropagation()}>
@@ -917,6 +938,7 @@ export function NewsView() {
               <dt>L</dt><dd>Listen to the selected story (again to stop)</dd>
               <dt>T</dt><dd>Cycle translation: original, Kreyòl, English, Español</dd>
               <dt>1 – 9</dt><dd>Pick a topic</dd>
+              <dt>M</dt><dd>Sources and settings menu</dd>
               <dt>/</dt><dd>Search the wire</dd>
               <dt>R</dt><dd>Sync feeds</dd>
               <dt>?</dt><dd>This list</dd>
@@ -1013,6 +1035,7 @@ export function NewsView() {
         }}
       >
         <div className="news-filter-strip" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" className="nh-btn" aria-label="Sources and settings menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>☰<kbd>M</kbd></button>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 4 }}>
             <span
               style={{
@@ -1280,7 +1303,7 @@ export function NewsView() {
         className="news-split-pane"
         style={{
           flex: "0 0 auto",
-          height: "calc(100dvh - 74px)",
+          height: "calc(100% - 74px)",
           display: "grid",
           gridTemplateColumns: "400px 1fr",
           gap: 18,
@@ -1626,7 +1649,7 @@ export function NewsView() {
               )}
 
               {currentArticle.videos?.length ? (
-                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} />
+                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} />
               ) : (
                 /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
                 <LowCacheThumb article={currentArticle} size="lg" priority={true} />

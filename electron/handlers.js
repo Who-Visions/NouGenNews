@@ -1,10 +1,12 @@
 // Commands the renderer can invoke (see preload.js). Each takes the args object and returns a value.
 const { fetchSafe } = require("./safe");
 const embed = require("./embed");
+const { app } = require("electron");
 
 const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
+  quit: () => { app.quit(); },
   // The whole story behind a headline, with the videos the page carries (electron/article.js).
   article_fetch: (args = {}) => require("./article").articleFetch(args.url || ""),
   // Feeds are fetched here because a page cannot read another site's feed (CORS). Public https only.

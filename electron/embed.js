@@ -24,11 +24,12 @@ function route(method, url) {
   return validId(id) ? id : null;
 }
 
-function page(id) {
+// Autoplay only when the caller asks (?autoplay=1): a story must not start playing by itself.
+function page(id, autoplay) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>YouTube</title>` +
     `<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}` +
     `iframe{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head>` +
-    `<body><iframe src="https://www.youtube.com/embed/${id}?autoplay=1&amp;playsinline=1&amp;enablejsapi=1&amp;origin=http://localhost&amp;widget_referrer=http://localhost&amp;color=white" ` +
+    `<body><iframe src="https://www.youtube.com/embed/${id}?autoplay=${autoplay ? 1 : 0}&amp;playsinline=1&amp;enablejsapi=1&amp;origin=http://localhost&amp;widget_referrer=http://localhost&amp;color=white" ` +
     `title="YouTube video player" ` +
     `allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ` +
     `allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></body></html>`;
@@ -36,7 +37,7 @@ function page(id) {
 
 function handler(req, res) {
   const id = route(req.method, req.url);
-  const body = id ? page(id) : "Not found";
+  const body = id ? page(id, /[?&]autoplay=1(&|$)/.test(req.url)) : "Not found";
   res.writeHead(id ? 200 : 404, { ...HEADERS, "Content-Length": Buffer.byteLength(body) });
   res.end(body);
 }

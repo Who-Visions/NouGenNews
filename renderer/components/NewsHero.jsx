@@ -9,7 +9,7 @@ const DWELL_MS = 8000;
 function Player({ video, embedPort }) {
   if (video.kind === "youtube") {
     const src = embedPort && embedPort !== "web"
-      ? `http://localhost:${embedPort}/embed?id=${video.id}`
+      ? `http://localhost:${embedPort}/embed?id=${video.id}&autoplay=1`
       : `https://www.youtube.com/embed/${video.id}?autoplay=1&playsinline=1`;
     return <iframe className="nh-player" title="Video" src={src} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />;
   }

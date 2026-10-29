@@ -8,7 +8,8 @@ body {
   font-size: var(--type-body);
   line-height: var(--line-body);
 }
-.app-shell { display: flex; height: 100%; min-width: 0; }
+.app-frame { display: flex; flex-direction: column; height: 100%; }
+.app-shell { display: flex; flex: 1 1 auto; min-height: 0; min-width: 0; }
 .app-main { flex: 1 1 auto; min-width: 0; overflow: hidden; }
 
 /* Thin matte scrollbars, app-wide. */

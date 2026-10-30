@@ -132,6 +132,27 @@ const newsapi = {
   },
 };
 
+// The Associated Press wire, as NewsAPI.org carries it (its own headlines, summaries and apnews.com links). apnews.com
+// itself is not read: its robots.txt turns away AI crawlers and its pages sit behind a bot challenge, so this goes
+// through the licensed aggregator instead. Same key and the same day's request allowance as the headlines provider;
+// the free plan delays articles by about a day, so this is background coverage, not breaking news.
+const ap = {
+  id: "ap",
+  env: "NEWSAPI_KEY",
+  ttlMs: 4 * 3600 * 1000,
+  cap: { period: "day", max: 12 },
+  async run({ key, get }) {
+    const d = await get(`https://newsapi.org/v2/top-headlines?${new URLSearchParams({ sources: "associated-press", pageSize: "40", apiKey: key })}`);
+    const items = [];
+    for (const a of (d && d.articles) || []) {
+      const title = clean(a.title);
+      if (!title || title === "[Removed]" || !isHttp(a.url)) continue;
+      items.push({ title, link: a.url, source: "Associated Press", desc: clean(a.description), thumbnail: isHttp(a.urlToImage) ? a.urlToImage : "", timestamp: Date.parse(a.publishedAt) || 0 });
+    }
+    return items;
+  },
+};
+
 // NewsData.io: US news from the highest-ranked outlets in four categories. The free plan delays articles by 12 hours
 // and returns 10 per request, so two requests are made per refresh; like NewsAPI it is background, not breaking.
 const newsdata = {
@@ -216,7 +237,7 @@ const massive = {
   },
 };
 
-const REGISTRY = { thenewsapi, tmdb, nasa, webz, newsapi, newsdata, eventregistry, massive };
+const REGISTRY = { thenewsapi, tmdb, nasa, webz, newsapi, ap, newsdata, eventregistry, massive };
 
 // ---- shared cache, caps and the fetch wrapper ------------------------------------------------------------------
 

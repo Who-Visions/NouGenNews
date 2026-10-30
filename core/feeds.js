@@ -179,6 +179,17 @@ export const FEEDS = [
     lang: "en",
   },
   {
+    id: "ap",
+    name: "Associated Press (about a day old)",
+    desc: "The AP wire via NewsAPI.org; the free plan delays it by about a day",
+    url: "@provider:ap",
+    icon: "🗞",
+    badge: "AP",
+    section: "Top stories",
+    accent: "#ef4444",
+    lang: "en",
+  },
+  {
     id: "latest",
     name: "Latest (12 h delay)",
     desc: "US news from top-ranked outlets via NewsData.io; the free plan delays it by 12 hours",

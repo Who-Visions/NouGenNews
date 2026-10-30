@@ -198,3 +198,22 @@ test("a relaunch refetches a cache older than the launch window once, then trust
   assert.equal(second.cached, true);
   assert.equal(n, 1);
 });
+
+test("the AP provider asks NewsAPI for the Associated Press source only, labels the items AP, and shares the key and a small daily cap", async () => {
+  const http = async (url) => {
+    assert.match(url, /^https:\/\/newsapi\.org\/v2\/top-headlines\?/);
+    assert.equal(new URL(url).searchParams.get("sources"), "associated-press");
+    assert.equal(new URL(url).searchParams.get("country"), null); // NewsAPI refuses sources together with country
+    return reply({ articles: [
+      { title: "Judge denies request", url: "https://apnews.com/article/x", description: "d", urlToImage: "https://img.test/a.jpg", publishedAt: "2026-10-29T00:46:37Z", source: { name: "Associated Press" } },
+      { title: "[Removed]", url: "https://apnews.com/article/y" },
+      { title: "Bad link", url: "javascript:alert(1)" },
+    ] });
+  };
+  const r = await fetchProvider({ id: "ap", env: { NEWSAPI_KEY: "N" }, file: tmp(), http, now: () => NOW });
+  assert.equal(r.items.length, 1);
+  assert.equal(r.items[0].source, "Associated Press");
+  assert.equal(r.items[0].link, "https://apnews.com/article/x");
+  assert.equal(REGISTRY.ap.env, REGISTRY.newsapi.env);
+  assert.ok(REGISTRY.ap.cap.max + REGISTRY.newsapi.cap.max < 100); // together they stay under the free plan's 100 a day
+});

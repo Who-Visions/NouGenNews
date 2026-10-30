@@ -21,6 +21,7 @@ import { scoreStory } from "../../core/edition.js";
 import { findAlerts } from "../../core/alerts.js";
 import { dedupeStories } from "../../core/dedupe.js";
 import { clusterStories } from "../../core/cluster.js";
+import { feedItems } from "../../core/atom.js";
 import { BreakingAlert } from "./BreakingAlert.jsx";
 import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
 import { loadCity, loadRegion, loadMetro, loadScope } from "./CornerClock.jsx";
@@ -335,7 +336,7 @@ const byPlayableThenNew = (a, b) => clampTs(b.timestamp) - clampTs(a.timestamp) 
 
 function parseFeedXml(xml, feedMeta) {
   const items = [];
-  const itemMatches = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
+  const itemMatches = feedItems(xml);
 
   for (const item of itemMatches) {
     const rawTitle = cleanPlainText((item.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || "");

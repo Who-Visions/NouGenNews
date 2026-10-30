@@ -70,6 +70,7 @@ const handlers = {
       history: Array.isArray(args.history) ? args.history.slice(-8) : [],
       keys: assistantKeys,
       readArticle: (url) => require("./article").articleFetch(url),
+      recall: (query) => require("./recall").recallShards(query),
     });
   },
   // The whole story behind a headline, with the videos the page carries (electron/article.js).

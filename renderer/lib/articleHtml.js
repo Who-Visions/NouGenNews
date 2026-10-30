@@ -149,7 +149,13 @@ export function imageKey(src) {
     const u = new URL(String(src || "").replace(/&amp;/g, "&").trim());
     // A WordPress CDN address carries the real host as its first path segment ("i0.wp.com/site.test/...").
     const cdn = /^i\d\.wp\.com$/.test(u.hostname);
-    return ((cdn ? "" : u.hostname) + (cdn ? u.pathname.replace(/^\//, "") : u.pathname)).replace(/-\d{2,4}x\d{2,4}(\.[A-Za-z0-9]+)$/, "$1").replace(/\.(?:jpe?g|png|webp|avif|gif)$/i, "").toLowerCase();
+    return ((cdn ? "" : u.hostname) + (cdn ? u.pathname.replace(/^\//, "") : u.pathname))
+      .replace(/-\d{2,4}x\d{2,4}(\.[A-Za-z0-9]+)$/, "$1")
+      .replace(/(?:\.(?:sm|md|lg|xs|xl))?\.(?:jpe?g|png|webp|avif|gif)$/i, "")
+      // A CMS that names each size ("l-intro-1793203098", "intro-1793203098.sm") still means one picture; the prefix is only
+      // dropped when the name carries a long numeric id, so ordinary names such as "s-curve" are left alone.
+      .replace(/([/])(?:xs|sm|md|lg|xl|[lmst])-([^/]*\d{6,}[^/]*)$/i, "$1$2")
+      .toLowerCase();
   } catch {
     return String(src || "");
   }

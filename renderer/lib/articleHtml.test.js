@@ -152,3 +152,20 @@ test("dropAdLabels also removes short page-control blocks (comment count, copied
   const out = dropAdLabels("<p>By Sam Published October 29, 2026 | Comments (29) | Copied!</p><p>Share this story</p><p>He said the comments (29 of them) were fair and the report ran long enough to count as a real paragraph of story text here.</p>", doc);
   assert.equal(out, "<p>He said the comments (29 of them) were fair and the report ran long enough to count as a real paragraph of story text here.</p>");
 });
+
+test("imageKey treats a CMS's size variants of one picture as one (l- prefix, .sm suffix, webp or jpg), but not ordinary names", () => {
+  const base = "https://www.tvline.com/img/gallery/story/intro-1793203098";
+  assert.equal(imageKey(`${base}.jpg`), imageKey("https://www.tvline.com/img/gallery/story/l-intro-1793203098.jpg"));
+  assert.equal(imageKey(`${base}.jpg`), imageKey(`${base}.sm.webp`));
+  assert.equal(imageKey(`${base}.jpg`), imageKey(`${base}.webp`));
+  assert.notEqual(imageKey(`${base}.jpg`), imageKey("https://www.tvline.com/img/gallery/story/other-1793203099.jpg"));
+  assert.notEqual(imageKey("https://x.test/p/s-curve.jpg"), imageKey("https://x.test/p/curve.jpg"));
+});
+
+test("a body picture that is the lead's larger variant is dropped, and the story's other picture stays", () => {
+  const doc = new JSDOM("").window.document;
+  const html = `<img src="https://www.tvline.com/img/gallery/s/intro-1793203098.jpg"><p>text</p><img src="https://www.tvline.com/img/gallery/s/second-1793203099.jpg">`;
+  const out = dropDuplicateImages(html, "https://www.tvline.com/img/gallery/s/l-intro-1793203098.jpg", doc);
+  assert.doesNotMatch(out, /intro-1793203098/);
+  assert.match(out, /second-1793203099/);
+});

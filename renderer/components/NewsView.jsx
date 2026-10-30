@@ -26,6 +26,8 @@ import { feedItems } from "../../core/atom.js";
 import { BreakingAlert } from "./BreakingAlert.jsx";
 import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
 import { loadCity, loadRegion, loadMetro, loadScope } from "./CornerClock.jsx";
+import { KnowhowPanel } from "./KnowhowPanel.jsx";
+import { applyKnowhow, flagsFor, forget, loadKnowhow, parseRules, saveKnowhow, vote } from "../lib/knowhow.js";
 import "./NewsView.css";
 import {
   articleLang,
@@ -798,6 +800,11 @@ export function NewsView() {
   const activeAlert = demoAlert || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
   // A real alert's story leads everything: the hero, the top of the list, and the story that opens in the reader.
   const alertLead = activeAlert && !activeAlert.demo && activeAlert.story ? activeAlert : null;
+  const [knowhow, setKnowhow] = useState(loadKnowhow);
+  const [knowhowOpen, setKnowhowOpen] = useState(false);
+  useEffect(() => { saveKnowhow(knowhow); }, [knowhow]);
+  const tasteRules = useMemo(() => parseRules(knowhow.text).rules, [knowhow.text]);
+  const tasteStats = useRef({ muted: 0, raised: 0, lowered: 0, flagged: 0, capped: 0 });
   const searchFiltered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const kept = withLibrary.filter((a) => {
@@ -813,14 +820,18 @@ export function NewsView() {
         a.categories.some((c) => c.toLowerCase().includes(q))
       );
     });
-    const ranked = !libraryTerms.length || (activeFeed !== "all" && activeFeed !== "library" && !activeFeed.startsWith("section:"))
+    const base = !libraryTerms.length || (activeFeed !== "all" && activeFeed !== "library" && !activeFeed.startsWith("section:"))
       ? kept
       : kept.map((a) => [a, scoreStory(a, { now: Date.now(), terms: libraryTerms })]).sort((x, y) => y[1] - x[1]).map((x) => x[0]);
+    // The reader's Know-how shapes the wire, but a search finds everything and a breaking alert is never hidden.
+    const taste = knowhow.on && !q ? applyKnowhow(base, tasteRules, knowhow.learned, new Set(alertLead ? alertLead.stories.map((s) => s.id) : [])) : null;
+    tasteStats.current = taste ? taste.stats : { muted: 0, raised: 0, lowered: 0, flagged: 0, capped: 0 };
+    const ranked = taste ? taste.stories : base;
     if (!alertLead || activeFeed !== "all" || q) return ranked;
     const ids = new Set(alertLead.stories.map((s) => s.id));
     const first = ranked.find((a) => a.id === alertLead.story.id);
     return [...(first ? [first] : []), ...ranked.filter((a) => ids.has(a.id) && a !== first), ...ranked.filter((a) => !ids.has(a.id))];
-  }, [withLibrary, libraryTerms, activeFeed, search, alertLead]);
+  }, [withLibrary, libraryTerms, activeFeed, search, alertLead, knowhow.on, knowhow.learned, tasteRules]);
 
   // Dynamically resolve wire headlines when wireLang is "ht", "en", or "es"
   useEffect(() => {
@@ -1408,6 +1419,10 @@ export function NewsView() {
             )}
           </div>
 
+          <button type="button" className="nn-knowhow-btn" title="Your rules for the wire" aria-expanded={knowhowOpen} onClick={() => setKnowhowOpen((o) => !o)} style={{ background: "rgba(232,184,109,0.06)", border: "1px solid rgba(232,184,109,0.5)", color: "#e8b86d", borderRadius: TOKENS.radiusSm, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>
+            Know-how
+          </button>
+
           <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent("nn:refresh"))}
@@ -1571,6 +1586,7 @@ export function NewsView() {
                     <div className="news-card-meta" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: TOKENS.textMuted }}>
                       {item.videos?.length ? <span style={{ color: item.accent, fontWeight: 700 }}>▶ Video</span> : null}
                       {item.libraryHits?.length ? <span title={item.libraryHits.join(", ")} style={{ color: TOKENS.accentPrimary, fontWeight: 700 }}>♥ In your library</span> : null}
+                      {flagsFor(item, tasteRules).length ? <span className="nn-flag" title={flagsFor(item, tasteRules).join(", ")}>⚑ Flagged</span> : null}
                       <span>{item.readMins} min read</span>
                       {item.alsoFrom && item.alsoFrom.length ? <span title={item.alsoFrom.map((a) => `${a.source}: ${a.title}`).join("\n")}>+{item.alsoFrom.length} {item.alsoFrom.length === 1 ? "source" : "sources"}</span> : null}
                       {item.categories[0] && (
@@ -1806,6 +1822,12 @@ export function NewsView() {
                 </div>
               )}
 
+              <div className="nn-vote" role="group" aria-label="Rate this story" style={{ marginBottom: 16 }}>
+                {[[1, "👍", "More like this"], [-1, "👎", "Less like this"]].map(([dir, icon, label]) => (
+                  <button key={dir} type="button" title={label} aria-label={label} aria-pressed={knowhow.learned.votes[currentArticle.id]?.dir === dir} onClick={() => setKnowhow((k) => ({ ...k, learned: vote(k.learned, currentArticle, dir) }))}>{icon}</button>
+                ))}
+              </div>
+
               {currentArticle.keyPoints?.length && effectiveArticleLang === "orig" ? (
                 <aside className="nn-keypoints" aria-label="Key points">
                   <h2 className="nn-keypoints__h">Key points</h2>
@@ -1903,6 +1925,15 @@ export function NewsView() {
       {archiveOpen ? <ShardsLitePanel onClose={() => setArchiveOpen(false)} /> : null}
       {assistantOpen ? <AssistantPanel articles={filtered} current={currentArticle} onClose={() => setAssistantOpen(false)} /> : null}
       {lightbox ? <Lightbox photos={lightbox.photos} index={lightbox.index} origin={lightbox.origin} onClose={() => setLightbox(null)} /> : null}
+      {knowhowOpen ? (
+        <KnowhowPanel
+          text={knowhow.text} on={knowhow.on} learned={knowhow.learned} stats={tasteStats.current}
+          onText={(text) => setKnowhow((k) => ({ ...k, text }))}
+          onToggle={(on) => setKnowhow((k) => ({ ...k, on }))}
+          onForget={(kind, key) => setKnowhow((k) => ({ ...k, learned: forget(k.learned, kind, key) }))}
+          onClose={() => setKnowhowOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

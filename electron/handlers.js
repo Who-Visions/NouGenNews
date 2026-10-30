@@ -62,6 +62,7 @@ const handlers = {
     const wire = (Array.isArray(args.wire) ? args.wire : []).slice(0, 400).map((s) => ({
       id: String(s.id || "").slice(0, 80), title: String(s.title || "").slice(0, 300), source: String(s.source || "").slice(0, 80),
       age: String(s.age || "").slice(0, 30), desc: String(s.desc || "").slice(0, 400), url: String(s.url || "").slice(0, 600),
+      coverage: Math.min(Math.max(Number(s.coverage) || 1, 1), 100000), ts: Number(s.ts) || 0,
     }));
     return assistant.ask({
       question: String(args.question || ""),

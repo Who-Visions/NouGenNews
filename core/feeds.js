@@ -112,6 +112,17 @@ export const FEEDS = [
     lang: "en",
   },
   {
+    id: "verge",
+    name: "The Verge",
+    desc: "Technology, science, culture and entertainment (an Atom feed)",
+    url: "https://www.theverge.com/rss/index.xml",
+    icon: "💻",
+    badge: "Tech",
+    section: "Tech",
+    accent: "#e8b86d",
+    lang: "en",
+  },
+  {
     id: "gsmarena",
     name: "GSMArena",
     desc: "Smartphone news and reviews",

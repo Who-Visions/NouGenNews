@@ -117,3 +117,17 @@ test("the assistant can call recall_shards in its loop", async () => {
   const out = await ask({ question: "what did we do on tts?", wire, keys: ["k"], http, recall: async () => [{ id: 7, db: 1, title: "Kokoro", body: "sidecar" }] });
   assert.equal(out.answer, "From memory: the sidecar.");
 });
+
+test("a question with no topic words gets the wire's lead: most outlets first, then newest", async () => {
+  const w = [
+    { id: "n1", title: "Minor local item", source: "A", age: "1h", ts: 3000, coverage: 1 },
+    { id: "n2", title: "Big event everyone covers", source: "B", age: "5h", ts: 1000, coverage: 5 },
+    { id: "n3", title: "Another minor item", source: "C", age: "2h", ts: 2000, coverage: 1 },
+  ];
+  const t = makeTools({ wire: w, readArticle: async () => ({}) });
+  const lines = t.search_wire({ query: "what are the biggest stories right now" }).split("\n");
+  assert.match(lines[0], /^\[n2\] Big event everyone covers — B, 5h, covered by 5 outlets$/);
+  assert.match(lines[1], /^\[n1\]/); // then the newest
+  assert.equal(t.search_wire({ query: "minor" }).split("\n").length, 2); // a topic word still searches
+  assert.equal(makeTools({ wire: [], readArticle: async () => ({}) }).search_wire({ query: "latest" }), "The wire is empty.");
+});

@@ -10,13 +10,12 @@ const NOW = Date.now();
 const story = (n, over = {}) => ({ id: `s${n}`, feedId: "tvline", title: `Story number ${n} about zebra migration`, link: `https://x.test/${n}`, source: "TVLine", badge: "TV", lang: "en", categories: ["TV", "Film"], desc: `Summary ${n} of the zebra story`, timestamp: NOW - n * 3600000, ...over });
 const mem = () => createArchive({ file: ":memory:" });
 
-test("a wire story becomes a shard-shaped record keyed by its address", () => {
+test("a wire story becomes a canonical shard record: its address is its identity, its feed is a tag", () => {
   const r = storyToRecord(story(1));
-  assert.equal(r.key, "https://x.test/1");
+  assert.equal(r.domain_key, "https://x.test/1");
   assert.equal(r.event_type, "NEWS_STORY");
-  assert.equal(r.domain_key, "nougennews/tvline");
   assert.equal(r.source_uri, "https://x.test/1");
-  assert.deepEqual(r.tags, ["TVLine", "TV", "en", "TV", "Film"]);
+  assert.deepEqual(r.tags, ["TVLine", "feed:tvline", "TV", "en", "TV", "Film"]);
   assert.equal(r.event_time, NOW - 3600000);
   assert.match(r.content, /Summary 1/);
 });
@@ -27,7 +26,7 @@ test("a story with no usable address or title is skipped, and an empty summary f
   assert.equal(storyToRecord(story(1, { title: "  " })), null);
   assert.equal(storyToRecord(null), null);
   assert.equal(storyToRecord(story(2, { desc: "", text: "" })).content, "TVLine: Story number 2 about zebra migration");
-  assert.equal(storyToRecord(story(3, { feedId: "../../etc" })).domain_key, "nougennews/etc");
+  assert.ok(storyToRecord(story(3, { feedId: "../../etc" })).tags.includes("feed:etc"));
 });
 
 test("ingesting the same wire twice stores each story once, and a story opened later gains its full text in place", () => {
@@ -57,7 +56,17 @@ test("search finds a story that has left the wire, and `days` limits it to recen
   assert.equal(recent[0].source_uri, "https://x.test/1");
 });
 
-test("the archive survives a restart and exports a bundle in the app's own documents folder layout", () => {
+test("a story the reader opens is marked used and ranks above an equal one", () => {
+  const a = mem();
+  a.ingest([story(1, { title: "Zebra herd count", desc: "zebra herd" }), story(2, { title: "Zebra herd count", desc: "zebra herd", link: "https://x.test/2" })]);
+  const last = a.search({ query: "zebra herd" }).pop();
+  const m = a.opened(last.source_uri);
+  assert.equal(m.access_count, 1);
+  assert.equal(a.search({ query: "zebra herd" })[0].source_uri, last.source_uri);
+  assert.equal(a.opened("https://nowhere.test/x"), null);
+});
+
+test("the archive survives a restart and exports a checksummed bundle", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nn-arch-"));
   const file = path.join(dir, "shards-light.db");
   const a = createArchive({ file });
@@ -67,17 +76,29 @@ test("the archive survives a restart and exports a bundle in the app's own docum
   assert.equal(b.stats().count, 2);
   const out = b.exportTo(path.join(dir, "export"));
   assert.equal(out.count, 2);
+  assert.equal(out.manifest.source_app, "NouGenNews");
+  assert.equal(out.manifest.sha256.length, 64);
   const lines = fs.readFileSync(out.file, "utf8").trim().split("\n").map((l) => JSON.parse(l));
-  assert.equal(lines[0].event_type, "NEWS_STORY");
-  assert.equal(lines[0].source_uri, "https://x.test/1");
+  assert.equal(lines[0].domain_key, "https://x.test/1");
   b.close();
 });
 
-test("upgradeInfo names this product and the shared product page", () => {
-  const u = mem().upgradeInfo();
-  assert.equal(u.product, "NouGenNews");
-  assert.equal(u.name, "NouGen Shards");
-  assert.match(u.url, /^https:\/\//);
+test("promote exports the archive and hands the bundle and the named vault to the importer", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nn-prom-"));
+  const a = mem();
+  a.ingest([story(1), story(2)]);
+  let call = null;
+  const r = await a.promote({ dir, vault: "/v", runImporter: async (args) => { call = args; return { ok: true, imported: 2, skipped: 0, vault: "/v" }; } });
+  assert.equal(call.vault, "/v");
+  assert.ok(fs.existsSync(call.bundle));
+  assert.deepEqual([r.ok, r.exported, r.imported], [true, 2, 2]);
+  assert.equal(r.sha256.length, 64);
+});
+
+test("upgradeInfo and diagnostics name this product", () => {
+  const a = mem();
+  assert.equal(a.upgradeInfo().product, "NouGenNews");
+  assert.equal(a.diagnostics().product, "NouGenNews");
 });
 
 test("the assistant's search_archive tool lists stories with outlet, time and address, and says so when there are none", async () => {
@@ -85,7 +106,7 @@ test("the assistant's search_archive tool lists stories with outlet, time and ad
   a.ingest([story(1), story(2, { link: "https://x.test/older", timestamp: NOW - 5 * 86400000 })]);
   const tools = makeTools({ wire: [], readArticle: async () => ({}), archive: (q, d) => a.search({ query: q, limit: 6, days: d }) });
   const out = await tools.search_archive({ query: "zebra", days: 0 });
-  assert.match(out, /^\[archive \d+\] Story number 1 about zebra migration — tvline, \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC: .*\(https:\/\/x\.test\/1\)/);
+  assert.match(out, /^\[archive \d+\] Story number 1 about zebra migration — TVLine, \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC: .*\(https:\/\/x\.test\/1\)/);
   assert.equal(out.split("\n").length, 2);
   assert.equal(await tools.search_archive({ query: "qqqqzzzz" }), "Nothing in the archive about that.");
   const broken = makeTools({ wire: [], readArticle: async () => ({}), archive: () => { throw new Error("locked"); } });

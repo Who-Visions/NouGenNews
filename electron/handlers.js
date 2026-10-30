@@ -55,6 +55,18 @@ const handlers = {
   archive_ingest: (args = {}) => require("./archive").appArchive(app).ingest(args.stories),
   archive_search: (args = {}) => require("./archive").appArchive(app).search({ query: String(args.query || ""), limit: Math.min(Number(args.limit) || 10, 50), days: Number(args.days) || 0 }),
   archive_stats: () => require("./archive").appArchive(app).stats(),
+  archive_opened: (args = {}) => require("./archive").appArchive(app).opened(String(args.link || "").slice(0, 1000)),
+  // Whether full NouGen Shards is on this machine (its vault folder, its local node on :4444).
+  archive_detect_full: () => require("./archive").appArchive(app).detectFull(),
+  // Copies the whole archive into the full NouGen Shards vault on this machine. Only when the reader presses Promote.
+  archive_promote: () => {
+    const archive = require("./archive");
+    const { nougenDir, pickPython } = require("../scripts/resolve-key.cjs");
+    return archive.appArchive(app).promote({
+      dir: path.join(app.getPath("documents"), "NouGenNews Archive"),
+      runImporter: archive.pythonImporter({ nougenDir: nougenDir(), pickPython }),
+    });
+  },
   archive_upgrade_info: () => require("./archive").appArchive(app).upgradeInfo(),
   // Writes the whole archive as a bundle full NouGen Shards imports, into Documents\NouGenNews Archive.
   archive_export: () => {

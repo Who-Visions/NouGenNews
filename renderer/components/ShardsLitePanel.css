@@ -30,3 +30,4 @@
 .sl :focus-visible { outline: 2px solid var(--nn-accent, #e8b86d); outline-offset: 2px; }
 @keyframes sl-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sl { animation: none; } }
+.sl__found { margin: 8px 0; font-size: 13px; color: #86efac; }

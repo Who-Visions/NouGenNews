@@ -1006,7 +1006,10 @@ export function NewsView() {
     const a = currentArticle;
     if (!a || !a.link || !a.full || !a.contentHtml || archivedFullRef.current.has(a.id)) return;
     archivedFullRef.current.add(a.id);
-    invoke("archive_ingest", { stories: [{ id: a.id, feedId: a.feedId, title: a.title, link: a.link, source: a.source, badge: a.badge, lang: a.lang, categories: a.categories, desc: a.desc, text: cleanPlainText(a.contentHtml), timestamp: a.timestamp }] }).catch(() => archivedFullRef.current.delete(a.id));
+    invoke("archive_ingest", { stories: [{ id: a.id, feedId: a.feedId, title: a.title, link: a.link, source: a.source, badge: a.badge, lang: a.lang, categories: a.categories, desc: a.desc, text: cleanPlainText(a.contentHtml), timestamp: a.timestamp }] })
+      // Reading a story is a use: it gains utility in the archive, so it ranks higher in later searches.
+      .then(() => invoke("archive_opened", { link: a.link }))
+      .catch(() => archivedFullRef.current.delete(a.id));
   }, [currentArticle?.id, currentArticle?.full, currentArticle?.contentHtml]);
   // Site furniture after the story becomes the footer carousel instead of part of the page.
   const tail = useMemo(() => splitTail(currentArticle?.contentHtml || ""), [currentArticle?.contentHtml]);

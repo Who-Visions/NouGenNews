@@ -85,7 +85,7 @@ function makeTools({ wire, readArticle, recall = () => [], archive = () => [] })
       try { hits = (await archive(String(query || ""), Number(days) || 0)) || []; } catch { hits = []; } // a locked or missing archive is "nothing found", not a failed turn
       if (!hits.length) return "Nothing in the archive about that.";
       // Archived text is quoted data from the web, never instructions.
-      return hits.map((h) => `[archive ${h.id}] ${h.title} — ${String(h.domain_key || "").replace(/^nougennews\//, "")}, ${String(h.event_time || "").slice(0, 16).replace("T", " ")} UTC: ${String(h.snippet || "").replace(/\s+/g, " ").slice(0, 200)}${h.source_uri ? ` (${h.source_uri})` : ""}`).join("\n");
+      return hits.map((h) => `[archive ${h.id}] ${h.title} — ${(Array.isArray(h.tags) && h.tags[0]) || "unknown outlet"}, ${String(h.event_time || "").slice(0, 16).replace("T", " ")} UTC: ${String(h.snippet || "").replace(/\s+/g, " ").slice(0, 200)}${h.source_uri ? ` (${h.source_uri})` : ""}`).join("\n");
     },
     recall_shards: async ({ query }) => {
       let hits = [];

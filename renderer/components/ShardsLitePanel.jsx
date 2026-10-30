@@ -16,10 +16,25 @@ export function ShardsLitePanel({ onClose }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
 
+  const [full, setFull] = useState(null);
+
   useEffect(() => {
     invoke("archive_stats").then(setStats).catch((e) => setNote(String((e && e.message) || e)));
     invoke("archive_upgrade_info").then(setInfo).catch(() => {});
+    invoke("archive_detect_full").then(setFull).catch(() => setFull(null));
   }, []);
+
+  // Copies every kept story into the full NouGen Shards on this machine, after the reader confirms.
+  const promote = async () => {
+    if (!window.confirm(`Copy all ${stats ? stats.count.toLocaleString() : ""} archived stories into NouGen Shards on this machine? They keep their original dates and sources.`)) return;
+    setBusy(true);
+    setNote("Promoting the archive into NouGen Shards…");
+    try {
+      const r = await invoke("archive_promote");
+      setNote(r.ok ? `Promoted: ${r.imported} new, ${r.skipped} already there, out of ${r.exported}. Bundle kept at ${r.bundle}` : `Promotion did not finish: ${r.error}. The bundle is at ${r.bundle}`);
+    } catch (err) { setNote(String((err && err.message) || err)); }
+    finally { setBusy(false); }
+  };
 
   const search = async (e) => {
     e.preventDefault();
@@ -64,7 +79,7 @@ export function ShardsLitePanel({ onClose }) {
                 {hits.map((h) => (
                   <li key={h.id}>
                     <div className="sl__title">{h.title}</div>
-                    <div className="sl__meta mono">{String(h.domain_key || "").replace(/^nougennews\//, "")} · {h.event_time ? ageLabel(Date.parse(h.event_time)) : ""}</div>
+                    <div className="sl__meta mono">{(Array.isArray(h.tags) && h.tags[0]) || ""} · {h.event_time ? ageLabel(Date.parse(h.event_time)) : ""}{h.access_count ? ` · read ${h.access_count}×` : ""}</div>
                     {h.snippet ? <div className="sl__snip">{h.snippet}</div> : null}
                   </li>
                 ))}
@@ -88,7 +103,14 @@ export function ShardsLitePanel({ onClose }) {
               </tbody>
             </table>
             <p className="sl__muted">{info.upgrade}</p>
-            <button type="button" className="sl__btn sl__btn--go" onClick={() => invoke("archive_open_upgrade").catch(() => {})}>Learn about {info.name}</button>
+            {full && full.detected ? (
+              <>
+                <p className="sl__found" role="status">{info.name} is on this machine{full.node ? " and its node is running" : " (its node is not running)"}.</p>
+                <button type="button" className="sl__btn sl__btn--go" onClick={promote} disabled={busy || !stats || !stats.count}>Promote this archive into {info.name}</button>
+              </>
+            ) : (
+              <button type="button" className="sl__btn sl__btn--go" onClick={() => invoke("archive_open_upgrade").catch(() => {})}>Learn about {info.name}</button>
+            )}
           </section>
         ) : null}
       </div>

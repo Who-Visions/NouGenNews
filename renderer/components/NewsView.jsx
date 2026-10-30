@@ -13,6 +13,7 @@ import { imagesFromXmlItem, imagesFromHtml, bestImage } from "../../core/images.
 import { VideoDock, useWide } from "./VideoDock.jsx";
 import { Lightbox, photoIndex } from "./Lightbox.jsx";
 import { AssistantPanel } from "./AssistantPanel.jsx";
+import { ShardsLitePanel } from "./ShardsLitePanel.jsx";
 import { clampTs } from "../lib/age.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
@@ -565,6 +566,10 @@ export function NewsView() {
   const wireRef = useRef(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  // Stories already handed to the archive this session (it also dedupes, so this only saves traffic), and the opened ones whose full text was kept.
+  const archivedRef = useRef(new Set());
+  const archivedFullRef = useRef(new Set());
   const speechRef = useRef(null);
   const wireTransAbortRef = useRef(null);
   const artTransAbortRef = useRef(null);
@@ -981,6 +986,28 @@ export function NewsView() {
     return wireTranslatedMap[`${rawCurrentArticle.id}::${effectiveArticleLang}`] || rawCurrentArticle;
   }, [rawCurrentArticle, effectiveArticleLang, articleTranslation, wireTranslatedMap]);
   currentArticleRef.current = currentArticle;
+
+  // Shards Light: every story the wire shows is kept in the app's own database (electron/archive.js), a few seconds after
+  // it arrives and in one batch, so the wire has a history and the assistant can search what has scrolled off.
+  useEffect(() => {
+    const fresh = articles.filter((a) => a && a.link && !archivedRef.current.has(a.id));
+    if (!fresh.length) return undefined;
+    const t = setTimeout(() => {
+      fresh.forEach((a) => archivedRef.current.add(a.id));
+      invoke("archive_ingest", { stories: fresh.map((a) => ({ id: a.id, feedId: a.feedId, title: a.title, link: a.link, source: a.source, badge: a.badge, lang: a.lang, categories: a.categories, desc: a.desc, timestamp: a.timestamp })) }).catch(() => {
+        fresh.forEach((a) => archivedRef.current.delete(a.id)); // try again with the next refresh
+      });
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [articles]);
+
+  // A story the reader opens is kept with its whole text, so the archive holds more than the headline and summary.
+  useEffect(() => {
+    const a = currentArticle;
+    if (!a || !a.link || !a.full || !a.contentHtml || archivedFullRef.current.has(a.id)) return;
+    archivedFullRef.current.add(a.id);
+    invoke("archive_ingest", { stories: [{ id: a.id, feedId: a.feedId, title: a.title, link: a.link, source: a.source, badge: a.badge, lang: a.lang, categories: a.categories, desc: a.desc, text: cleanPlainText(a.contentHtml), timestamp: a.timestamp }] }).catch(() => archivedFullRef.current.delete(a.id));
+  }, [currentArticle?.id, currentArticle?.full, currentArticle?.contentHtml]);
   // Site furniture after the story becomes the footer carousel instead of part of the page.
   const tail = useMemo(() => splitTail(currentArticle?.contentHtml || ""), [currentArticle?.contentHtml]);
   // Each picture once: the lead picture and repeats inside the body are dropped from the body.
@@ -1049,6 +1076,7 @@ export function NewsView() {
       if (e.key === "m" || e.key === "M") { e.preventDefault(); setMenuOpen((o) => !o); return; }
       if (e.key === "?") { e.preventDefault(); setHelpOpen((o) => !o); return; }
       if (e.key === "a" || e.key === "A") { e.preventDefault(); setAssistantOpen((o) => !o); return; }
+      if (e.key === "s" || e.key === "S") { e.preventDefault(); setArchiveOpen((o) => !o); return; }
       if (e.key === "r" || e.key === "R") { e.preventDefault(); fetchAllFeeds(); return; }
       if (/^[1-9]$/.test(e.key)) {
         const f = FEEDS[Number(e.key) - 1];
@@ -1827,6 +1855,7 @@ export function NewsView() {
         <span><b>←/→</b> lead story</span>
         <span><b>Space</b> play</span>
         <span><b>A</b> assistant</span>
+        <span><b>S</b> archive</span>
         <span><b>L</b> listen</span>
         <span><b>T</b> translate</span>
         <span><b>1–9</b> topic</span>
@@ -1835,6 +1864,7 @@ export function NewsView() {
         <span className="spacer" />
         <button type="button" onClick={() => setHelpOpen(true)}>? help</button>
       </div>
+      {archiveOpen ? <ShardsLitePanel onClose={() => setArchiveOpen(false)} /> : null}
       {assistantOpen ? <AssistantPanel articles={filtered} current={currentArticle} onClose={() => setAssistantOpen(false)} /> : null}
       {lightbox ? <Lightbox photos={lightbox.photos} index={lightbox.index} origin={lightbox.origin} onClose={() => setLightbox(null)} /> : null}
     </div>

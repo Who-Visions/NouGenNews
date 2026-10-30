@@ -50,6 +50,7 @@
     "luxon": "^3.7.2",
     "next": "^16.2.10",
     "next-devtools-mcp": "^0.4.0",
+    "nougen-shards-lite": "file:../NouGenShardsLite",
     "qrcode-terminal": "^0.12.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

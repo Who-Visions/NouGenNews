@@ -51,6 +51,24 @@ const handlers = {
   // Titles the reader owns (NouGenFlix library), for lifting related stories. Read-only.
   library_titles: () => require("./library").libraryTitles(app),
   restart: () => { app.relaunch(); app.exit(0); },
+  // The archive (electron/archive.js): NouGen Shards Light, one local SQLite file. Every story the app sees is kept once.
+  archive_ingest: (args = {}) => require("./archive").appArchive(app).ingest(args.stories),
+  archive_search: (args = {}) => require("./archive").appArchive(app).search({ query: String(args.query || ""), limit: Math.min(Number(args.limit) || 10, 50), days: Number(args.days) || 0 }),
+  archive_stats: () => require("./archive").appArchive(app).stats(),
+  archive_upgrade_info: () => require("./archive").appArchive(app).upgradeInfo(),
+  // Writes the whole archive as a bundle full NouGen Shards imports, into Documents\NouGenNews Archive.
+  archive_export: () => {
+    const out = require("./archive").appArchive(app).exportTo(path.join(app.getPath("documents"), "NouGenNews Archive"));
+    return { file: out.file, count: out.count };
+  },
+  // Opens the NouGen Shards page in the reader's browser: only the address upgradeInfo names, nothing the page supplies.
+  archive_open_upgrade: () => {
+    const { shell } = require("electron");
+    const url = require("./archive").appArchive(app).upgradeInfo().url;
+    if (!/^https:\/\//i.test(url)) return false;
+    shell.openExternal(url);
+    return true;
+  },
   // The assistant (electron/assistant.js): gemma4:31b on Ollama Cloud with the keymaker's keys, local model as fallback.
   // The renderer sends the wire it is showing; keys are read here once and never go back to the page.
   assistant_ask: async (args = {}) => {
@@ -72,6 +90,7 @@ const handlers = {
       keys: assistantKeys,
       readArticle: (url) => require("./article").articleFetch(url),
       recall: (query) => require("./recall").recallShards(query),
+      archive: (query, days) => require("./archive").appArchive(app).search({ query, limit: 6, days }),
     });
   },
   // The whole story behind a headline, with the videos the page carries (electron/article.js).

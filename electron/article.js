@@ -4,6 +4,7 @@
 // Videos the page carries (YouTube embeds and direct .mp4/.webm files) are listed so the reader can play
 // them in the app. The renderer still sanitizes what comes back; this only chooses what to keep.
 const { fetchSafe } = require("./safe");
+const { extractMeta, keywords, summarize, linkDensity, squash } = require("./articlemeta");
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const YT = /(?:youtube(?:-nocookie)?\.com\/(?:embed\/|watch\?(?:[^"'\s&]*&)?v=|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/g;
@@ -30,7 +31,7 @@ const paragraphText = (html) => [...String(html).matchAll(/<p\b[^>]*>([\s\S]*?)<
 // Strips the parts of a page that are not the story, then keeps the richest block.
 function extractArticle(html, url = "") {
   let s = String(html || "").replace(/<!--[\s\S]*?-->/g, "");
-  const title = ((s.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i) || s.match(/<title>([^<]*)/i) || [])[1] || "").trim();
+  const title = squash((s.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i) || s.match(/<title>([^<]*)/i) || [])[1] || "").trim();
   const videos = findVideos(s);
   s = s.replace(DROP, "");
   let body = (s.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i) || [])[1] || "";
@@ -40,7 +41,8 @@ function extractArticle(html, url = "") {
     let bestLen = 0;
     for (const m of s.matchAll(/<(div|section|main)\b([^>]*)>([\s\S]*?)<\/\1>/gi)) {
       if (JUNK_CLASS.test(m[2])) continue;
-      const len = paragraphText(m[3]);
+      // A block that is mostly links is a menu or a related-stories rail, however much text it holds.
+      const len = paragraphText(m[3]) * (1 - Math.min(0.9, linkDensity(m[3])));
       if (len > bestLen) { bestLen = len; best = m[3]; }
     }
     if (bestLen > paragraphText(body)) body = best;
@@ -65,6 +67,12 @@ async function articleFetch(raw, http = fetchSafe) {
   if (!res.ok) throw new Error(`Article error: HTTP ${res.status}`);
   const html = (await res.text()).slice(0, MAX_BYTES);
   const out = extractArticle(html, u.toString());
+  // Who wrote it, when, and the gist: from the page's own tags and the body we kept, no model involved.
+  const meta = extractMeta(html, u.toString());
+  const text = squash(out.html.replace(/<\/(p|li|h\d|blockquote)>/gi, ". ").replace(/\.(\s*\.)+/g, "."));
+  const kw = keywords(text, out.title, 8);
+  Object.assign(out, meta, { keywords: kw.length ? kw : meta.keywordsMeta, summary: text ? summarize(text, out.title, 4) : [] });
+  delete out.keywordsMeta;
   // The page's best picture however it names it (Open Graph, Twitter, JSON-LD, its own images); the same reader as feeds use.
   try {
     const { imagesFromHtml, bestImage } = await import("../core/images.js");

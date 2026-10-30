@@ -142,7 +142,9 @@ function makeTools({ wire, readArticle, recall = () => [], archive = () => [], w
       try {
         const a = await readArticle(s.url);
         const text = String((a && (a.text || a.html)) || "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().slice(0, 6000);
-        return text ? `${s.title}\n${text}` : `${s.title}\n${s.desc || ""}`;
+        const by = [a && a.authors && a.authors.length ? `By ${a.authors.join(", ")}` : "", a && a.publishedAt ? `published ${a.publishedAt.slice(0, 10)}` : ""].filter(Boolean).join(", ");
+        const gist = a && a.summary && a.summary.length ? `\nKey points (extracted from the article): ${a.summary.join(" ")}` : "";
+        return text ? `${s.title}${by ? `\n${by}` : ""}${gist}\n${text}` : `${s.title}\n${s.desc || ""}`;
       } catch {
         return `${s.title}\n${s.desc || ""}`;
       }

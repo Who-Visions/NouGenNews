@@ -47,3 +47,36 @@ test("the page's own headline and breadcrumb trail are dropped from the body", (
   assert.doesNotMatch(out.html, /Television|Big Story Headline/);
   assert.match(out.html, /Real story text/);
 });
+
+test("a link-heavy rail with more text than the story does not win the block choice", () => {
+  const rail = `<div id="rail">${Array.from({ length: 30 }, (_, i) => `<p><a href="/r${i}">Related headline number ${i} that goes on for quite a few words indeed</a></p>`).join("")}</div>`;
+  const story = `<div id="story">${para("real", 8)}<p><a href="/x">one link</a></p></div>`;
+  const out = extractArticle(`<html><body>${rail}${story}</body></html>`);
+  assert.match(out.html, /real paragraph 0/);
+  assert.doesNotMatch(out.html, /Related headline/);
+});
+
+test("articleFetch also returns who wrote it, when, the gist and the keywords, from the page itself", async () => {
+  const body = Array.from({ length: 12 }, (_, i) => `<p>The harbor flood barrier plan moved forward on day ${i} as engineers reviewed the storm surge gates for the harbor district.</p>`).join("");
+  const html = `<html lang="en"><head><meta property="og:title" content="Harbor flood barrier moves forward"><meta name="author" content="By Jane Roe">
+    <meta property="article:published_time" content="2026-10-29T12:00:00Z"><meta property="og:description" content="A barrier."></head><body><article>${body}</article></body></html>`;
+  const out = await articleFetch("https://news.test/a", async () => ({ ok: true, text: async () => html }));
+  assert.deepEqual(out.authors, ["Jane Roe"]);
+  assert.equal(out.publishedAt, "2026-10-29T12:00:00.000Z");
+  assert.equal(out.description, "A barrier.");
+  assert.ok(out.keywords.includes("harbor") && out.keywords.includes("barrier"));
+  assert.ok(out.summary.length >= 1 && out.summary.length <= 4);
+  assert.equal(out.keywordsMeta, undefined);
+});
+
+test("the page title has its HTML entities decoded", () => {
+  assert.equal(extractArticle(`<meta property="og:title" content="Stewart in &#039;Star Trek&#039; &amp; &quot;X-Men&quot;"><article>${para("x")}</article>`).title, `Stewart in 'Star Trek' & "X-Men"`);
+});
+
+test("the summary is built from sentences only: subheadings inside the body are left out", async () => {
+  const p = (n) => `<p>The harbor flood barrier plan moved forward on day ${n} as engineers reviewed the storm surge gates for the harbor district.</p>`;
+  const html = `<html><head><meta property="og:title" content="Harbor flood barrier"></head><body><article>${p(1)}<h2>How the harbor barrier became the rarest project</h2>${p(2)}${p(3)}</article></body></html>`;
+  const out = await articleFetch("https://news.test/h", async () => ({ ok: true, text: async () => html }));
+  assert.equal(out.summary.length, 3); // fewer sentences than the summary size: every one comes back, so a leaked heading would show
+  assert.ok(!out.summary.some((s) => /rarest project/.test(s)));
+});

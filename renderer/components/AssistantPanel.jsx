@@ -7,7 +7,8 @@ import "./AssistantPanel.css";
 function wireForAssistant(articles) {
   return (articles || []).slice(0, 300).map((a) => ({
     id: a.id, title: a.title, source: a.source, age: a.timestamp ? ageLabel(a.timestamp) : "", desc: a.desc || "", url: a.link || "",
-    coverage: Math.max(a.reportCount || 0, a.clusterSize || 0, 1), ts: a.timestamp || 0,
+    // Distinct outlets only: reportCount is that after clustering. Counting stories would let one outlet's many notices look like wide coverage.
+    coverage: Math.max(a.reportCount || 0, 1), ts: a.timestamp || 0,
   }));
 }
 

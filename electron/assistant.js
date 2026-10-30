@@ -59,6 +59,8 @@ const KEY_NAMES = [
 // Words that ask about the wire itself rather than a topic in it.
 const GENERIC = new Set(["biggest", "top", "latest", "news", "story", "stories", "headline", "headlines", "right", "now", "today", "tonight", "wire", "what", "whats", "going", "main", "important", "major", "current", "recent", "happening", "new", "name", "three", "most", "the", "are", "and", "was", "for", "you", "any", "has", "have", "does", "did", "about", "with", "from", "that", "this", "tell", "give", "show", "list", "can", "please", "which", "who", "how", "why", "when", "there", "been", "being", "some", "all", "out", "get"]);
 
+const PRESS_WIRE = /globenewswire|pr newswire|prnewswire|business wire|businesswire|accesswire|einpresswire|newsfile|press release/i;
+
 // Which words of the query appear in the title or description, best matches first.
 function scoreStory(s, words) {
   const hay = `${s.title} ${s.desc || ""} ${s.source || ""}`.toLowerCase();
@@ -80,7 +82,8 @@ function makeTools({ wire, readArticle, recall = () => [] }) {
       const line = (s) => `[${s.id}] ${s.title} — ${s.source || "unknown"}, ${s.age || "age unknown"}${s.coverage > 1 ? `, covered by ${s.coverage} outlets` : ""}`;
       // A question with no topic words ("the biggest stories") asks for the wire's lead: most outlets first, then newest.
       if (!words.length) {
-        const top = wire.slice().sort((a, b) => (b.coverage || 1) - (a.coverage || 1) || (b.ts || 0) - (a.ts || 0)).slice(0, 8);
+        // Press-release wires are paid announcements, not news the reader asked about; they never lead.
+        const top = wire.filter((s) => !PRESS_WIRE.test(s.source || "")).sort((a, b) => (b.coverage || 1) - (a.coverage || 1) || (b.ts || 0) - (a.ts || 0)).slice(0, 8);
         return top.length ? top.map(line).join("\n") : "The wire is empty.";
       }
       const hits = wire.map((s) => ({ s, n: scoreStory(s, words) })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n || (b.s.coverage || 1) - (a.s.coverage || 1)).slice(0, 8);

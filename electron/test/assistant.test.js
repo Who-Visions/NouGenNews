@@ -131,3 +131,14 @@ test("a question with no topic words gets the wire's lead: most outlets first, t
   assert.equal(t.search_wire({ query: "minor" }).split("\n").length, 2); // a topic word still searches
   assert.equal(makeTools({ wire: [], readArticle: async () => ({}) }).search_wire({ query: "latest" }), "The wire is empty.");
 });
+
+test("press-release wires never lead the 'biggest stories' list, however many notices they run", () => {
+  const w = [
+    { id: "p1", title: "FUELCELL DEADLINE: investors urged to secure counsel", source: "GlobeNewswire Inc.", age: "1h", ts: 9000, coverage: 1 },
+    { id: "p2", title: "Lost money on Pathward shares?", source: "Business Wire", age: "1h", ts: 8000, coverage: 3 },
+    { id: "r1", title: "Real story", source: "Reuters", age: "2h", ts: 1000, coverage: 2 },
+  ];
+  const lines = makeTools({ wire: w, readArticle: async () => ({}) }).search_wire({ query: "biggest stories" }).split("\n");
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /^\[r1\]/);
+});

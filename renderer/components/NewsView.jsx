@@ -12,6 +12,7 @@ import { Ago } from "./Ago.jsx";
 import { imagesFromXmlItem, imagesFromHtml, bestImage } from "../../core/images.js";
 import { VideoDock, useWide } from "./VideoDock.jsx";
 import { Lightbox, photoIndex } from "./Lightbox.jsx";
+import { AssistantPanel } from "./AssistantPanel.jsx";
 import { clampTs } from "../lib/age.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
@@ -561,6 +562,7 @@ export function NewsView() {
   const searchRef = useRef(null);
   const wireRef = useRef(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const speechRef = useRef(null);
   const wireTransAbortRef = useRef(null);
   const artTransAbortRef = useRef(null);
@@ -1044,6 +1046,7 @@ export function NewsView() {
       if (e.key === "/") { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
       if (e.key === "m" || e.key === "M") { e.preventDefault(); setMenuOpen((o) => !o); return; }
       if (e.key === "?") { e.preventDefault(); setHelpOpen((o) => !o); return; }
+      if (e.key === "a" || e.key === "A") { e.preventDefault(); setAssistantOpen((o) => !o); return; }
       if (e.key === "r" || e.key === "R") { e.preventDefault(); fetchAllFeeds(); return; }
       if (/^[1-9]$/.test(e.key)) {
         const f = FEEDS[Number(e.key) - 1];
@@ -1820,6 +1823,7 @@ export function NewsView() {
         <span><b>Enter</b> open</span>
         <span><b>←/→</b> lead story</span>
         <span><b>Space</b> play</span>
+        <span><b>A</b> assistant</span>
         <span><b>L</b> listen</span>
         <span><b>T</b> translate</span>
         <span><b>1–9</b> topic</span>
@@ -1828,6 +1832,7 @@ export function NewsView() {
         <span className="spacer" />
         <button type="button" onClick={() => setHelpOpen(true)}>? help</button>
       </div>
+      {assistantOpen ? <AssistantPanel articles={filtered} current={currentArticle} onClose={() => setAssistantOpen(false)} /> : null}
       {lightbox ? <Lightbox photos={lightbox.photos} index={lightbox.index} origin={lightbox.origin} onClose={() => setLightbox(null)} /> : null}
     </div>
   );

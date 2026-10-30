@@ -4,6 +4,9 @@ const embed = require("./embed");
 const { app } = require("electron");
 const path = require("node:path");
 
+// The assistant's Ollama Cloud keys, read from the keymaker on first use and kept in this process only.
+let assistantKeys = null;
+
 const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
@@ -48,6 +51,27 @@ const handlers = {
   // Titles the reader owns (NouGenFlix library), for lifting related stories. Read-only.
   library_titles: () => require("./library").libraryTitles(app),
   restart: () => { app.relaunch(); app.exit(0); },
+  // The assistant (electron/assistant.js): gemma4:31b on Ollama Cloud with the keymaker's keys, local model as fallback.
+  // The renderer sends the wire it is showing; keys are read here once and never go back to the page.
+  assistant_ask: async (args = {}) => {
+    const assistant = require("./assistant");
+    if (!assistantKeys) {
+      const found = require("../scripts/resolve-key.cjs").readSecrets(assistant.KEY_NAMES);
+      assistantKeys = assistant.KEY_NAMES.map((n) => found[n]).filter(Boolean);
+    }
+    const wire = (Array.isArray(args.wire) ? args.wire : []).slice(0, 400).map((s) => ({
+      id: String(s.id || "").slice(0, 80), title: String(s.title || "").slice(0, 300), source: String(s.source || "").slice(0, 80),
+      age: String(s.age || "").slice(0, 30), desc: String(s.desc || "").slice(0, 400), url: String(s.url || "").slice(0, 600),
+    }));
+    return assistant.ask({
+      question: String(args.question || ""),
+      wire,
+      current: args.current && typeof args.current === "object" ? { title: String(args.current.title || "").slice(0, 300), source: String(args.current.source || "").slice(0, 80), text: String(args.current.text || "").slice(0, 3000) } : null,
+      history: Array.isArray(args.history) ? args.history.slice(-8) : [],
+      keys: assistantKeys,
+      readArticle: (url) => require("./article").articleFetch(url),
+    });
+  },
   // The whole story behind a headline, with the videos the page carries (electron/article.js).
   article_fetch: (args = {}) => require("./article").articleFetch(args.url || ""),
   // Feeds are fetched here because a page cannot read another site's feed (CORS). Public https only.

@@ -56,4 +56,45 @@ function readSecret(name, { env = process.env, run = spawnSync, exists = fs.exis
   }
 }
 
-module.exports = { nougenDir, pickPython, readSecret };
+const MANY_SNIPPET = [
+  "import sys, json",
+  "sys.path.insert(0, 'src')",
+  "import nougen_shards.keymaker as k",
+  "out = {}",
+  "for n in sys.argv[1:]:",
+  "    try:",
+  "        v = k.get_secret(n)",
+  "    except Exception:",
+  "        v = None",
+  "    if v: out[n] = v",
+  "sys.stdout.write(json.dumps(out))",
+].join("\n");
+
+// Several secrets in one Python start (each start costs seconds). Returns { NAME: value } for the ones found; {} on any failure.
+function readSecrets(names, { env = process.env, run = spawnSync, exists = fs.existsSync } = {}) {
+  const ok = (Array.isArray(names) ? names : []).filter((n) => /^[A-Z0-9_]{3,64}$/.test(n));
+  if (!ok.length) return {};
+  const dir = nougenDir(env);
+  if (!exists(dir)) return {};
+  try {
+    const r = run(pickPython(dir, exists), ["-I", "-c", MANY_SNIPPET, ...ok], {
+      cwd: dir,
+      encoding: "utf8",
+      timeout: 60000,
+      windowsHide: true,
+      env: {
+        ...env,
+        PYTHONPATH: "src",
+        NOUGEN_SECRETS_VAULT_DIR: env.NOUGEN_SECRETS_VAULT_DIR || path.join(os.homedir(), ".nougen", "secrets"),
+        NOUGEN_VAULT_DIR: env.NOUGEN_VAULT_DIR || path.join(os.homedir(), ".nougen", "shards"),
+      },
+    });
+    if (!r || r.status !== 0) return {};
+    const parsed = JSON.parse(String(r.stdout || "{}"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+module.exports = { nougenDir, pickPython, readSecret, readSecrets };

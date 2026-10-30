@@ -4,6 +4,29 @@ import { CornerClock } from "./CornerClock.jsx";
 import { CastButton } from "./CastButton.jsx";
 import "./MenuBar.css";
 
+// A visible Refresh button: pulls every feed and asks the API providers for fresh data. It shows what the wire is doing
+// (the news view reports it) and when the last pull finished.
+function RefreshButton() {
+  const [state, setState] = useState({ loading: false, lastUpdated: null });
+  useEffect(() => {
+    const on = (e) => setState({ loading: !!(e.detail && e.detail.loading), lastUpdated: (e.detail && e.detail.lastUpdated) || null });
+    window.addEventListener("nn:sync-state", on);
+    return () => window.removeEventListener("nn:sync-state", on);
+  }, []);
+  return (
+    <button
+      type="button"
+      className={`menubar__refresh${state.loading ? " is-busy" : ""}`}
+      disabled={state.loading}
+      aria-busy={state.loading}
+      title={state.lastUpdated ? `Refresh the wire (last pulled ${state.lastUpdated})` : "Refresh the wire"}
+      onClick={() => window.dispatchEvent(new CustomEvent("nn:refresh"))}
+    >
+      <span className="menubar__spin" aria-hidden="true">&#10227;</span> {state.loading ? "Refreshing…" : "Refresh"}
+    </button>
+  );
+}
+
 // Each item presses the key the news view already listens for, so menu and keyboard never drift apart.
 const press = (key) => () => window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 const browse = () => window.dispatchEvent(new CustomEvent("nn:browse-current"));
@@ -89,6 +112,7 @@ export function MenuBar() {
       ))}
       <CornerClock />
       <CastButton />
+      <RefreshButton />
       <button type="button" className="menubar__restart" title="Restart the app" onClick={() => invoke("restart")}>&#8635; Restart</button>
     </div>
   );

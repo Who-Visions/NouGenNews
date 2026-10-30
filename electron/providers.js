@@ -255,7 +255,8 @@ const launched = new Set();
 const LAUNCH_FRESH_MS = 10 * 60 * 1000;
 
 // { items, cached, stale } or null. Never throws; never returns the key.
-async function fetchProvider({ id, env = process.env, file, http = fetchSafe, now = Date.now, registry = REGISTRY }) {
+// `force` (the Refresh button) skips the cached copy but not the daily cap: at the cap it still serves the stale copy.
+async function fetchProvider({ id, env = process.env, file, http = fetchSafe, now = Date.now, registry = REGISTRY, force = false }) {
   const p = registry[id];
   if (!p) return null;
   const t = now();
@@ -271,7 +272,7 @@ async function fetchProvider({ id, env = process.env, file, http = fetchSafe, no
   const firstRead = !launched.has(id);
   launched.add(id);
   const fresh = firstRead && use.used < p.cap.max / 2 ? Math.min(p.ttlMs, LAUNCH_FRESH_MS) : p.ttlMs;
-  if (hit && t - hit.at < fresh) return { items: hit.items, cached: true };
+  if (hit && !force && t - hit.at < fresh) return { items: hit.items, cached: true };
   const key = env[p.env] || "";
   if (!key) return stale;
 

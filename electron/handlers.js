@@ -32,6 +32,7 @@ const handlers = {
   youtube_add: (args = {}) => ({ channels: require("./youtube").addChannel(app.getPath("userData"), String(args.ref || "").slice(0, 200)) }),
   provider_feed: (args = {}) => require("./providers").fetchProvider({
     id: String(args.id || "").slice(0, 30),
+    force: args.force === true,
     file: path.join(app.getPath("userData"), "provider-cache.json"),
   }).then((r) => (r ? { items: r.items, cached: !!r.cached, stale: !!r.stale } : null)),
   // Near you from SerpApi when a key is present (publisher links, pictures); null means use the free feed.

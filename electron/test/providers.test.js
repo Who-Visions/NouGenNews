@@ -217,3 +217,22 @@ test("the AP provider asks NewsAPI for the Associated Press source only, labels 
   assert.equal(REGISTRY.ap.env, REGISTRY.newsapi.env);
   assert.ok(REGISTRY.ap.cap.max + REGISTRY.newsapi.cap.max < 100); // together they stay under the free plan's 100 a day
 });
+
+test("force (the Refresh button) skips a fresh cached copy, still counts against the cap, and at the cap serves the stale copy", async () => {
+  const file = tmp();
+  let calls = 0;
+  const http = async () => { calls += 1; return reply({ articles: [{ title: `Story ${calls}`, url: `https://apnews.com/article/${calls}`, publishedAt: "2026-10-29T00:00:00Z" }] }); };
+  const env = { NEWSAPI_KEY: "N" };
+  const first = await fetchProvider({ id: "ap", env, file, http, now: () => NOW });
+  assert.equal(first.items[0].title, "Story 1");
+  const cached = await fetchProvider({ id: "ap", env, file, http, now: () => NOW + 60000 });
+  assert.deepEqual([cached.cached, calls], [true, 1]); // a normal pull inside the cache window makes no request
+  const forced = await fetchProvider({ id: "ap", env, file, http, now: () => NOW + 120000, force: true });
+  assert.deepEqual([forced.cached, forced.items[0].title, calls], [false, "Story 2", 2]);
+  // Spend the rest of the day's allowance, then a forced refresh serves the stale copy instead of calling out.
+  for (let i = 0; i < REGISTRY.ap.cap.max; i++) await fetchProvider({ id: "ap", env, file, http, now: () => NOW + 180000 + i, force: true });
+  const before = calls;
+  const atCap = await fetchProvider({ id: "ap", env, file, http, now: () => NOW + 240000, force: true });
+  assert.equal(calls, before);
+  assert.equal(atCap.stale, true);
+});

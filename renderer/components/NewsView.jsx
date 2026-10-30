@@ -638,11 +638,11 @@ export function NewsView() {
     });
   }, []);
   const providerRef = useRef({});
-  const loadProviders = useCallback(async () => {
+  const loadProviders = useCallback(async (force = false) => {
     const feeds = FEEDS.filter((f) => f.url && (f.url.startsWith("@provider:") || f.url === "@youtube"));
     const results = await Promise.all(feeds.map(async (f) => {
       try {
-        const r = f.url === "@youtube" ? await invoke("youtube_feed") : await invoke("provider_feed", { id: f.url.slice("@provider:".length) });
+        const r = f.url === "@youtube" ? await invoke("youtube_feed") : await invoke("provider_feed", { id: f.url.slice("@provider:".length), force });
         return [f.id, r && r.items ? r.items.map((it) => serpStory(it, f)) : []];
       } catch { return [f.id, []]; }
     }));
@@ -689,6 +689,7 @@ export function NewsView() {
     return () => { live = false; };
   }, [city, loadLocal]);
 
+  const forceRef = useRef(false);
   const fetchAllFeeds = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort();
     const ctrl = new AbortController();
@@ -742,7 +743,10 @@ export function NewsView() {
       setFeedHealth(healthMap);
       setArticles(aggregated);
       if (placeRef.current) loadLocal(placeRef.current);
-      loadProviders();
+      // Only the Refresh button asks the API providers to skip their cache; the automatic pull never does.
+      const forced = forceRef.current === true;
+      forceRef.current = false;
+      loadProviders(forced);
       setSelectedArticleId((prev) => prev || aggregated[0]?.id || null);
       setLastUpdated(
         new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -758,6 +762,17 @@ export function NewsView() {
     fetchAllFeeds();
     return () => abortRef.current?.abort();
   }, [fetchAllFeeds]);
+
+  // The menu bar's Refresh button: a full pull that also asks the API providers for fresh data (within their daily caps).
+  useEffect(() => {
+    const onRefresh = () => { forceRef.current = true; fetchAllFeeds(); };
+    window.addEventListener("nn:refresh", onRefresh);
+    return () => window.removeEventListener("nn:refresh", onRefresh);
+  }, [fetchAllFeeds]);
+  // ...and the button shows what the wire is doing.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("nn:sync-state", { detail: { loading, lastUpdated } }));
+  }, [loading, lastUpdated]);
 
   // Always the latest: pull again every minute while the window is visible, and the moment it comes back into view.
   useEffect(() => {
@@ -1080,7 +1095,7 @@ export function NewsView() {
       if (e.key === "?") { e.preventDefault(); setHelpOpen((o) => !o); return; }
       if (e.key === "a" || e.key === "A") { e.preventDefault(); setAssistantOpen((o) => !o); return; }
       if (e.key === "s" || e.key === "S") { e.preventDefault(); setArchiveOpen((o) => !o); return; }
-      if (e.key === "r" || e.key === "R") { e.preventDefault(); fetchAllFeeds(); return; }
+      if (e.key === "r" || e.key === "R") { e.preventDefault(); window.dispatchEvent(new CustomEvent("nn:refresh")); return; }
       if (/^[1-9]$/.test(e.key)) {
         const f = FEEDS[Number(e.key) - 1];
         if (f) { e.preventDefault(); setActiveFeed(f.id); }
@@ -1388,9 +1403,9 @@ export function NewsView() {
 
           <button
             type="button"
-            onClick={fetchAllFeeds}
+            onClick={() => window.dispatchEvent(new CustomEvent("nn:refresh"))}
             disabled={loading}
-            title={lastUpdated ? `Sync live RSS feeds (last synced ${lastUpdated})` : "Sync live RSS feeds"}
+            title={lastUpdated ? `Refresh the wire (last pulled ${lastUpdated})` : "Refresh the wire"}
             style={{
               background: TOKENS.surfaceInteractive,
               border: `1px solid ${TOKENS.borderSubtle}`,
@@ -1863,7 +1878,7 @@ export function NewsView() {
         <span><b>T</b> translate</span>
         <span><b>1–9</b> topic</span>
         <span><b>/</b> search</span>
-        <span><b>R</b> sync</span>
+        <span><b>R</b> refresh</span>
         <span className="spacer" />
         <button type="button" onClick={() => setHelpOpen(true)}>? help</button>
       </div>

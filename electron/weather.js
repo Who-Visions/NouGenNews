@@ -271,7 +271,10 @@ async function fetchNormal(lat, lon, date, { get = getJson } = {}) {
   }));
   const got = highs.filter((v) => v != null);
   const normal = got.length >= 3 ? { high_f: Math.round(got.reduce((a, b) => a + b, 0) / got.length), years: got.length } : null; // too few years is no average
-  if (normal) normalCache.set(k, normal);
+  if (normal) {
+    normalCache.set(k, normal);
+    if (normalCache.size > 200) normalCache.delete(normalCache.keys().next().value);
+  }
   return normal;
 }
 

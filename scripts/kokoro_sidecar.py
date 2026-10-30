@@ -66,8 +66,79 @@ def synth(voice, out_path):
     return {"ok": True, "path": out_path, "seconds": round(len(audio) / SAMPLE_RATE, 2)}
 
 
+_PIPELINES = {}
+
+
+def _pipeline(lang):
+    """One loaded Kokoro pipeline per language code, kept for the life of the server."""
+    if lang not in _PIPELINES:
+        _point_espeak_at_bundled_copy()
+        from kokoro import KPipeline
+
+        _PIPELINES[lang] = KPipeline(lang_code=lang, repo_id="hexgrad/Kokoro-82M")
+    return _PIPELINES[lang]
+
+
+def synth_text(voice, text, out_path):
+    """Same result as synth(), but with the text given and the pipeline reused."""
+    if voice not in VOICES:
+        return {"ok": False, "error": f"Unknown Kokoro voice {voice}"}
+    text = (text or "").strip()
+    if not text:
+        return {"ok": False, "error": "No text to read"}
+    import numpy as np
+    import soundfile as sf
+
+    pipeline = _pipeline(VOICES[voice][0])
+    chunks = [audio for _, _, audio in pipeline(text, voice=voice, speed=1.0)]
+    if not chunks:
+        return {"ok": False, "error": "Kokoro produced no audio"}
+    audio = np.concatenate(chunks)
+    sf.write(out_path, audio, SAMPLE_RATE)
+    return {"ok": True, "path": out_path, "seconds": round(len(audio) / SAMPLE_RATE, 2)}
+
+
+def serve():
+    """Long-lived mode: one JSON request per stdin line, one JSON answer per stdout line.
+
+    {"id": 1, "op": "warm", "voice": "af_heart"}  loads the pipeline for that voice's language
+    {"id": 2, "op": "synth", "voice": "af_heart", "text": "...", "out": "x.wav"}
+    A bad request gets an error answer; it never stops the server.
+    """
+    out = sys.stdout
+    out.write(json.dumps({"ok": True, "ready": True}) + "\n")
+    out.flush()
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        rid = None
+        try:
+            req = json.loads(line)
+            rid = req.get("id")
+            if req.get("op") == "warm":
+                voice = req.get("voice", "")
+                if voice not in VOICES:
+                    ans = {"ok": False, "error": f"Unknown Kokoro voice {voice}"}
+                else:
+                    _pipeline(VOICES[voice][0])
+                    ans = {"ok": True}
+            elif req.get("op") == "synth":
+                ans = synth_text(req.get("voice", ""), req.get("text", ""), req.get("out", ""))
+            else:
+                ans = {"ok": False, "error": f"Unknown op {req.get('op')!r}"}
+        except Exception as exc:
+            ans = {"ok": False, "error": str(exc)}
+        ans["id"] = rid
+        out.write(json.dumps(ans) + "\n")
+        out.flush()
+
+
 def main(argv):
     cmd = argv[1] if len(argv) > 1 else ""
+    if cmd == "serve":
+        serve()
+        return
     try:
         if cmd == "voices":
             out = list_voices()

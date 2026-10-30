@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
 import { ageLabel } from "../lib/age.js";
+import { loadCity, loadRegion } from "./CornerClock.jsx";
 import "./AssistantPanel.css";
 
 // The wire as the assistant sees it: ids, headlines, sources and live ages. Capped so one question stays small.
@@ -43,6 +44,7 @@ export function AssistantPanel({ articles, current, onClose }) {
       const r = await invoke("assistant_ask", {
         question: q,
         history,
+        home: { city: loadCity(), region: loadRegion() },
         wire: wireForAssistant(articles),
         current: current ? { title: current.title, source: current.source, text: plainText(current.contentHtml) } : null,
       });

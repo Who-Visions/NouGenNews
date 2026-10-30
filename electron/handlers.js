@@ -120,6 +120,8 @@ const handlers = {
       readArticle: (url) => require("./article").articleFetch(url),
       recall: (query) => require("./recall").recallShards(query),
       archive: (query, days) => require("./archive").appArchive(app).search({ query, limit: 6, days }),
+      // The reader's home place (sent by the page) unless the model names another city.
+      weather: (place) => require("./weather").weatherReport(place ? { city: place, region: "" } : { city: String((args.home && args.home.city) || "").slice(0, 80), region: String((args.home && args.home.region) || "").slice(0, 80) }),
     });
   },
   // The whole story behind a headline, with the videos the page carries (electron/article.js).

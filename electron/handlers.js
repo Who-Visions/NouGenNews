@@ -120,6 +120,16 @@ const handlers = {
       readArticle: (url) => require("./article").articleFetch(url),
       recall: (query) => require("./recall").recallShards(query),
       archive: (query, days) => require("./archive").appArchive(app).search({ query, limit: 6, days }),
+      // A cited briefing: curated from this wire and the archive, written by the same model chain, checked sentence by sentence.
+      brief: async (topic) => {
+        const b = require("./brief");
+        const r = await b.brief({
+          topic, wire, keys: assistantKeys,
+          archive: (query, days) => require("./archive").appArchive(app).search({ query, limit: 10, days }),
+          readArticle: (url) => require("./article").articleFetch(url),
+        });
+        return b.briefText(r);
+      },
       // The reader's home place (sent by the page) unless the model names another city.
       weather: (place) => require("./weather").weatherReport(place ? { city: place, region: "" } : { city: String((args.home && args.home.city) || "").slice(0, 80), region: String((args.home && args.home.region) || "").slice(0, 80) }),
     });

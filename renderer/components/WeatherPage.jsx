@@ -8,6 +8,7 @@ import {
   clockLabel,
 } from "../lib/weatherSummary.js";
 import { loadCity, loadRegion } from "./CornerClock.jsx";
+import { WeatherWatch } from "./weather/WeatherWatch.jsx";
 import { WeatherGlobe } from "./WeatherGlobe.jsx";
 import { WhatMattersToday } from "./weather/WhatMattersToday.jsx";
 import { HourlyOutlook } from "./weather/HourlyOutlook.jsx";
@@ -161,6 +162,12 @@ export function WeatherPage({ onBack }) {
           </button>
         </div>
       </header>
+
+      <WeatherWatch place={place} onPick={setPlace} />
+
+      {r && r.stale ? (
+        <p className="ww-stale" role="status">Offline: showing the last report, {r.staleMinutes} min old.</p>
+      ) : null}
 
       {/* Error state with retry action */}
       {err ? (

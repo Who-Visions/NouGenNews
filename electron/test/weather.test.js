@@ -180,3 +180,20 @@ test("OpenWeather backup maps conditions and needs a key", async () => {
   const got = await fetchOpenWeather("Miami", "Florida", { key: "k", get: async (_u, p) => ({ name: p.q, main: { temp: 80 }, weather: [{ id: 800, icon: "01d" }] }) });
   assert.equal(got.place, "Miami,Florida");
 });
+
+test("a failed fetch serves a recent report labelled stale, and fails once it is over a day old", async () => {
+  const real = globalThis.fetch;
+  globalThis.fetch = async (u) => ({ ok: true, json: async () => ({ results: [{ latitude: 1, longitude: 2, name: "Offline Town", admin1: "" }] }), url: String(u) });
+  const good = async (url) => { if (url.includes("air-quality")) throw new Error("no air"); return FORECAST; };
+  const bad = async () => { throw new Error("network down"); };
+  try {
+    const t0 = 5e12;
+    const first = await weatherReport({ city: "Offline Town" }, { get: good, now: () => t0 });
+    assert.ok(first.now);
+    assert.equal(first.stale, undefined);
+    const s = await weatherReport({ city: "Offline Town" }, { get: bad, now: () => t0 + 30 * 60000 });
+    assert.equal(s.stale, true);
+    assert.equal(s.staleMinutes, 30);
+    await assert.rejects(weatherReport({ city: "Offline Town" }, { get: bad, now: () => t0 + 25 * 3600000 }), /network down/);
+  } finally { globalThis.fetch = real; }
+});

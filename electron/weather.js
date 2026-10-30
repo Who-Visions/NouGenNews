@@ -90,6 +90,17 @@ function aqiCategory(aqi) {
 }
 
 // Open-Meteo's forecast and air-quality answers as one flat report. Anything the service leaves null stays null.
+// The 15-minute rain steps from the current quarter hour on, in the place's own clock.
+function parseMinutely(f) {
+  const m = (f && f.minutely_15) || {};
+  const times = Array.isArray(m.time) ? m.time : [];
+  const rain = Array.isArray(m.precipitation) ? m.precipitation : [];
+  const now = String((f && f.current && f.current.time) || "");
+  const steps = times.map((time, i) => ({ time, precip_in: rain[i] ?? null }));
+  const from = steps.findIndex((s, i) => !steps[i + 1] || steps[i + 1].time > now);
+  return from < 0 ? [] : steps.slice(from, from + 12);
+}
+
 function parseReport(f, air, place, region = "", { hoursAhead = 48 } = {}) {
   const cur = f && f.current;
   if (!cur || num(cur.temperature_2m) == null) throw new Error("forecast has no current conditions");
@@ -241,6 +252,7 @@ async function fetchReport(city, wantRegion = "", { get = getJson, key } = {}) {
       ...where,
       current: "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation,uv_index,pressure_msl,cloud_cover,dew_point_2m,visibility",
       hourly: "temperature_2m,precipitation_probability,weather_code,is_day",
+      minutely_15: "precipitation", forecast_minutely_15: "16",
       daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max,sunrise,sunset",
       temperature_unit: "fahrenheit", wind_speed_unit: "mph", precipitation_unit: "inch", timezone: "auto", forecast_days: "16", forecast_hours: "72",
     }),
@@ -249,7 +261,7 @@ async function fetchReport(city, wantRegion = "", { get = getJson, key } = {}) {
     fetchAlerts(lat, lon, { get, key }),
     fetchMarine(lat, lon, "", { get, key }),
   ]);
-  const report = parseReport(f, air, place, region);
+  const report = { ...parseReport(f, air, place, region), minutely: parseMinutely(f) };
   // The marine call ran in parallel without the place's clock; pick the matching hour now that it is known.
   const marineNow = marine && report.updated ? marine : marine;
   return { ...report, lat, lon, alerts, marine: marineNow };
@@ -274,4 +286,4 @@ async function weatherReport({ city, region = "" }, { get, key, now = Date.now }
   return report;
 }
 
-module.exports = { homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };
+module.exports = { parseMinutely, homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };

@@ -188,3 +188,10 @@ test("a failed fetch serves a recent report labelled stale, and fails once it is
     await assert.rejects(weatherReport({ city: "Offline Town" }, { get: bad, now: () => t0 + 25 * 3600000 }), /network down/);
   } finally { globalThis.fetch = real; }
 });
+
+test("minutely steps start at the current quarter hour, and a forecast without them gives none", () => {
+  const { parseMinutely } = require("../weather");
+  const f = { current: { time: "2026-10-30T14:37" }, minutely_15: { time: ["2026-10-30T14:15", "2026-10-30T14:30", "2026-10-30T14:45"], precipitation: [0.1, 0, null] } };
+  assert.deepEqual(parseMinutely(f), [{ time: "2026-10-30T14:30", precip_in: 0 }, { time: "2026-10-30T14:45", precip_in: null }]);
+  assert.deepEqual(parseMinutely({}), []);
+});

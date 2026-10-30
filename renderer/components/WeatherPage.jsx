@@ -9,6 +9,7 @@ import {
 } from "../lib/weatherSummary.js";
 import { loadCity, loadRegion } from "./CornerClock.jsx";
 import { WeatherWatch } from "./weather/WeatherWatch.jsx";
+import { RainNowcast } from "./weather/RainNowcast.jsx";
 import { WeatherGlobe } from "./WeatherGlobe.jsx";
 import { WhatMattersToday } from "./weather/WhatMattersToday.jsx";
 import { HourlyOutlook } from "./weather/HourlyOutlook.jsx";
@@ -239,6 +240,7 @@ export function WeatherPage({ onBack }) {
       ) : null}
 
       {/* "What Matters Today" 4-Card Instrument Cluster */}
+      {r ? <RainNowcast steps={r.minutely} /> : null}
       {r && matters ? <WhatMattersToday matters={matters} /> : null}
 
       {/* Loading Skeleton */}

@@ -108,7 +108,9 @@
 .nh-hint { font-size: 10px; color: var(--nn-dim); margin-left: 4px; }
 
 /* Up-next strip: compact thumbs with the progress bar on the active one. */
-.nh-strip { grid-column: 1 / 3; list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 10px; overflow-x: auto; }
+/* Fixed-width cards, so the row is wider than the window and can drift; the second copy of the cards makes the loop seamless. */
+.nh-strip { grid-column: 1 / 3; list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 300px; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+.nh-strip::-webkit-scrollbar { display: none; }
 .nh-thumb {
   position: relative; display: block; width: 100%; padding: 0; text-align: left; cursor: pointer;
   background: var(--nn-panel); border: 1px solid var(--nn-line); border-radius: var(--nn-radius); overflow: hidden;

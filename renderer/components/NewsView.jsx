@@ -331,6 +331,8 @@ async function kokoroSynth(text, voice) {
 }
 
 // One copy of every story, however many sources carried it, then playable first and newest first.
+// How many stories the hero carousel and its drifting "Up next" row hold.
+const HERO_COUNT = 18;
 const mergeWire = (list) => clusterStories(dedupeStories(list)).sort(byPlayableThenNew);
 
 const byPlayableThenNew = (a, b) => clampTs(b.timestamp) - clampTs(a.timestamp) || String(a.id).localeCompare(String(b.id));
@@ -1133,9 +1135,9 @@ export function NewsView() {
   // The stories the hero can play: the ones with a video, newest first.
   const playable = useMemo(() => {
     const withVideo = filtered.filter((a) => a.videos && a.videos.length);
-    if (!alertLead || activeFeed !== "all" || search.trim()) return withVideo.slice(0, 6);
+    if (!alertLead || activeFeed !== "all" || search.trim()) return withVideo.slice(0, HERO_COUNT);
     const lead = filtered.find((a) => a.id === alertLead.story.id) || alertLead.story;
-    return [{ ...lead, alertLevel: alertLead.level }, ...withVideo.filter((a) => a.id !== lead.id)].slice(0, 6);
+    return [{ ...lead, alertLevel: alertLead.level }, ...withVideo.filter((a) => a.id !== lead.id)].slice(0, HERO_COUNT);
   }, [filtered, alertLead, activeFeed, search]);
 
   return (

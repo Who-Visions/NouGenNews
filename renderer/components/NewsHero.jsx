@@ -6,6 +6,7 @@ import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "re
 import { Ago } from "./Ago.jsx";
 import { HeroScroller } from "./HeroScroller.jsx";
 import { HeroTitle } from "./HeroTitle.jsx";
+import { useStripDrift } from "./StripDrift.js";
 
 const DWELL_MS = 16000;
 
@@ -38,6 +39,8 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
   const [tick, setTick] = useState(0); // restarts the progress animation
   const count = items.length;
   const safe = count ? Math.min(index, count - 1) : 0;
+  // The "Up next" row drifts slowly right to left and loops (two copies of the cards, the second one hidden from assistive tech).
+  const drift = useStripDrift(count > 1);
   const item = items[safe];
 
   const go = (n) => {
@@ -115,13 +118,26 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
         </div>}
       </div>
 
-      {count > 1 && <ol className="nh-strip" aria-label="Up next">
-        {items.map((it, i) => (
-          <li key={it.id}>
+      {count > 1 && <ol
+        className="nh-strip"
+        aria-label="Up next"
+        ref={drift.box}
+        data-cards={count}
+        onMouseEnter={() => drift.hold(true)}
+        onMouseLeave={() => drift.hold(false)}
+        onFocus={() => drift.hold(true)}
+        onBlur={() => drift.hold(false)}
+      >
+        {Array.from({ length: count * drift.reps }, (_, n) => items[n % count]).map((it, n) => {
+          const i = n % count;
+          const copy = Math.floor(n / count);
+          return (
+          <li key={`${it.id}:${copy}`} data-copy={copy} aria-hidden={copy ? "true" : undefined}>
             <button
               type="button"
               className={`nh-thumb${i === safe ? " on" : ""}`}
               onClick={() => go(i)}
+              tabIndex={copy ? -1 : undefined}
               aria-current={i === safe ? "true" : undefined}
               aria-label={`${i + 1} of ${count}: ${it.title}`}
             >
@@ -134,7 +150,8 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
               ) : null}
             </button>
           </li>
-        ))}
+          );
+        })}
       </ol>}
     </section>
   );

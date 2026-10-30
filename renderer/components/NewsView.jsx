@@ -953,7 +953,10 @@ export function NewsView() {
         const seen = new Set((a.videos || []).map((v) => v.id || v.url));
         const videos = [...(a.videos || []), ...((got && got.videos) || []).filter((v) => !seen.has(v.id || v.url))];
         const lead = got && got.image && !a.imageUrl ? { imageUrl: got.image } : {};
-        setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, full: true, videos, ...lead, ...(html ? { contentHtml: html, readMins: estimateReadingMinutes(html) } : {}) } : x)));
+        // What the page itself says about the story: its writers (only where the feed named none) and the extracted gist.
+        const by = got && Array.isArray(got.authors) && got.authors.length && !a.creator ? { creator: got.authors.join(", ") } : {};
+        const gist = got && Array.isArray(got.summary) && got.summary.length >= 2 && html ? { keyPoints: got.summary } : {};
+        setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, full: true, videos, ...lead, ...by, ...gist, ...(html ? { contentHtml: html, readMins: estimateReadingMinutes(html) } : {}) } : x)));
       })
       .catch(() => { if (live) setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, full: true } : x))); })
       .finally(() => { if (live) setFetchingFull(false); });
@@ -1802,6 +1805,16 @@ export function NewsView() {
                   ))}
                 </div>
               )}
+
+              {currentArticle.keyPoints?.length && effectiveArticleLang === "orig" ? (
+                <aside className="nn-keypoints" aria-label="Key points">
+                  <h2 className="nn-keypoints__h">Key points</h2>
+                  <ul className="nn-keypoints__list">
+                    {currentArticle.keyPoints.map((p, i) => <li key={i}>{p}</li>)}
+                  </ul>
+                  <p className="nn-keypoints__note">Extracted from the article's own sentences.</p>
+                </aside>
+              ) : null}
 
               {currentArticle.videos?.length && !docked ? (
                 <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />

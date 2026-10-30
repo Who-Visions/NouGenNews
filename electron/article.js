@@ -69,7 +69,7 @@ async function articleFetch(raw, http = fetchSafe) {
   const out = extractArticle(html, u.toString());
   // Who wrote it, when, and the gist: from the page's own tags and the body we kept, no model involved.
   const meta = extractMeta(html, u.toString());
-  const text = squash(out.html.replace(/<\/(p|li|h\d|blockquote)>/gi, ". ").replace(/\.(\s*\.)+/g, "."));
+  const text = squash(out.html.replace(/<h\d\b[^>]*>[\s\S]*?<\/h\d>/gi, " ").replace(/<\/(p|li|blockquote)>/gi, ". ").replace(/\.(\s*\.)+/g, "."));
   const kw = keywords(text, out.title, 8);
   Object.assign(out, meta, { keywords: kw.length ? kw : meta.keywordsMeta, summary: text ? summarize(text, out.title, 4) : [] });
   delete out.keywordsMeta;

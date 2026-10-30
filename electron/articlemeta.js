@@ -108,7 +108,8 @@ function keywords(text, title = "", n = 10) {
 function sentences(text) {
   const t = squash(text).replace(/\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|Inc|Ltd|Co|U\.S|U\.K|vs|etc|No)\./g, "$1\u0001").replace(/(\d)\.(\d)/g, "$1\u0002$2");
   return (t.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) || []).map((x) => x.replace(/\u0001/g, ".").replace(/\u0002/g, ".").trim()).filter((x) => x.split(/\s+/).length >= 5
-    && /^[\p{Lu}\p{N}“"‘']/u.test(x)                                                              // a fragment that opens mid-sentence (closing quote, lowercase) is not a sentence
+    && /[.!?]["')\]”’]*$/.test(x)                                                                 // a subheading or label with no closing punctuation is not a sentence
+    && /^[\p{Lu}\p{N}“"‘']/u.test(x)                                                            // a fragment that opens mid-sentence (closing quote, lowercase) is not a sentence
     && !/^(photograph|photo|image|illustration|credit|source|advertisement|getty|file photo|screenshot|video)\b[:\s]/i.test(x)); // captions are not story
 }
 

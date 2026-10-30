@@ -72,3 +72,11 @@ test("articleFetch also returns who wrote it, when, the gist and the keywords, f
 test("the page title has its HTML entities decoded", () => {
   assert.equal(extractArticle(`<meta property="og:title" content="Stewart in &#039;Star Trek&#039; &amp; &quot;X-Men&quot;"><article>${para("x")}</article>`).title, `Stewart in 'Star Trek' & "X-Men"`);
 });
+
+test("the summary is built from sentences only: subheadings inside the body are left out", async () => {
+  const p = (n) => `<p>The harbor flood barrier plan moved forward on day ${n} as engineers reviewed the storm surge gates for the harbor district.</p>`;
+  const html = `<html><head><meta property="og:title" content="Harbor flood barrier"></head><body><article>${p(1)}<h2>How the harbor barrier became the rarest project</h2>${p(2)}${p(3)}</article></body></html>`;
+  const out = await articleFetch("https://news.test/h", async () => ({ ok: true, text: async () => html }));
+  assert.equal(out.summary.length, 3); // fewer sentences than the summary size: every one comes back, so a leaked heading would show
+  assert.ok(!out.summary.some((s) => /rarest project/.test(s)));
+});

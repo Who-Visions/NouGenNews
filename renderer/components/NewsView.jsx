@@ -1305,9 +1305,9 @@ export function NewsView() {
               else speechRef.current.startBriefing(filtered, prefs, (a) => setSelectedArticleId(a.id));
             }}
             style={{
-              background: "rgba(16,185,129,0.16)",
-              border: "1px solid rgba(16,185,129,0.45)",
-              color: "#fff",
+              background: "rgba(232,184,109,0.2)",
+              border: "1px solid #e8b86d",
+              color: "#e8b86d",
               borderRadius: TOKENS.radiusSm,
               padding: "5px 11px",
               fontSize: 12,
@@ -1338,13 +1338,13 @@ export function NewsView() {
               style={{
                 background:
                   prefs.briefMode === "ollama"
-                    ? "rgba(168,85,247,0.22)"
-                    : TOKENS.surfaceInteractive,
+                    ? "rgba(232,184,109,0.2)"
+                    : "rgba(232,184,109,0.06)",
                 border:
                   prefs.briefMode === "ollama"
-                    ? "1px solid rgba(168,85,247,0.6)"
-                    : `1px solid ${TOKENS.borderSubtle}`,
-                color: prefs.briefMode === "ollama" ? "#e9d5ff" : TOKENS.textSecondary,
+                    ? "1px solid #e8b86d"
+                    : "1px solid rgba(232,184,109,0.5)",
+                color: "#e8b86d",
                 borderRadius: TOKENS.radiusSm,
                 padding: "5px 9px",
                 fontSize: 11,

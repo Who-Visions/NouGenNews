@@ -27,3 +27,11 @@
 /* Keep the command bar on one line: the section buttons drop their count badges on narrower windows (the
    counts stay inside each dropdown). */
 @media (max-width: 1700px) { .sm__split .sm__n { display: none; } }
+
+/* Gold source strip: every chip carries the accent, the active one is filled. Flat colour only (nougen-core). */
+.sm__btn, .sm__main, .sm__caret { color: var(--nn-accent, #e8b86d); }
+.sm__btn, .sm__split { border-color: rgba(232, 184, 109, 0.5); background: rgba(232, 184, 109, 0.06); }
+.sm__caret { border-left-color: rgba(232, 184, 109, 0.4); }
+.sm__btn:hover, .sm__main:hover, .sm__caret:hover { background: rgba(232, 184, 109, 0.16); }
+.sm__btn.is-active, .sm__split.is-active { border-color: var(--nn-accent, #e8b86d); background: rgba(232, 184, 109, 0.2); box-shadow: inset 0 -2px 0 var(--nn-accent, #e8b86d); }
+.sm__n { color: var(--nn-accent, #e8b86d); background: rgba(232, 184, 109, 0.14); }

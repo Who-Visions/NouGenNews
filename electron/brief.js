@@ -91,6 +91,108 @@ function critique(text, sources) {
   });
 }
 
+// ---- The map phase (after the MAP paper: look around before acting) --------------------------------------------------------
+// Before anything is written the desk surveys what the app holds on the topic and builds a map of it: which names and
+// figures the sources establish, which outlets agree, which claim rests on one outlet only, which sources are only a
+// headline. The writer then works inside that map instead of from the top few stories alone. The survey widens in steps
+// (wire, then archive 14 days, then archive 60 days, then reading more articles) and stops on the paper's two signals
+// together: the map gained nothing new (knowledge increment) AND no new outlet turned up (state novelty); or the step
+// budget is spent. Stopping on one signal alone would end the survey while a whole outlet was still unseen.
+const NAME = /\p{Lu}[\p{L}'’.-]*(?:\s+(?:of|the|de|van|von|and|for)\s+\p{Lu}[\p{L}'’.-]*|\s+\p{Lu}[\p{L}'’.-]*){0,3}/gu;
+const FIGURE = /(?:[$£€]\s?)?\d[\d,]*(?:\.\d+)?(?:\s?(?:million|billion|trillion|thousand|percent|%|tonnes?|bn|km|miles|people|deaths|years?|days?))?/gi;
+
+function buildMap(sources) {
+  const names = new Map(); // lower-case name -> { name, by: Set of source numbers }
+  const figures = new Map(); // normalised figure -> { text, by: Set }
+  const thin = [];
+  for (const s of sources) {
+    const body = String(s.body || s.text || "");
+    if (squash(body).length < 200) thin.push(s.n);
+    for (const sent of squash(body).split(/(?<=[.!?])\s+/)) {
+      for (const m of sent.matchAll(NAME)) {
+        const text = m[0].replace(/[.'’-]+$/, "");
+        const single = !/\s/.test(text);
+        if (single && (m.index === 0 || text.length < 4 || STOPMAP.has(text.toLowerCase()))) continue; // a sentence's first word is capitalised for grammar, not because it is a name
+        const k = text.toLowerCase();
+        if (!names.has(k)) names.set(k, { name: text, by: new Set() });
+        names.get(k).by.add(s.n);
+      }
+      for (const m of sent.matchAll(FIGURE)) {
+        const raw = m[0].trim();
+        if (!/[$£€%]|[a-z]/i.test(raw) && raw.replace(/\D/g, "").length < 3) continue; // a bare small number is noise
+        const k = raw.toLowerCase().replace(/[,\s]/g, "");
+        if (!figures.has(k)) figures.set(k, { text: raw, by: new Set() });
+        figures.get(k).by.add(s.n);
+      }
+    }
+  }
+  const outletOf = new Map(sources.map((s) => [s.n, s.source.toLowerCase()]));
+  const outlets = (set) => new Set([...set].map((n) => outletOf.get(n)));
+  const rows = [...names.values()].map((e) => ({ name: e.name, sources: [...e.by].sort((a, b) => a - b), outlets: outlets(e.by).size }));
+  const byWeight = (a, b) => b.outlets - a.outlets || b.sources.length - a.sources.length || (a.name < b.name ? -1 : 1);
+  return {
+    names: new Set(names.keys()),
+    outlets: new Set(outletOf.values()),
+    confirmed: rows.filter((r) => r.outlets >= 2).sort(byWeight).slice(0, 10),
+    single: rows.filter((r) => r.outlets === 1 && r.name.includes(" ")).sort(byWeight).slice(0, 8),
+    figures: [...figures.values()].map((f) => ({ text: f.text, sources: [...f.by].sort((a, b) => a - b) })).slice(0, 8),
+    thin,
+  };
+}
+const STOPMAP = new Set(["the", "this", "that", "these", "those", "there", "when", "where", "while", "after", "before", "with", "from", "they", "their", "have", "will", "also", "said", "says", "more", "some", "such", "other", "about", "into", "than", "then", "what", "which", "during", "since", "because", "however", "according", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "january", "february", "march", "april", "june", "july", "august", "september", "october", "november", "december"]);
+
+// The map as text for the writer: what is established, what rests on one outlet, what is only a headline.
+function mapText(map) {
+  const cite = (r) => r.sources.map((n) => `[${n}]`).join("");
+  const out = [`Surveyed ${map.outlets.size} outlet(s).`];
+  if (map.confirmed.length) out.push(`Named in two or more outlets (safe to state plainly): ${map.confirmed.map((r) => `${r.name} ${cite(r)}`).join("; ")}.`);
+  if (map.single.length) out.push(`Named by one outlet only (attribute it, "according to ..."): ${map.single.map((r) => `${r.name} ${cite(r)}`).join("; ")}.`);
+  if (map.figures.length) out.push(`Figures and where they appear: ${map.figures.map((f) => `${f.text} ${f.sources.map((n) => `[${n}]`).join("")}`).join("; ")}.`);
+  if (map.thin.length) out.push(`Sources with only a headline or a line of text (lean on the others): ${map.thin.map((n) => `[${n}]`).join("")}.`);
+  return out.join("\n");
+}
+
+// Widening survey with the dual stop rule. Returns the final sources, their map and a trace of each step.
+async function survey({ topic, wire, archive, readArticle, maxSteps = 4 }) {
+  const bodies = new Map();
+  const seen = new Map(); // archive id/title -> hit
+  const pull = async (days) => { try { for (const h of (await archive(topic, days)) || []) seen.set(h.id ?? h.title, h); } catch { /* an unreadable archive adds nothing */ } };
+  const read = async (list) => Promise.all(list.map(async (s) => {
+    if (!s.url || bodies.has(s.url)) return;
+    try {
+      const a = await readArticle(s.url);
+      const body = a && Array.isArray(a.summary) && a.summary.length ? a.summary.join(" ") : squash((a && (a.text || a.html)) || "").slice(0, 1200);
+      bodies.set(s.url, body || "");
+    } catch { bodies.set(s.url, ""); }
+  }));
+  const steps = [
+    { name: "wire", run: async () => {} },
+    { name: "archive, 14 days", run: async () => pull(14) },
+    { name: "archive, 60 days", run: async () => pull(60) },
+    { name: "read more articles", run: async () => {} },
+  ].slice(0, maxSteps);
+  const trace = [];
+  let prevNames = new Set();
+  let prevOutlets = new Set();
+  let sources = [];
+  let map = null;
+  for (let i = 0; i < steps.length; i += 1) {
+    await steps[i].run();
+    sources = curate({ topic, wire, archive: [...seen.values()] }).sources;
+    await read(sources.slice(0, i === steps.length - 1 ? MAX_SOURCES : 3)); // the last step reads every kept source, earlier ones the top three
+    for (const s of sources) s.body = `${s.text} ${bodies.get(s.url) || ""}`.trim();
+    map = buildMap(sources);
+    const gained = [...map.names].filter((x) => !prevNames.has(x)).length; // knowledge increment
+    const newOutlets = [...map.outlets].filter((x) => !prevOutlets.has(x)).length; // state novelty
+    trace.push({ step: steps[i].name, sources: sources.length, outlets: map.outlets.size, newNames: gained, newOutlets });
+    // Both signals must have settled, and at least one widening step must have been tried.
+    if (!sources.length || (i >= 1 && gained <= 1 && newOutlets === 0)) break;
+    prevNames = map.names;
+    prevOutlets = map.outlets;
+  }
+  return { sources, map, trace };
+}
+
 const WRITER = [
   "You are a wire-desk writer. Write a briefing of 90 to 170 words on the topic, in plain prose, using ONLY the numbered sources below.",
   "End every sentence with the number of the source that supports it, like [2] (or [1][3] when two do). Never state a figure, date or name that is not in a source.",
@@ -100,25 +202,13 @@ const WRITER = [
 
 async function brief({ topic, wire = [], archive = async () => [], readArticle = async () => ({}), keys = [], http, signal, llm }) {
   const asked = squash(topic).slice(0, 120);
-  let hits = [];
-  try { hits = (await archive(asked, 14)) || []; } catch { hits = []; }
-  const { sources } = curate({ topic: asked, wire, archive: hits });
+  // Look around first: survey, then write inside the map.
+  const { sources, map, trace } = await survey({ topic: asked, wire, archive, readArticle });
   if (!sources.length) return { ok: false, topic: asked, reason: "No stories on the wire or in the archive are about that topic, so there is nothing to base a briefing on." };
-
-  // The top three get their article's own key sentences when the page can be read; the rest keep their feed text.
-  await Promise.all(sources.slice(0, 3).map(async (s) => {
-    if (!s.url) return;
-    try {
-      const a = await readArticle(s.url);
-      const body = a && Array.isArray(a.summary) && a.summary.length ? a.summary.join(" ") : squash((a && (a.text || a.html)) || "").slice(0, 1200);
-      if (body) s.body = `${s.text} ${body}`.trim();
-    } catch { /* the feed text still stands */ }
-  }));
-  for (const s of sources) if (!s.body) s.body = s.text;
 
   const ask = llm || (async (messages) => { const r = await chatRound({ keys, http, signal, messages, tools: [] }); return { text: String(r.data.message.content || "").trim(), model: r.model }; });
   const sourceBlock = sources.map((s) => `[${s.n}] ${s.title} (${s.source}${s.when ? `, ${s.when}` : ""})\n${String(s.body || "").slice(0, 1400)}`).join("\n\n");
-  const messages = [{ role: "system", content: WRITER }, { role: "user", content: `Topic: ${asked}\n\nSources:\n${sourceBlock}` }];
+  const messages = [{ role: "system", content: WRITER }, { role: "user", content: `Topic: ${asked}\n\nMap of what the sources establish (built before writing; follow it):\n${mapText(map)}\n\nSources:\n${sourceBlock}` }];
 
   let model = "";
   let verdict = [];
@@ -138,7 +228,7 @@ async function brief({ topic, wire = [], archive = async () => [], readArticle =
   if (!kept.length) return { ok: false, topic: asked, reason: "The writer could not produce a briefing the sources support.", dropped, sources: sources.map(({ n, title, source, when, url }) => ({ n, title, source, when, url })) };
   const used = new Set(kept.flatMap((k) => k.cites));
   return {
-    ok: true, topic: asked, model, revisions,
+    ok: true, topic: asked, model, revisions, survey: trace, outlets: map.outlets.size,
     brief: kept.map((k) => k.text).join(" "),
     dropped,
     sources: sources.filter((s) => used.has(s.n)).map(({ n, title, source, when, url }) => ({ n, title, source, when, url })),
@@ -149,7 +239,7 @@ async function brief({ topic, wire = [], archive = async () => [], readArticle =
 function briefText(r) {
   if (!r || !r.ok) return (r && r.reason) || "No briefing.";
   return [
-    `Briefing on ${r.topic} (written by ${r.model} from the sources below, each sentence checked against them):`,
+    `Briefing on ${r.topic} (surveyed ${r.outlets} outlet(s) in ${r.survey.length} step(s); written by ${r.model} from the sources below, each sentence checked against them):`,
     r.brief,
     "Sources:",
     ...r.sources.map((s) => `[${s.n}] ${s.title} — ${s.source}${s.when ? `, ${s.when}` : ""}${s.url ? ` ${s.url}` : ""}`),
@@ -157,4 +247,4 @@ function briefText(r) {
   ].join("\n");
 }
 
-module.exports = { brief, briefText, curate, critique, splitBrief, topicWords, keywords };
+module.exports = { brief, briefText, curate, critique, splitBrief, topicWords, keywords, survey, buildMap, mapText };

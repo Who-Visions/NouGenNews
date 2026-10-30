@@ -195,3 +195,22 @@ test("minutely steps start at the current quarter hour, and a forecast without t
   assert.deepEqual(parseMinutely(f), [{ time: "2026-10-30T14:30", precip_in: 0 }, { time: "2026-10-30T14:45", precip_in: null }]);
   assert.deepEqual(parseMinutely({}), []);
 });
+
+test("pollen is null where the service has none, and sorted where it does", () => {
+  const { parsePollen } = require("../weather");
+  assert.equal(parsePollen({ current: { grass_pollen: null } }), null);
+  assert.equal(parsePollen(null), null);
+  assert.deepEqual(parsePollen({ current: { grass_pollen: 2.4, birch_pollen: 9 } }), [{ name: "birch", value: 9 }, { name: "grass", value: 2 }]);
+});
+
+test("the usual high averages past years, needs at least three, and asks for the same date", async () => {
+  const { fetchNormal } = require("../weather");
+  const seen = [];
+  const get = async (u, p) => { seen.push(p.start_date); return { daily: { temperature_2m_max: [80] } }; };
+  assert.deepEqual(await fetchNormal(11, 22, "2026-10-30", { get }), { high_f: 80, years: 5 });
+  assert.deepEqual(seen.slice(0, 2), ["2025-10-30", "2024-10-30"]);
+  let n = 0;
+  const flaky = async () => { n += 1; if (n > 2) throw new Error("down"); return { daily: { temperature_2m_max: [70] } }; };
+  assert.equal(await fetchNormal(3, 4, "2026-10-30", { get: flaky }), null);
+  assert.equal(await fetchNormal(3, 4, "bad", { get }), null);
+});

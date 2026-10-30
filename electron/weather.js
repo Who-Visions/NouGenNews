@@ -244,6 +244,37 @@ const REPORT_PLACES = 24;
 const FRESH_MS = 10 * 60 * 1000;
 const STALE_MS = 24 * 60 * 60 * 1000;
 
+// Pollen in grains/m3, highest first. Open-Meteo gives it for Europe only in season; elsewhere every value is null and
+// the answer is null, never a claim of zero.
+function parsePollen(air) {
+  const c = (air && air.current) || {};
+  const rows = ["alder", "birch", "grass", "mugwort", "olive", "ragweed"].filter((n) => c[`${n}_pollen`] != null).map((name) => ({ name, value: Math.round(c[`${name}_pollen`]) }));
+  return rows.some((r) => r.value > 0) ? rows.filter((r) => r.value > 0).sort((a, b) => b.value - a.value) : null; // all zero is out of season: nothing to say
+}
+
+// The usual high for this calendar date: the mean daily high of the same date over the last five years.
+const CLIMATE_YEARS = 5;
+const normalCache = new Map();
+async function fetchNormal(lat, lon, date, { get = getJson } = {}) {
+  const m = String(date || "").match(/^(\d{4})-(\d\d-\d\d)$/);
+  if (!m) return null;
+  const k = `${lat},${lon},${m[2]}`;
+  if (normalCache.has(k)) return normalCache.get(k);
+  const years = Array.from({ length: CLIMATE_YEARS }, (_, i) => Number(m[1]) - 1 - i);
+  const highs = await Promise.all(years.map(async (y) => {
+    const day = `${y}-${m[2]}`;
+    try {
+      const r = await get("https://archive-api.open-meteo.com/v1/archive", { latitude: lat, longitude: lon, start_date: day, end_date: day, daily: "temperature_2m_max", temperature_unit: "fahrenheit", timezone: "auto" });
+      const v = r && r.daily && r.daily.temperature_2m_max && r.daily.temperature_2m_max[0];
+      return typeof v === "number" ? v : null;
+    } catch { return null; }
+  }));
+  const got = highs.filter((v) => v != null);
+  const normal = got.length >= 3 ? { high_f: Math.round(got.reduce((a, b) => a + b, 0) / got.length), years: got.length } : null; // too few years is no average
+  if (normal) normalCache.set(k, normal);
+  return normal;
+}
+
 async function fetchReport(city, wantRegion = "", { get = getJson, key } = {}) {
   const [lat, lon, place, region] = await locate(city, wantRegion);
   const where = { latitude: String(lat), longitude: String(lon) };
@@ -257,14 +288,15 @@ async function fetchReport(city, wantRegion = "", { get = getJson, key } = {}) {
       temperature_unit: "fahrenheit", wind_speed_unit: "mph", precipitation_unit: "inch", timezone: "auto", forecast_days: "16", forecast_hours: "72",
     }),
     // Air quality is a nicety: if it fails the report still arrives, without it.
-    get("https://air-quality-api.open-meteo.com/v1/air-quality", { ...where, current: "us_aqi,pm2_5", timezone: "auto" }).catch(() => null),
+    get("https://air-quality-api.open-meteo.com/v1/air-quality", { ...where, current: "us_aqi,pm2_5,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen", timezone: "auto" }).catch(() => null),
     fetchAlerts(lat, lon, { get, key }),
     fetchMarine(lat, lon, "", { get, key }),
   ]);
   const report = { ...parseReport(f, air, place, region), minutely: parseMinutely(f) };
   // The marine call ran in parallel without the place's clock; pick the matching hour now that it is known.
   const marineNow = marine && report.updated ? marine : marine;
-  return { ...report, lat, lon, alerts, marine: marineNow };
+  const normal = report.today ? await fetchNormal(lat, lon, report.today.date, { get }) : null;
+  return { ...report, lat, lon, alerts, marine: marineNow, pollen: parsePollen(air), normal };
 }
 
 // The report for a place, cached ten minutes per place. When a fetch fails, a report under a day old is served marked
@@ -286,4 +318,4 @@ async function weatherReport({ city, region = "" }, { get, key, now = Date.now }
   return report;
 }
 
-module.exports = { parseMinutely, homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };
+module.exports = { parsePollen, fetchNormal, parseMinutely, homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };

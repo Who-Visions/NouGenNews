@@ -20,6 +20,7 @@ import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
 import { scoreStory } from "../../core/edition.js";
 import { findAlerts } from "../../core/alerts.js";
 import { dedupeStories } from "../../core/dedupe.js";
+import { clusterStories } from "../../core/cluster.js";
 import { BreakingAlert } from "./BreakingAlert.jsx";
 import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
 import { loadCity, loadRegion, loadMetro, loadScope } from "./CornerClock.jsx";
@@ -328,7 +329,7 @@ async function kokoroSynth(text, voice) {
 }
 
 // One copy of every story, however many sources carried it, then playable first and newest first.
-const mergeWire = (list) => dedupeStories(list).sort(byPlayableThenNew);
+const mergeWire = (list) => clusterStories(dedupeStories(list)).sort(byPlayableThenNew);
 
 const byPlayableThenNew = (a, b) => clampTs(b.timestamp) - clampTs(a.timestamp) || String(a.id).localeCompare(String(b.id));
 
@@ -1517,6 +1518,7 @@ export function NewsView() {
                       {item.videos?.length ? <span style={{ color: item.accent, fontWeight: 700 }}>▶ Video</span> : null}
                       {item.libraryHits?.length ? <span title={item.libraryHits.join(", ")} style={{ color: TOKENS.accentPrimary, fontWeight: 700 }}>♥ In your library</span> : null}
                       <span>{item.readMins} min read</span>
+                      {item.alsoFrom && item.alsoFrom.length ? <span title={item.alsoFrom.map((a) => `${a.source}: ${a.title}`).join("\n")}>+{item.alsoFrom.length} {item.alsoFrom.length === 1 ? "source" : "sources"}</span> : null}
                       {item.categories[0] && (
                         <>
                           <span>•</span>

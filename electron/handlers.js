@@ -46,6 +46,22 @@ const handlers = {
   resolve_story_url: (args = {}) => require("./gnews").resolveStoryUrl(String(args.url || "")),
   // Opens the Windows cast flyout so the whole window can be mirrored to a TV (electron/cast.js).
   cast_screen: () => require("./cast").castScreen(),
+  // The whole report for the weather panel: now, today, the next hours, seven days, air quality (Open-Meteo, CC BY 4.0).
+  weather_report: (args = {}) => require("./weather").weatherReport({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),
+  // Official severe-weather alerts for the corner place (WeatherAPI.com, key from the keymaker in this process only); [] without one.
+  weather_alerts: (args = {}) => require("./weather").weatherAlerts({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),
+  // The credit link in the weather panel: opens Open-Meteo's own site, a fixed address, nothing the page supplies.
+  // Radar frames (RainViewer): the page draws the tiles; this lists which exist. Cached five minutes.
+  weather_radar: () => require("./weather").radarFrames(),
+  // What the 3D globe needs: a Cesium ion token (assets:read, geocode) from the keymaker via the launcher. Cesium ion tokens
+  // are made for client-side use; this one reaches the page only when the Weather tab opens, and is never written to disk here.
+  weather_globe_config: () => ({ token: process.env.CESIUM_ION_TOKEN_20261030 || process.env.CESIUM_ION_TOKEN || "" }),
+  weather_open_credit: (args = {}) => {
+    const url = { "open-meteo": "https://open-meteo.com/", weatherapi: "https://www.weatherapi.com/", rainviewer: "https://www.rainviewer.com/", cesium: "https://cesium.com/" }[String(args.which || "open-meteo")];
+    if (!url) return false;
+    require("electron").shell.openExternal(url);
+    return true;
+  },
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),
   // The reader's own place from Windows' location service, only when they ask (electron/geo.js).
   locate_me: () => require("./geo").locateMe(),

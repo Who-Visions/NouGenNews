@@ -1083,6 +1083,7 @@ export function NewsView() {
   }, [prefs]);
   useEffect(() => {
     const onKey = (e) => {
+      if (document.body.dataset.view && document.body.dataset.view !== "news") return; // another tab is in front
       if (e.key === "Escape") {
         if (helpOpen) { e.preventDefault(); setHelpOpen(false); return; }
         if (speechRef.current?.getState().status !== "idle") { e.preventDefault(); speechRef.current.stop(); return; }
@@ -1097,6 +1098,7 @@ export function NewsView() {
       if (e.key === "?") { e.preventDefault(); setHelpOpen((o) => !o); return; }
       if (e.key === "a" || e.key === "A") { e.preventDefault(); setAssistantOpen((o) => !o); return; }
       if (e.key === "s" || e.key === "S") { e.preventDefault(); setArchiveOpen((o) => !o); return; }
+      if (e.key === "w" || e.key === "W") { e.preventDefault(); window.dispatchEvent(new CustomEvent("nn:view", { detail: { view: "weather" } })); return; }
       if (e.key === "r" || e.key === "R") { e.preventDefault(); window.dispatchEvent(new CustomEvent("nn:refresh")); return; }
       if (/^[1-9]$/.test(e.key)) {
         const f = FEEDS[Number(e.key) - 1];
@@ -1876,6 +1878,7 @@ export function NewsView() {
         <span><b>Space</b> play</span>
         <span><b>A</b> assistant</span>
         <span><b>S</b> archive</span>
+        <span><b>W</b> weather</span>
         <span><b>L</b> listen</span>
         <span><b>T</b> translate</span>
         <span><b>1–9</b> topic</span>

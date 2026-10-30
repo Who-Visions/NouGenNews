@@ -23,3 +23,7 @@
 .menubar__refresh.is-busy .menubar__spin { animation: menubar-spin 900ms linear infinite; }
 @keyframes menubar-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .menubar__refresh.is-busy .menubar__spin { animation: none; } }
+.menubar__tabs { display: flex; gap: 2px; margin: 3px 12px 3px 6px; padding: 2px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line, rgba(255, 255, 255, 0.14)); border-radius: 6px; }
+.menubar__tab { padding: 0 12px; font: inherit; font-size: 12px; color: var(--muted, #bdb8ad); background: none; border: 0; border-radius: 4px; cursor: pointer; }
+.menubar__tab:hover { color: var(--text, #f2eee6); }
+.menubar__tab.is-on { color: #0b0b0d; background: var(--accent, #e8b86d); font-weight: 600; }

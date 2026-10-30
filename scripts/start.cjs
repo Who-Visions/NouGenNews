@@ -4,7 +4,7 @@ const { spawn } = require("node:child_process");
 const path = require("node:path");
 const { readSecrets } = require("./resolve-key.cjs");
 
-const OPTIONAL = ["SERPAPI_API_KEY", "THENEWSAPI_TOKEN", "TMDB_READ_ACCESS_TOKEN", "DATA_GOV_API_KEY", "WEBZ_API_KEY", "NEWSAPI_KEY", "NEWSDATA_API_KEY", "EVENTREGISTRY_API_KEY", "MASSIVE_API_KEY"];
+const OPTIONAL = ["SERPAPI_API_KEY", "THENEWSAPI_TOKEN", "TMDB_READ_ACCESS_TOKEN", "DATA_GOV_API_KEY", "WEBZ_API_KEY", "NEWSAPI_KEY", "NEWSDATA_API_KEY", "EVENTREGISTRY_API_KEY", "MASSIVE_API_KEY", "WEATHERAPI_KEY", "CESIUM_ION_TOKEN_20261030", "CESIUM_ION_TOKEN"];
 const env = { ...process.env };
 // One Python start for every missing key (each start costs seconds).
 const missing = OPTIONAL.filter((name) => !env[name]);

@@ -36,7 +36,7 @@
     "@tailwindcss/typography": "^0.5.20",
     "axios": "^1.18.1",
     "better-sqlite3": "^12.11.1",
-    "cesium": "^1.143.0",
+    "cesium": "1.141.0",
     "cheerio": "^1.2.0",
     "cloudinary": "^2.10.0",
     "cross-env": "^7.0.3",

@@ -51,6 +51,7 @@ export function CornerClock() {
   const [now, setNow] = useState(() => new Date());
   const [city, setCity] = useState(loadCity);
   const [wx, setWx] = useState(null);
+  const [alerts, setAlerts] = useState([]); // official severe-weather alerts for the place (none without a WeatherAPI key)
   const [chosen, setChosen] = useState(hasChosenCity);
   const [locating, setLocating] = useState(false);
   const useMyLocation = async () => {
@@ -84,6 +85,15 @@ export function CornerClock() {
     return () => { live = false; clearInterval(t); };
   }, [city]);
 
+  // Alerts are checked more often than the temperature: a warning should not wait fifteen minutes.
+  useEffect(() => {
+    let live = true;
+    const pull = () => invoke("weather_alerts", { city, region: loadRegion() }).then((a) => live && setAlerts(Array.isArray(a) ? a : [])).catch(() => live && setAlerts([]));
+    pull();
+    const t = setInterval(pull, 5 * 60 * 1000);
+    return () => { live = false; clearInterval(t); };
+  }, [city]);
+
   const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
   const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   return (
@@ -94,7 +104,7 @@ export function CornerClock() {
       <span className="cc__sep">·</span>
       <span>{wx?.place || city}</span>
       {!chosen ? <button type="button" className="cc__locate" onClick={useMyLocation} disabled={locating} title="The city above is a guess from your time zone. Ask Windows for your actual location (sent once to a place-name lookup).">{locating ? "Locating\u2026" : "Use my location"}</button> : null}
-      {wx ? <span className="cc__wx"><i aria-hidden="true">{ICON[wx.label] || "\u2601"}</i>{Math.round(wx.temp_f)}°F</span> : null}
+      {wx ? <button type="button" className={`cc__wx${alerts.length ? " cc__wx--alert" : ""}`} title={alerts.length ? `${alerts.length} weather alert${alerts.length === 1 ? "" : "s"}: ${alerts[0].event}. Open the Weather tab (W)` : "Open the Weather tab (W)"} onClick={() => window.dispatchEvent(new CustomEvent("nn:weather"))}><i aria-hidden="true">{ICON[wx.label] || "☁"}</i>{Math.round(wx.temp_f)}°F{alerts.length ? <b className="cc__warn" aria-label={`${alerts.length} weather alerts`}>{" ⚠ "}{alerts.length}</b> : null}</button> : null}
     </div>
   );
 }

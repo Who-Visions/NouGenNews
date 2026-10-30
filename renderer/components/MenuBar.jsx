@@ -4,6 +4,20 @@ import { CornerClock } from "./CornerClock.jsx";
 import { CastButton } from "./CastButton.jsx";
 import "./MenuBar.css";
 
+// The tabs: News and Weather. App owns which one is in front and announces it; clicking asks App to switch.
+function ViewTabs() {
+  const [view, setView] = useState(() => document.body.dataset.view || "news");
+  useEffect(() => {
+    const on = (e) => setView((e.detail && e.detail.view) || "news");
+    window.addEventListener("nn:view-state", on);
+    return () => window.removeEventListener("nn:view-state", on);
+  }, []);
+  const tab = (id, label, key) => (
+    <button type="button" role="tab" aria-selected={view === id} className={`menubar__tab${view === id ? " is-on" : ""}`} title={`${label} (${key})`} onClick={() => window.dispatchEvent(new CustomEvent("nn:view", { detail: { view: id } }))}>{label}</button>
+  );
+  return <div className="menubar__tabs" role="tablist" aria-label="Pages">{tab("news", "News", "N")}{tab("weather", "Weather", "W")}</div>;
+}
+
 // A visible Refresh button: pulls every feed and asks the API providers for fresh data. It shows what the wire is doing
 // (the news view reports it) and when the last pull finished.
 function RefreshButton() {
@@ -110,6 +124,7 @@ export function MenuBar() {
           )}
         </div>
       ))}
+      <ViewTabs />
       <CornerClock />
       <CastButton />
       <RefreshButton />

@@ -207,3 +207,5 @@
 /* The hero's tag for an alert story: red for a red alert, gold for a breaking one. */
 .nh-tag--red { background: #b3121a; color: #fff; border-color: #ff4b4b; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
 .nh-tag--amber { background: #e8b86d; color: #141414; border-color: #8a5a00; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+
+.voice-pick { max-width: 210px; font-size: 12px; cursor: pointer; }

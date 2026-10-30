@@ -11,6 +11,7 @@ import { NewsHero } from "./NewsHero.jsx";
 import { Ago } from "./Ago.jsx";
 import { imagesFromXmlItem, imagesFromHtml, bestImage } from "../../core/images.js";
 import { VideoDock, useWide } from "./VideoDock.jsx";
+import { Lightbox, photoIndex } from "./Lightbox.jsx";
 import { clampTs } from "../lib/age.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
@@ -27,6 +28,7 @@ import {
   createSpeechController,
   detectTextLang,
   loadSpeechPrefs,
+  KOKORO_VOICES,
   probeOllamaModels,
   saveSpeechPrefs,
 } from "../lib/speech.js";
@@ -317,6 +319,13 @@ function serpStory(it, meta) {
 const WIRE_OFF = new Set(FEEDS.filter((f) => f.wire === false).map((f) => f.id));
 const inWire = (a) => !WIRE_OFF.has(a.feedId);
 
+// The WAV the Kokoro sidecar wrote for this text, as a playable object URL.
+async function kokoroSynth(text, voice) {
+  const b64 = await invoke("tts_kokoro_synth", { text, voice });
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+}
+
 // One copy of every story, however many sources carried it, then playable first and newest first.
 const mergeWire = (list) => dedupeStories(list).sort(byPlayableThenNew);
 
@@ -557,7 +566,7 @@ export function NewsView() {
   const artTransAbortRef = useRef(null);
 
   if (!speechRef.current) {
-    speechRef.current = createSpeechController({ onChange: (st) => setSpeech(st) });
+    speechRef.current = createSpeechController({ onChange: (st) => setSpeech(st), kokoro: kokoroSynth });
   }
 
   useEffect(() => () => speechRef.current?.stop(), []);
@@ -981,6 +990,19 @@ export function NewsView() {
   const photos = useMemo(() => collectPhotos(articleBody, currentArticle?.imageUrl), [articleBody, currentArticle?.imageUrl]);
   const docked = wideEnough && readerMode === "view" && (!!currentArticle?.videos?.length || photos.length > 1);
   const shownBody = articleBody;
+  // A picture clicked anywhere in the story opens large, growing out of where it was.
+  const [lightbox, setLightbox] = useState(null);
+  const openPicture = useCallback((e) => {
+    const img = e.target && e.target.closest ? e.target.closest("img") : null;
+    if (!img || img.closest(".vdock__thumb, .tail, .news-mobile-back")) return;
+    const r = img.getBoundingClientRect();
+    if (r.width < 80 || r.height < 60) return;
+    const src = img.currentSrc || img.src;
+    e.preventDefault();
+    e.stopPropagation();
+    const at = photoIndex(photos, src);
+    setLightbox({ photos: at >= 0 ? photos : [{ src, alt: img.alt || "" }, ...photos], index: at >= 0 ? at : 0, origin: { left: r.left, top: r.top, width: r.width, height: r.height } });
+  }, [photos]);
 
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.scrollTop = 0;
@@ -1510,6 +1532,7 @@ export function NewsView() {
         <div
           ref={canvasRef}
           className="news-article-canvas"
+          onClickCapture={openPicture}
           style={{
             background: TOKENS.surfaceElevated,
             border: `1px solid ${TOKENS.borderSubtle}`,
@@ -1757,6 +1780,10 @@ export function NewsView() {
                 <button type="button" className="nh-btn" aria-pressed={readerMode === "view"} title="Switch between the magazine column and the photo gallery view" onClick={() => setReaderMode(readerMode === "view" ? "read" : "view")}>
                   {readerMode === "view" ? "Magazine" : "Gallery"} <kbd>V</kbd>
                 </button>
+                <select className="nh-btn voice-pick" aria-label="Read-aloud voice" title="Voice for Listen" value={prefs.ttsEngine === "kokoro" ? prefs.kokoroVoice : "system"} onChange={(e) => (e.target.value === "system" ? updatePrefs({ ttsEngine: "system", ttsChosen: true }) : updatePrefs({ ttsEngine: "kokoro", kokoroVoice: e.target.value, ttsChosen: true }))}>
+                  {KOKORO_VOICES.map((v) => <option key={v.id} value={v.id}>Kokoro · {v.label}</option>)}
+                  <option value="system">System voice</option>
+                </select>
                 <button type="button" className="nh-btn" onClick={() => listenTo(currentArticle)}>
                   {speaking && speech.mode === "single" && speech.articleId === currentArticle.id ? "Stop listening" : "Listen"} <kbd>L</kbd>
                 </button>
@@ -1801,6 +1828,7 @@ export function NewsView() {
         <span className="spacer" />
         <button type="button" onClick={() => setHelpOpen(true)}>? help</button>
       </div>
+      {lightbox ? <Lightbox photos={lightbox.photos} index={lightbox.index} origin={lightbox.origin} onClose={() => setLightbox(null)} /> : null}
     </div>
   );
 }

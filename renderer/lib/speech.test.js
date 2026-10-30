@@ -168,3 +168,18 @@ test("the radio brief uses the summarizer for each story", async () => {
   await c.startBriefing([{ id: "1", title: "Un", contentHtml: "<p>A.</p>" }], { rate: 1, voices: {}, briefMode: "ollama", ollamaModel: "gemma4:e2b-it-qat" });
   assert.deepEqual(synth.spoken.map((u) => u.text), ["Un.", "Résumé."]);
 });
+
+test("prefs saved before the reader chose a voice use the default engine; a chosen engine is kept", async () => {
+  const { loadSpeechPrefs } = await import("./speech.js");
+  const store = (v) => ({ getItem: () => JSON.stringify(v) });
+  assert.equal(loadSpeechPrefs(store({ ttsEngine: "system" })).ttsEngine, "kokoro");
+  assert.equal(loadSpeechPrefs(store({ ttsEngine: "system", ttsChosen: true })).ttsEngine, "system");
+  assert.equal(loadSpeechPrefs(store({ ttsEngine: "kokoro", ttsChosen: true, kokoroVoice: "bf_emma" })).kokoroVoice, "bf_emma");
+});
+
+test("groupSentences gathers sentences into pieces under the limit", async () => {
+  const { groupSentences } = await import("./speech.js");
+  assert.deepEqual(groupSentences(["One.", "Two.", "Three."], 12), ["One. Two.", "Three."]);
+  assert.deepEqual(groupSentences(["A very long single sentence here."], 5), ["A very long single sentence here."]);
+  assert.deepEqual(groupSentences([], 10), []);
+});

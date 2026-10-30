@@ -201,15 +201,30 @@ export const DEFAULT_PREFS = {
   voices: { fr: "", en: "", es: "", ht: "" },
   briefMode: "sentences",
   ollamaModel: "",
-  ttsEngine: "system", // "system" = installed OS voices, "kokoro" = Kokoro neural voice
+  ttsEngine: "kokoro", // "kokoro" = Kokoro neural voice (falls back to the system voice if it cannot run), "system" = installed OS voices
   kokoroVoice: "af_heart",
 };
+// Sentences gathered into pieces of at most `max` characters (a longer sentence is its own piece).
+export function groupSentences(sentences, max = 650) {
+  const out = [];
+  let cur = "";
+  for (const raw of sentences || []) {
+    const t = String(raw || "").trim();
+    if (!t) continue;
+    if (cur && cur.length + 1 + t.length > max) { out.push(cur); cur = t; } else cur = cur ? `${cur} ${t}` : t;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
 const clampRate = (r) => Math.min(1.4, Math.max(0.8, Number(r) || 1));
 
 export function loadSpeechPrefs(storage = globalThis.localStorage) {
   try {
     const saved = JSON.parse(storage?.getItem(PREFS_KEY) || "{}");
-    return { ...DEFAULT_PREFS, ...saved, rate: clampRate(saved.rate ?? 1), voices: { ...DEFAULT_PREFS.voices, ...(saved.voices || {}) } };
+    // An engine the reader never picked is the default one: prefs saved before Kokoro was the default carry "system" only because it was the default then.
+    const engine = saved.ttsChosen ? saved.ttsEngine : DEFAULT_PREFS.ttsEngine;
+    return { ...DEFAULT_PREFS, ...saved, ttsEngine: engine || DEFAULT_PREFS.ttsEngine, rate: clampRate(saved.rate ?? 1), voices: { ...DEFAULT_PREFS.voices, ...(saved.voices || {}) } };
   } catch {
     return { ...DEFAULT_PREFS };
   }
@@ -283,7 +298,9 @@ export function createSpeechController({
   };
   const togglePause = () => (state.status === "paused" ? resume() : pause());
 
-  // Plays the whole text with a Kokoro voice. Resolves "done", "stopped", or "failed".
+  // Plays the text with a Kokoro voice, a few sentences at a time: the next piece is synthesised while the current one
+  // plays, so listening starts after the first piece, not after the whole article. Resolves "done", "stopped", or
+  // "failed" (only when nothing has played yet, so the caller can fall back to the system voice without repeating).
   const speakKokoro = async (text, { lang, prefs, mine }) => {
     const voiceId = prefs.kokoroVoice || DEFAULT_PREFS.kokoroVoice;
     const label = KOKORO_VOICES.find((v) => v.id === voiceId)?.label || voiceId;
@@ -293,28 +310,45 @@ export function createSpeechController({
       lang,
       notice: lang === "ht" ? "Kokoro has no Haitian Creole voice, so this reads with the selected voice." : null,
     });
-    let url = null;
-    try {
-      url = await kokoro(text, voiceId);
-    } catch (err) {
-      emit({ notice: `Kokoro could not speak (${err?.message || err}); using the system voice.` });
-      return "failed";
+    // A short first piece so listening starts quickly; the rest in longer pieces.
+    const sentences = splitIntoSentences(text);
+    let used = 0;
+    let acc = 0;
+    for (const t of sentences) { if (used && acc + t.length > 220) break; acc += t.length + 1; used += 1; }
+    const parts = [...groupSentences(sentences.slice(0, used), 100000), ...groupSentences(sentences.slice(used), 650)];
+    if (!parts.length) return "done";
+    const synthPart = (i) => Promise.resolve().then(() => kokoro(parts[i], voiceId));
+    let pending = synthPart(0);
+    pending.catch(() => { /* handled where it is awaited */ });
+    for (let i = 0; i < parts.length; i++) {
+      let url = null;
+      try {
+        url = await pending;
+      } catch (err) {
+        if (i === 0) { emit({ notice: `Kokoro could not speak (${err?.message || err}); using the system voice.` }); return "failed"; }
+        emit({ notice: `Kokoro stopped part-way (${err?.message || err}).` });
+        return "done";
+      }
+      if (mine !== session) { try { URL.revokeObjectURL?.(url); } catch { /* ignore */ } return "stopped"; }
+      if (i + 1 < parts.length) { pending = synthPart(i + 1); pending.catch(() => { /* handled where it is awaited */ }); }
+      const result = await new Promise((resolve) => {
+        const audio = new AudioCtor(url);
+        audio.playbackRate = clampRate(prefs.rate);
+        const finish = (r) => {
+          if (player === audio) { player = null; playerStop = null; }
+          try { URL.revokeObjectURL?.(url); } catch { /* ignore */ }
+          resolve(r);
+        };
+        player = audio;
+        playerStop = () => finish("stopped");
+        audio.onended = () => finish("done");
+        audio.onerror = () => finish("failed");
+        audio.play().catch(() => finish("failed"));
+      });
+      if (result === "stopped") return "stopped";
+      if (result === "failed") return i === 0 ? "failed" : "done";
     }
-    if (mine !== session) { try { URL.revokeObjectURL?.(url); } catch { /* ignore */ } return "stopped"; }
-    return new Promise((resolve) => {
-      const audio = new AudioCtor(url);
-      audio.playbackRate = clampRate(prefs.rate);
-      const finish = (result) => {
-        if (player === audio) { player = null; playerStop = null; }
-        try { URL.revokeObjectURL?.(url); } catch { /* ignore */ }
-        resolve(result);
-      };
-      player = audio;
-      playerStop = () => finish("stopped");
-      audio.onended = () => finish("done");
-      audio.onerror = () => finish("failed");
-      audio.play().catch(() => finish("failed"));
-    });
+    return "done";
   };
 
   // Speaks text chunk by chunk with the installed system voices; resolves true when it ran to the end, false when stopped.

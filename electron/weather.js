@@ -228,7 +228,10 @@ async function radarFrames({ get = getJson, now = Date.now } = {}) {
   return radar;
 }
 
-let reportCache = null; // { key, at, report }
+const reportCache = new Map(); // key -> { at, report }, newest last, for the saved places
+const REPORT_PLACES = 24;
+const FRESH_MS = 10 * 60 * 1000;
+const STALE_MS = 24 * 60 * 60 * 1000;
 
 async function fetchReport(city, wantRegion = "", { get = getJson, key } = {}) {
   const [lat, lon, place, region] = await locate(city, wantRegion);
@@ -252,12 +255,22 @@ async function fetchReport(city, wantRegion = "", { get = getJson, key } = {}) {
   return { ...report, lat, lon, alerts, marine: marineNow };
 }
 
-// The report for a place, cached ten minutes per place. Never serves a failed fetch from the cache.
+// The report for a place, cached ten minutes per place. When a fetch fails, a report under a day old is served marked
+// stale with its age, so a dropped connection shows the last known weather labelled as such; older than that it fails.
 async function weatherReport({ city, region = "" }, { get, key, now = Date.now } = {}) {
   const cacheKey = `${String(city || "").trim().toLowerCase()}|${String(region || "").trim().toLowerCase()}`;
-  if (reportCache && reportCache.key === cacheKey && now() - reportCache.at < 10 * 60 * 1000) return reportCache.report;
-  const report = await fetchReport(city, region, { get, key });
-  reportCache = { key: cacheKey, at: now(), report };
+  const hit = reportCache.get(cacheKey);
+  if (hit && now() - hit.at < FRESH_MS) return hit.report;
+  let report;
+  try {
+    report = await fetchReport(city, region, { get, key });
+  } catch (e) {
+    if (hit && now() - hit.at < STALE_MS) return { ...hit.report, stale: true, staleMinutes: Math.round((now() - hit.at) / 60000) };
+    throw e;
+  }
+  reportCache.delete(cacheKey);
+  reportCache.set(cacheKey, { at: now(), report });
+  if (reportCache.size > REPORT_PLACES) reportCache.delete(reportCache.keys().next().value);
   return report;
 }
 

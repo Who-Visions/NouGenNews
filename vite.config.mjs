@@ -18,5 +18,7 @@ export default defineConfig({
   root: "renderer",
   base: "./",
   plugins: [react(), cesiumFiles()],
+  // Inline (empty) PostCSS config so Vite never walks up to a stray postcss.config.js in a parent folder.
+  css: { postcss: {} },
   build: { outDir: "../dist", emptyOutDir: true },
 });

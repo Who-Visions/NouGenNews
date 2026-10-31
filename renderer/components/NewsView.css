@@ -142,7 +142,7 @@
 .news-reader-bar {
   position: sticky; bottom: -28px; margin: 24px -40px -28px; padding: 10px 40px;
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  background: var(--nn-panel); border-top: 1px solid var(--nn-line);
+  z-index: 2; background: var(--nn-bg); border-top: 1px solid var(--nn-line); /* opaque: the article scrolls behind it */
   font-size: 12px;
 }
 .news-reader-bar .spacer { flex: 1; }

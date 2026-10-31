@@ -8,6 +8,8 @@ import {
   clockLabel,
 } from "../lib/weatherSummary.js";
 import { loadCity, loadRegion } from "./CornerClock.jsx";
+import { WeatherWatch } from "./weather/WeatherWatch.jsx";
+import { RainNowcast } from "./weather/RainNowcast.jsx";
 import { WeatherGlobe } from "./WeatherGlobe.jsx";
 import { WhatMattersToday } from "./weather/WhatMattersToday.jsx";
 import { HourlyOutlook } from "./weather/HourlyOutlook.jsx";
@@ -162,6 +164,12 @@ export function WeatherPage({ onBack }) {
         </div>
       </header>
 
+      <WeatherWatch place={place} onPick={setPlace} />
+
+      {r && r.stale ? (
+        <p className="ww-stale" role="status">Offline: showing the last report, {r.staleMinutes} min old.</p>
+      ) : null}
+
       {/* Error state with retry action */}
       {err ? (
         <div className="wp-err-panel" role="alert">
@@ -232,6 +240,13 @@ export function WeatherPage({ onBack }) {
       ) : null}
 
       {/* "What Matters Today" 4-Card Instrument Cluster */}
+      {r ? <RainNowcast steps={r.minutely} /> : null}
+      {r && r.today && r.normal ? (
+        <p className="wn-line">{r.today.high_f === r.normal.high_f ? "Today's high is right on" : `Today's high is ${Math.abs(Math.round(r.today.high_f - r.normal.high_f))}°F ${r.today.high_f > r.normal.high_f ? "above" : "below"}`} the {r.normal.years}-year average for this date ({r.normal.high_f}°F).</p>
+      ) : null}
+      {r && r.pollen ? (
+        <p className="wn-line">Pollen, grains/m³: {r.pollen.map((p) => `${p.name} ${p.value}`).join(" · ")}</p>
+      ) : null}
       {r && matters ? <WhatMattersToday matters={matters} /> : null}
 
       {/* Loading Skeleton */}

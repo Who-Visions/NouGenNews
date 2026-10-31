@@ -171,3 +171,46 @@ test("radar frames: only safe hosts and paths, thinned, newest last, cached five
   t += 2 * 60 * 1000; await radarFrames({ get, now: () => t }); assert.equal(calls, 2);
   await assert.rejects(radarFrames({ get: async () => ({ host: "http://evil.test", radar: { past: frames(2, 1) } }), now: () => t + 99999999 }), /no tile host/);
 });
+
+test("a failed fetch serves a recent report labelled stale, and fails once it is over a day old", async () => {
+  const real = globalThis.fetch;
+  globalThis.fetch = async (u) => ({ ok: true, json: async () => ({ results: [{ latitude: 1, longitude: 2, name: "Offline Town", admin1: "" }] }), url: String(u) });
+  const good = async (url) => { if (url.includes("air-quality")) throw new Error("no air"); return FORECAST; };
+  const bad = async () => { throw new Error("network down"); };
+  try {
+    const t0 = 5e12;
+    const first = await weatherReport({ city: "Offline Town" }, { get: good, now: () => t0 });
+    assert.ok(first.now);
+    assert.equal(first.stale, undefined);
+    const s = await weatherReport({ city: "Offline Town" }, { get: bad, now: () => t0 + 30 * 60000 });
+    assert.equal(s.stale, true);
+    assert.equal(s.staleMinutes, 30);
+    await assert.rejects(weatherReport({ city: "Offline Town" }, { get: bad, now: () => t0 + 25 * 3600000 }), /network down/);
+  } finally { globalThis.fetch = real; }
+});
+
+test("minutely steps start at the current quarter hour, and a forecast without them gives none", () => {
+  const { parseMinutely } = require("../weather");
+  const f = { current: { time: "2026-10-30T14:37" }, minutely_15: { time: ["2026-10-30T14:15", "2026-10-30T14:30", "2026-10-30T14:45"], precipitation: [0.1, 0, null] } };
+  assert.deepEqual(parseMinutely(f), [{ time: "2026-10-30T14:30", precip_in: 0 }, { time: "2026-10-30T14:45", precip_in: null }]);
+  assert.deepEqual(parseMinutely({}), []);
+});
+
+test("pollen is null where the service has none, and sorted where it does", () => {
+  const { parsePollen } = require("../weather");
+  assert.equal(parsePollen({ current: { grass_pollen: null } }), null);
+  assert.equal(parsePollen(null), null);
+  assert.deepEqual(parsePollen({ current: { grass_pollen: 2.4, birch_pollen: 9 } }), [{ name: "birch", value: 9 }, { name: "grass", value: 2 }]);
+});
+
+test("the usual high averages past years, needs at least three, and asks for the same date", async () => {
+  const { fetchNormal } = require("../weather");
+  const seen = [];
+  const get = async (u, p) => { seen.push(p.start_date); return { daily: { temperature_2m_max: [80] } }; };
+  assert.deepEqual(await fetchNormal(11, 22, "2026-10-30", { get }), { high_f: 80, years: 5 });
+  assert.deepEqual(seen.slice(0, 2), ["2025-10-30", "2024-10-30"]);
+  let n = 0;
+  const flaky = async () => { n += 1; if (n > 2) throw new Error("down"); return { daily: { temperature_2m_max: [70] } }; };
+  assert.equal(await fetchNormal(3, 4, "2026-10-30", { get: flaky }), null);
+  assert.equal(await fetchNormal(3, 4, "bad", { get }), null);
+});

@@ -90,6 +90,17 @@ function aqiCategory(aqi) {
 }
 
 // Open-Meteo's forecast and air-quality answers as one flat report. Anything the service leaves null stays null.
+// The 15-minute rain steps from the current quarter hour on, in the place's own clock.
+function parseMinutely(f) {
+  const m = (f && f.minutely_15) || {};
+  const times = Array.isArray(m.time) ? m.time : [];
+  const rain = Array.isArray(m.precipitation) ? m.precipitation : [];
+  const now = String((f && f.current && f.current.time) || "");
+  const steps = times.map((time, i) => ({ time, precip_in: rain[i] ?? null }));
+  const from = steps.findIndex((s, i) => !steps[i + 1] || steps[i + 1].time > now);
+  return from < 0 ? [] : steps.slice(from, from + 12);
+}
+
 function parseReport(f, air, place, region = "", { hoursAhead = 48 } = {}) {
   const cur = f && f.current;
   if (!cur || num(cur.temperature_2m) == null) throw new Error("forecast has no current conditions");
@@ -228,7 +239,44 @@ async function radarFrames({ get = getJson, now = Date.now } = {}) {
   return radar;
 }
 
-let reportCache = null; // { key, at, report }
+const reportCache = new Map(); // key -> { at, report }, newest last, for the saved places
+const REPORT_PLACES = 24;
+const FRESH_MS = 10 * 60 * 1000;
+const STALE_MS = 24 * 60 * 60 * 1000;
+
+// Pollen in grains/m3, highest first. Open-Meteo gives it for Europe only in season; elsewhere every value is null and
+// the answer is null, never a claim of zero.
+function parsePollen(air) {
+  const c = (air && air.current) || {};
+  const rows = ["alder", "birch", "grass", "mugwort", "olive", "ragweed"].filter((n) => c[`${n}_pollen`] != null).map((name) => ({ name, value: Math.round(c[`${name}_pollen`]) }));
+  return rows.some((r) => r.value > 0) ? rows.filter((r) => r.value > 0).sort((a, b) => b.value - a.value) : null; // all zero is out of season: nothing to say
+}
+
+// The usual high for this calendar date: the mean daily high of the same date over the last five years.
+const CLIMATE_YEARS = 5;
+const normalCache = new Map();
+async function fetchNormal(lat, lon, date, { get = getJson } = {}) {
+  const m = String(date || "").match(/^(\d{4})-(\d\d-\d\d)$/);
+  if (!m) return null;
+  const k = `${lat},${lon},${m[2]}`;
+  if (normalCache.has(k)) return normalCache.get(k);
+  const years = Array.from({ length: CLIMATE_YEARS }, (_, i) => Number(m[1]) - 1 - i);
+  const highs = await Promise.all(years.map(async (y) => {
+    const day = `${y}-${m[2]}`;
+    try {
+      const r = await get("https://archive-api.open-meteo.com/v1/archive", { latitude: lat, longitude: lon, start_date: day, end_date: day, daily: "temperature_2m_max", temperature_unit: "fahrenheit", timezone: "auto" });
+      const v = r && r.daily && r.daily.temperature_2m_max && r.daily.temperature_2m_max[0];
+      return typeof v === "number" ? v : null;
+    } catch { return null; }
+  }));
+  const got = highs.filter((v) => v != null);
+  const normal = got.length >= 3 ? { high_f: Math.round(got.reduce((a, b) => a + b, 0) / got.length), years: got.length } : null; // too few years is no average
+  if (normal) {
+    normalCache.set(k, normal);
+    if (normalCache.size > 200) normalCache.delete(normalCache.keys().next().value);
+  }
+  return normal;
+}
 
 async function fetchReport(city, wantRegion = "", { get = getJson, key } = {}) {
   const [lat, lon, place, region] = await locate(city, wantRegion);
@@ -238,27 +286,39 @@ async function fetchReport(city, wantRegion = "", { get = getJson, key } = {}) {
       ...where,
       current: "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation,uv_index,pressure_msl,cloud_cover,dew_point_2m,visibility",
       hourly: "temperature_2m,precipitation_probability,weather_code,is_day",
+      minutely_15: "precipitation", forecast_minutely_15: "16",
       daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max,sunrise,sunset",
       temperature_unit: "fahrenheit", wind_speed_unit: "mph", precipitation_unit: "inch", timezone: "auto", forecast_days: "16", forecast_hours: "72",
     }),
     // Air quality is a nicety: if it fails the report still arrives, without it.
-    get("https://air-quality-api.open-meteo.com/v1/air-quality", { ...where, current: "us_aqi,pm2_5", timezone: "auto" }).catch(() => null),
+    get("https://air-quality-api.open-meteo.com/v1/air-quality", { ...where, current: "us_aqi,pm2_5,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen", timezone: "auto" }).catch(() => null),
     fetchAlerts(lat, lon, { get, key }),
     fetchMarine(lat, lon, "", { get, key }),
   ]);
-  const report = parseReport(f, air, place, region);
+  const report = { ...parseReport(f, air, place, region), minutely: parseMinutely(f) };
   // The marine call ran in parallel without the place's clock; pick the matching hour now that it is known.
   const marineNow = marine && report.updated ? marine : marine;
-  return { ...report, lat, lon, alerts, marine: marineNow };
+  const normal = report.today ? await fetchNormal(lat, lon, report.today.date, { get }) : null;
+  return { ...report, lat, lon, alerts, marine: marineNow, pollen: parsePollen(air), normal };
 }
 
-// The report for a place, cached ten minutes per place. Never serves a failed fetch from the cache.
+// The report for a place, cached ten minutes per place. When a fetch fails, a report under a day old is served marked
+// stale with its age, so a dropped connection shows the last known weather labelled as such; older than that it fails.
 async function weatherReport({ city, region = "" }, { get, key, now = Date.now } = {}) {
   const cacheKey = `${String(city || "").trim().toLowerCase()}|${String(region || "").trim().toLowerCase()}`;
-  if (reportCache && reportCache.key === cacheKey && now() - reportCache.at < 10 * 60 * 1000) return reportCache.report;
-  const report = await fetchReport(city, region, { get, key });
-  reportCache = { key: cacheKey, at: now(), report };
+  const hit = reportCache.get(cacheKey);
+  if (hit && now() - hit.at < FRESH_MS) return hit.report;
+  let report;
+  try {
+    report = await fetchReport(city, region, { get, key });
+  } catch (e) {
+    if (hit && now() - hit.at < STALE_MS) return { ...hit.report, stale: true, staleMinutes: Math.round((now() - hit.at) / 60000) };
+    throw e;
+  }
+  reportCache.delete(cacheKey);
+  reportCache.set(cacheKey, { at: now(), report });
+  if (reportCache.size > REPORT_PLACES) reportCache.delete(reportCache.keys().next().value);
   return report;
 }
 
-module.exports = { homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };
+module.exports = { parsePollen, fetchNormal, parseMinutely, homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };

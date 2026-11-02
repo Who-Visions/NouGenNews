@@ -23,22 +23,31 @@ const MAX_LEN = 4096;
 const fileOf = (userDir) => path.join(userDir, "api-keys.json");
 
 function readStore(userDir) {
+  let text;
+  try { text = fs.readFileSync(fileOf(userDir), "utf8"); } catch { return {}; }
   try {
-    const data = JSON.parse(fs.readFileSync(fileOf(userDir), "utf8"));
-    return data && typeof data === "object" ? data : {};
-  } catch { return {}; }
+    const data = JSON.parse(text);
+    if (data && typeof data === "object" && !Array.isArray(data)) return data;
+  } catch { /* set aside below */ }
+  // A damaged file is kept beside the store, so the next save cannot overwrite what might be recovered from it.
+  fs.renameSync(fileOf(userDir), `${fileOf(userDir)}.damaged-${Date.now()}`);
+  return {};
 }
 
 function writeStore(userDir, store) {
   const file = fileOf(userDir);
   const tmp = `${file}.tmp`;
   fs.mkdirSync(userDir, { recursive: true });
-  fs.writeFileSync(tmp, JSON.stringify(store), { mode: 0o600 });
-  fs.renameSync(tmp, file);
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(store), { mode: 0o600 });
+    fs.renameSync(tmp, file);
+  } finally { fs.rmSync(tmp, { force: true }); }
 }
 
 // What the environment held at launch, so removing a saved key falls back to it.
 const launchEnv = new Map();
+// Saved keys this computer could not decrypt, shown as such rather than as working.
+const unreadable = new Set();
 
 // Saved keys win over the launch environment. One that cannot be decrypted is skipped.
 function applySaved({ userDir, crypt, env = process.env }) {
@@ -46,13 +55,14 @@ function applySaved({ userDir, crypt, env = process.env }) {
   if (!crypt.isEncryptionAvailable()) return;
   for (const [name, b64] of Object.entries(readStore(userDir))) {
     if (!NAMES.has(name)) continue;
-    try { env[name] = crypt.decryptString(Buffer.from(b64, "base64")); } catch { /* left to the launch value */ }
+    try { env[name] = crypt.decryptString(Buffer.from(b64, "base64")); unreadable.delete(name); }
+    catch { unreadable.add(name); }
   }
 }
 
 function listKeys({ userDir, env = process.env }) {
   const store = readStore(userDir);
-  return KEYS.map((k) => ({ ...k, source: store[k.env] ? "saved" : env[k.env] ? "environment" : "none" }));
+  return KEYS.map((k) => ({ ...k, source: unreadable.has(k.env) && store[k.env] ? "unreadable" : store[k.env] ? "saved" : env[k.env] ? "environment" : "none" }));
 }
 
 function saveKey({ userDir, crypt, name, value, env = process.env }) {
@@ -62,6 +72,7 @@ function saveKey({ userDir, crypt, name, value, env = process.env }) {
   if (!crypt.isEncryptionAvailable()) throw new Error("Secure storage is not available on this computer, so the key was not saved");
   writeStore(userDir, { ...readStore(userDir), [name]: crypt.encryptString(v).toString("base64") });
   env[name] = v;
+  unreadable.delete(name);
   return listKeys({ userDir, env });
 }
 
@@ -69,6 +80,7 @@ function clearKey({ userDir, name, env = process.env }) {
   if (!NAMES.has(name)) throw new Error("Unknown key");
   const { [name]: _gone, ...rest } = readStore(userDir);
   writeStore(userDir, rest);
+  unreadable.delete(name);
   const before = launchEnv.get(name);
   if (before) env[name] = before; else delete env[name];
   return listKeys({ userDir, env });

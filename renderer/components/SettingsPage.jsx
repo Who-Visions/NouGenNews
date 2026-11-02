@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "../lib/bridge.js";
 import "./SettingsPage.css";
 
-const STATUS = { saved: "Saved here", environment: "From this computer", none: "Not set" };
+const STATUS = { saved: "Saved here", environment: "From this computer", none: "Not set", unreadable: "Can't be read, paste it again" };
 
 // One key: the box is write-only, since a saved value never comes back from the main process.
 function KeyRow({ row, onRows }) {
@@ -19,7 +19,7 @@ function KeyRow({ row, onRows }) {
       <span className={`settings__status is-${row.source}`}>{STATUS[row.source]}</span>
       <input id={row.env} type="password" autoComplete="off" spellCheck={false} value={value} placeholder={row.source === "none" ? "Paste key" : "Paste a new key to replace"} onChange={(e) => setValue(e.target.value)} />
       <button type="submit" disabled={!value.trim()}>Save</button>
-      <button type="button" disabled={row.source !== "saved"} onClick={() => run("keys_clear", { name: row.env })}>Remove</button>
+      <button type="button" disabled={row.source !== "saved" && row.source !== "unreadable"} onClick={() => run("keys_clear", { name: row.env })}>Remove</button>
       {error ? <p className="settings__error" role="alert">{error}</p> : null}
     </form>
   );

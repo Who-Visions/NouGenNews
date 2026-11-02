@@ -21,7 +21,7 @@ async function loadBrief(url) {
 function Pic({ src, width, className }) {
   const [url, setUrl] = useState(() => hiResUrl(src, width));
   useEffect(() => { setUrl(hiResUrl(src, width)); }, [src, width]);
-  return <img className={className} src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => { if (url !== src) setUrl(src); }} />;
+  return <img className={className} src={url} alt="" decoding="async" referrerPolicy="no-referrer" onError={() => { if (url !== src) setUrl(src); }} />;
 }
 const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
 
@@ -43,6 +43,11 @@ export function TailCarousel({ items, onOpen, intervalMs = 6500 }) {
     return () => clearInterval(t);
   }, [count, paused, reduced, intervalMs]);
   useEffect(() => () => clearTimeout(timer.current), []);
+  // The next promo's picture loads ahead of its turn, so it does not flash in.
+  useEffect(() => {
+    const next = items[(i + 1) % (count || 1)];
+    if (next?.img) new Image().src = hiResUrl(next.img, 56);
+  }, [items, i, count]);
 
   if (!count) return null;
   const it = items[i % count];

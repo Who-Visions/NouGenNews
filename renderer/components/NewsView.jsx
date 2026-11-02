@@ -339,6 +339,17 @@ async function kokoroSynth(text, voice) {
 const HERO_COUNT = 18;
 const mergeWire = (list) => clusterStories(dedupeStories(list)).sort(byPlayableThenNew);
 
+// A feed refresh brings bare copies of every story. What the reader already fetched stays, so an open story keeps
+// its body and pictures instead of dropping to the summary and loading again each minute.
+const keepFetched = (prev, next) => {
+  const fetched = new Map(prev.filter((a) => a.full && a.link).map((a) => [a.link, a]));
+  return next.map((s) => {
+    const p = fetched.get(s.link);
+    if (!p || s.full) return s;
+    return { ...s, full: true, contentHtml: p.contentHtml, keyPoints: p.keyPoints, videos: p.videos, readMins: p.readMins, written: p.written, imageUrl: s.imageUrl || p.imageUrl, creator: s.creator || p.creator };
+  });
+};
+
 const byPlayableThenNew = (a, b) => clampTs(b.timestamp) - clampTs(a.timestamp) || String(a.id).localeCompare(String(b.id));
 
 function parseFeedXml(xml, feedMeta) {
@@ -654,7 +665,7 @@ export function NewsView() {
     }));
     providerRef.current = Object.fromEntries(results);
     const ids = new Set(feeds.map((f) => f.id));
-    setArticles((prev) => mergeWire(prev.filter((a) => !ids.has(a.feedId)).concat(results.flatMap(([, s]) => s))));
+    setArticles((prev) => keepFetched(prev, mergeWire(prev.filter((a) => !ids.has(a.feedId)).concat(results.flatMap(([, s]) => s)))));
   }, []);
   useEffect(() => { loadProviders(); }, [loadProviders]);
 
@@ -674,7 +685,7 @@ export function NewsView() {
       }
       setLocalVia(via);
       localRef.current = items;
-      setArticles((prev) => mergeWire(prev.filter((a) => a.feedId !== LOCAL_ID).concat(items)));
+      setArticles((prev) => keepFetched(prev, mergeWire(prev.filter((a) => a.feedId !== LOCAL_ID).concat(items))));
       setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: true, count: items.length } }));
     } catch (e) {
       setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: false, error: e?.message || "Failed" } }));
@@ -747,7 +758,7 @@ export function NewsView() {
       // Stories the app can play come first, then newest first.
       aggregated = mergeWire(aggregated.concat(localRef.current, Object.values(providerRef.current).flat()));
       setFeedHealth(healthMap);
-      setArticles(aggregated);
+      setArticles((prev) => keepFetched(prev, aggregated));
       if (placeRef.current) loadLocal(placeRef.current);
       // Only the Refresh button asks the API providers to skip their cache; the automatic pull never does.
       const forced = forceRef.current === true;

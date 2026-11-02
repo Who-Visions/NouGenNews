@@ -63,10 +63,38 @@ async function fetchWeather(city, wantRegion = "") {
   return { ...parseForecast(v, place), region };
 }
 
+// OpenWeather's condition ids as the WMO codes the rest of the app reads.
+function wmoFromOpenWeather(id) {
+  if (id >= 200 && id < 300) return 95;
+  if (id >= 300 && id < 400) return 51;
+  if (id >= 500 && id < 600) return 61;
+  if (id >= 600 && id < 700) return 71;
+  if (id >= 700 && id < 800) return 45;
+  if (id === 800) return 0;
+  return id === 801 || id === 802 ? 2 : 3;
+}
+
+function parseOpenWeather(json, fallbackPlace) {
+  const temp = json?.main?.temp;
+  if (typeof temp !== "number") throw new Error("OpenWeather has no temperature");
+  const code = wmoFromOpenWeather(json.weather?.[0]?.id);
+  return { place: json.name || fallbackPlace, temp_f: temp, code, label: labelFor(code), is_day: !String(json.weather?.[0]?.icon || "").endsWith("n"), region: "" };
+}
+
+// The backup for the corner temperature when Open-Meteo cannot answer. Only used with a key from the keymaker.
+async function fetchOpenWeather(city, region, { key = process.env.OPENWEATHER_API_KEY, get = getJson } = {}) {
+  if (!key) throw new Error("no OpenWeather key");
+  const q = [city, region].filter(Boolean).join(",");
+  return parseOpenWeather(await get("https://api.openweathermap.org/data/2.5/weather", { q, units: "imperial", appid: key }), city);
+}
+
 async function homeWeather({ city, region = "" }) {
   const key = `${String(city || "").trim().toLowerCase()}|${String(region || "").trim().toLowerCase()}`;
   if (cache && cache.key === key && Date.now() - cache.at < TTL_MS) return cache.weather;
-  const weather = await fetchWeather(city, region);
+  let weather;
+  try { weather = await fetchWeather(city, region); } catch (err) {
+    try { weather = await fetchOpenWeather(city, region); } catch { throw err; }
+  }
   cache = { key, at: Date.now(), weather };
   return weather;
 }
@@ -290,4 +318,4 @@ async function weatherReport({ city, region = "" }, { get, key, now = Date.now }
   return report;
 }
 
-module.exports = { parseNws, homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };
+module.exports = { parseOpenWeather, fetchOpenWeather, parseNws, homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };

@@ -171,3 +171,12 @@ test("radar frames: only safe hosts and paths, thinned, newest last, cached five
   t += 2 * 60 * 1000; await radarFrames({ get, now: () => t }); assert.equal(calls, 2);
   await assert.rejects(radarFrames({ get: async () => ({ host: "http://evil.test", radar: { past: frames(2, 1) } }), now: () => t + 99999999 }), /no tile host/);
 });
+
+test("OpenWeather backup maps conditions and needs a key", async () => {
+  const { parseOpenWeather, fetchOpenWeather } = require("../weather");
+  const w = parseOpenWeather({ name: "West Palm Beach", main: { temp: 76 }, weather: [{ id: 500, icon: "10n" }] }, "x");
+  assert.deepEqual([w.place, w.temp_f, w.code, w.is_day], ["West Palm Beach", 76, 61, false]);
+  await assert.rejects(fetchOpenWeather("Miami", "", { key: "" }));
+  const got = await fetchOpenWeather("Miami", "Florida", { key: "k", get: async (_u, p) => ({ name: p.q, main: { temp: 80 }, weather: [{ id: 800, icon: "01d" }] }) });
+  assert.equal(got.place, "Miami,Florida");
+});

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
 const path = require("node:path");
 const { handlers } = require("./handlers");
 
@@ -46,6 +46,7 @@ app.on("web-contents-created", (_e, contents) => {
 });
 
 app.whenReady().then(() => {
+  require("./keys").applySaved({ userDir: app.getPath("userData"), crypt: safeStorage });
   ipcMain.handle("cmd", (_e, cmd, args) => {
     const fn = Object.prototype.hasOwnProperty.call(handlers, cmd) ? handlers[cmd] : null;
     if (!fn) throw new Error(`Unknown command: ${cmd}`);

@@ -166,6 +166,34 @@ function parseAlerts(json) {
   return out.sort((x, y) => (SEVERITY_RANK[y.severity.toLowerCase()] || 0) - (SEVERITY_RANK[x.severity.toLowerCase()] || 0));
 }
 
+// US warnings straight from the National Weather Service: free, keyless, and first to carry a new warning.
+function parseNws(json) {
+  const seen = new Set();
+  const out = [];
+  for (const f of (json && Array.isArray(json.features)) ? json.features : []) {
+    const p = f.properties || {};
+    const event = clip(p.event, 120);
+    if (!event) continue;
+    const alert = {
+      event, headline: clip(p.headline, 300), severity: clip(p.severity, 30), urgency: clip(p.urgency, 30), areas: clip(p.areaDesc, 300),
+      effective: clip(p.effective, 40), expires: clip(p.ends || p.expires, 40), description: clip(p.description, 700), instruction: clip(p.instruction, 400),
+      source: "National Weather Service",
+    };
+    const id = `${alert.event}|${alert.areas}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(alert);
+  }
+  return out.sort((x, y) => (SEVERITY_RANK[y.severity.toLowerCase()] || 0) - (SEVERITY_RANK[x.severity.toLowerCase()] || 0));
+}
+
+async function fetchNws(lat, lon, http = require("./safe").fetchSafe) {
+  try {
+    const res = await http(`https://api.weather.gov/alerts/active?point=${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}`, { headers: { Accept: "application/geo+json", "User-Agent": "NouGenNews" } });
+    return res.ok ? parseNws(await res.json()) : [];
+  } catch { return []; }
+}
+
 // Alerts for a point, or [] on any failure (no key, no alerts on the plan, network down). Never throws.
 async function fetchAlerts(lat, lon, { key = process.env.WEATHERAPI_KEY, get = getJson } = {}) {
   if (!key) return [];
@@ -177,9 +205,10 @@ async function fetchAlerts(lat, lon, { key = process.env.WEATHERAPI_KEY, get = g
 let alertCache = null; // { key, at, alerts }
 async function weatherAlerts({ city, region = "" }, { get, key, now = Date.now } = {}) {
   const k = `${String(city || "").trim().toLowerCase()}|${String(region || "").trim().toLowerCase()}`;
-  if (alertCache && alertCache.key === k && now() - alertCache.at < 5 * 60 * 1000) return alertCache.alerts;
+  if (alertCache && alertCache.key === k && now() - alertCache.at < 2 * 60 * 1000) return alertCache.alerts;
   const [lat, lon] = await locate(city, region);
-  const alerts = await fetchAlerts(lat, lon, { get, key });
+  const nws = get ? [] : await fetchNws(lat, lon);
+  const alerts = nws.length ? nws : await fetchAlerts(lat, lon, { get, key });
   alertCache = { key: k, at: now(), alerts };
   return alerts;
 }
@@ -261,4 +290,4 @@ async function weatherReport({ city, region = "" }, { get, key, now = Date.now }
   return report;
 }
 
-module.exports = { homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };
+module.exports = { parseNws, homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };

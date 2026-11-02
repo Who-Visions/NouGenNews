@@ -125,7 +125,7 @@ test("without a key there is no request at all, and any failure gives no alerts 
   assert.deepEqual([seen.p.q, seen.p.alerts, seen.p.days], ["26.7,-80.05", "yes", "1"]);
 });
 
-test("alerts for a place are cached five minutes", async () => {
+test("alerts for a place are cached two minutes", async () => {
   const real = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ results: [{ latitude: 1, longitude: 2, name: "Alert City", admin1: "X" }] }) });
   let calls = 0;
@@ -133,7 +133,7 @@ test("alerts for a place are cached five minutes", async () => {
   try {
     let t = 5000;
     await weatherAlerts({ city: "Alert City" }, { get, key: "k", now: () => t });
-    t += 4 * 60 * 1000;
+    t += 60 * 1000;
     await weatherAlerts({ city: "Alert City" }, { get, key: "k", now: () => t });
     assert.equal(calls, 1);
     t += 2 * 60 * 1000;

@@ -20,6 +20,7 @@ import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
 import { scoreStory } from "../../core/edition.js";
 import { findAlerts } from "../../core/alerts.js";
+import { officialAlert } from "../../core/weatheralert.js";
 import { dedupeStories } from "../../core/dedupe.js";
 import { clusterStories } from "../../core/cluster.js";
 import { isOpinion, capSources } from "../../core/voices.js";
@@ -810,7 +811,18 @@ export function NewsView() {
     [articles, libraryTerms]
   );
   const alerts = useMemo(() => findAlerts(withLibrary, { now: clock }), [withLibrary, clock]);
-  const activeAlert = demoAlert || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
+  // Official warnings for the reader's place, checked every two minutes, outrank anything the outlets are saying.
+  const [warnings, setWarnings] = useState([]);
+  useEffect(() => {
+    if (!city) return undefined;
+    let live = true;
+    const check = () => invoke("weather_alerts", { city, region: loadRegion() }).then((w) => { if (live) setWarnings(Array.isArray(w) ? w : w?.alerts || []); }).catch(() => {});
+    check();
+    const t = setInterval(check, 120000);
+    return () => { live = false; clearInterval(t); };
+  }, [city]);
+  const weatherAlert = useMemo(() => officialAlert(warnings, withLibrary, { now: clock }), [warnings, withLibrary, clock]);
+  const activeAlert = demoAlert || (weatherAlert && !alertsSeen.includes(weatherAlert.key) ? weatherAlert : null) || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
   // A real alert's story leads everything: the hero, the top of the list, and the story that opens in the reader.
   const alertLead = activeAlert && !activeAlert.demo && activeAlert.story ? activeAlert : null;
   const [knowhow, setKnowhow] = useState(loadKnowhow);
@@ -907,7 +919,8 @@ export function NewsView() {
     if (!activeAlert) return;
     if (activeAlert.demo) { setDemoAlert(null); return; }
     markSeen(activeAlert.key);
-    readStory(activeAlert.story);
+    if (activeAlert.story) readStory(activeAlert.story);
+    else window.dispatchEvent(new CustomEvent("nn:view", { detail: { view: "weather" } }));
   };
 
   const feedCounts = useMemo(() => {
@@ -1167,7 +1180,9 @@ export function NewsView() {
     const withVideo = filtered.filter((a) => a.videos && a.videos.length);
     if (!alertLead || activeFeed !== "all" || search.trim()) return withVideo.slice(0, HERO_COUNT);
     const lead = filtered.find((a) => a.id === alertLead.story.id) || alertLead.story;
-    return [{ ...lead, alertLevel: alertLead.level }, ...withVideo.filter((a) => a.id !== lead.id)].slice(0, HERO_COUNT);
+    const coverage = alertLead.kind === "weather" ? alertLead.stories.filter((a) => a.id !== lead.id) : [];
+    const ahead = new Set([lead.id, ...coverage.map((a) => a.id)]);
+    return [{ ...lead, alertLevel: alertLead.level }, ...coverage, ...withVideo.filter((a) => !ahead.has(a.id))].slice(0, HERO_COUNT);
   }, [filtered, alertLead, activeFeed, search]);
 
   return (

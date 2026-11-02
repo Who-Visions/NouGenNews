@@ -23,6 +23,7 @@ import { findAlerts } from "../../core/alerts.js";
 import { dedupeStories } from "../../core/dedupe.js";
 import { clusterStories } from "../../core/cluster.js";
 import { isOpinion, capSources } from "../../core/voices.js";
+import { healImage } from "../lib/imageHeal.js";
 import { feedItems } from "../../core/atom.js";
 import { BreakingAlert } from "./BreakingAlert.jsx";
 import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
@@ -519,7 +520,7 @@ function LowCacheThumb({ article, size = "sm", priority = false }) {
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
+        onError={(e) => healImage(e, { raw: imgUrl, link: article.link, onGiveUp: () => setFailed(true) })}
         style={{
           width: "100%",
           height: "100%",
@@ -1790,6 +1791,14 @@ export function NewsView() {
                 {currentArticle.title}
               </h1>
 
+              {/* The story's main picture stays directly under the headline, above the fold. */}
+              {currentArticle.videos?.length && !docked ? (
+                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />
+              ) : (
+                /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
+                <LowCacheThumb article={currentArticle} size="lg" priority={true} />
+              )}
+
               {/* Author & Tags */}
               {(currentArticle.creator || currentArticle.categories.length > 0) && (
                 <div
@@ -1841,12 +1850,6 @@ export function NewsView() {
                 </aside>
               ) : null}
 
-              {currentArticle.videos?.length && !docked ? (
-                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />
-              ) : (
-                /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
-                <LowCacheThumb article={currentArticle} size="lg" priority={true} />
-              )}
               {writing && !currentArticle.written ? (
                 <p style={{ fontSize: 12, color: TOKENS.textMuted, margin: "0 0 10px" }}>NouGen is writing this story from the video…</p>
               ) : null}

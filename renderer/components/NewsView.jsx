@@ -821,7 +821,7 @@ export function NewsView() {
     const t = setInterval(check, 120000);
     return () => { live = false; clearInterval(t); };
   }, [city]);
-  const weatherAlert = useMemo(() => officialAlert(warnings, withLibrary, { now: clock }), [warnings, withLibrary, clock]);
+  const weatherAlert = useMemo(() => officialAlert(warnings, withLibrary, { now: clock, city }), [warnings, withLibrary, clock, city]);
   const activeAlert = demoAlert || (weatherAlert && !alertsSeen.includes(weatherAlert.key) ? weatherAlert : null) || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
   // A real alert's story leads everything: the hero, the top of the list, and the story that opens in the reader.
   const alertLead = activeAlert && !activeAlert.demo && activeAlert.story ? activeAlert : null;
@@ -918,7 +918,8 @@ export function NewsView() {
   const readAlert = () => {
     if (!activeAlert) return;
     if (activeAlert.demo) { setDemoAlert(null); return; }
-    markSeen(activeAlert.key);
+    // A warning in force stays up after it is read; only the reader dismisses it.
+    if (activeAlert.kind !== "weather") markSeen(activeAlert.key);
     if (activeAlert.story) readStory(activeAlert.story);
     else window.dispatchEvent(new CustomEvent("nn:view", { detail: { view: "weather" } }));
   };

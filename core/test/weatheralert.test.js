@@ -17,9 +17,11 @@ test("an expired warning raises nothing", () => {
 
 test("local coverage leads, video first, and a warning stands alone without coverage", () => {
   const stories = [
-    { id: "a", feedId: "local", title: "Flooding closes I-95 ramps", imageUrl: "x", timestamp: 2 },
-    { id: "b", feedId: "local", title: "Flash flood video from Palm Beach", videos: [{}], timestamp: 1 },
+    { id: "a", feedId: "local", title: "Flooding closes Palm Beach ramps", imageUrl: "x", timestamp: now - 1000 },
+    { id: "b", feedId: "local", title: "Flash flood video from Palm Beach", videos: [{}], timestamp: now - 2000 },
     { id: "c", feedId: "tv", title: "Flood season premiere" },
+    { id: "e", feedId: "local", title: "Flash flood warning in Miami-Dade", timestamp: now - 1000 },
+    { id: "f", feedId: "local", title: "Palm Beach flooding yesterday", timestamp: now - 14 * 3600e3 },
     { id: "d", feedId: "local", title: "Council meets" },
   ];
   const a = officialAlert([flood], stories, { now });

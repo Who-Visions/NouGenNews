@@ -4,6 +4,7 @@
 // video plays. Left/Right arrows step it; the parent owns the rest of the keyboard.
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { Ago } from "./Ago.jsx";
+import { healImage } from "../lib/imageHeal.js";
 import { HeroScroller } from "./HeroScroller.jsx";
 import { HeroTitle } from "./HeroTitle.jsx";
 import { useStripDrift } from "./StripDrift.js";
@@ -86,7 +87,7 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
           <Player video={video} embedPort={embedPort} />
         ) : (
           <button type="button" className="nh-poster" onClick={() => (video ? setPlaying(true) : onRead(item))} aria-label={video ? `Play video: ${item.title}` : `Read: ${item.title}`}>
-            {item.imageUrl ? <img src={item.imageUrl} alt="" loading="eager" decoding="async" referrerPolicy="no-referrer" /> : <span className="nh-poster-blank" />}
+            {item.imageUrl ? <img src={item.imageUrl} alt="" loading="eager" decoding="async" referrerPolicy="no-referrer" onError={(e) => healImage(e, { raw: item.imageUrl, link: item.link })} /> : <span className="nh-poster-blank" />}
             {video ? <span className="nh-play" aria-hidden="true">▶</span> : null}
             {item.alertLevel ? <span className={`nh-tag nh-tag--${item.alertLevel}`}>{item.alertLevel === "red" ? "Red alert" : "Breaking"}</span> : video ? <span className="nh-tag">▶ Video</span> : null}
           </button>
@@ -141,7 +142,7 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
               aria-current={i === safe ? "true" : undefined}
               aria-label={`${i + 1} of ${count}: ${it.title}`}
             >
-              {it.imageUrl ? <img src={it.imageUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" /> : <span className="nh-poster-blank" />}
+              {it.imageUrl ? <img src={it.imageUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => healImage(e, { raw: it.imageUrl, link: it.link })} /> : <span className="nh-poster-blank" />}
               <span className="nh-thumb-title">{it.title}</span>
               {i === safe ? (
                 <span className="nh-progress" aria-hidden="true">

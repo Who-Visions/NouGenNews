@@ -28,5 +28,7 @@ test("local coverage leads, video first, and a warning stands alone without cove
   assert.equal(a.level, "red");
   assert.deepEqual(a.stories.map((s) => s.id), ["b", "a"]);
   assert.equal(officialAlert([flood], [], { now }).story, null);
+  assert.equal(officialAlert([flood], [], { now }).cameras, "palm-beach-cameras");
+  assert.equal(officialAlert([{ ...flood, areas: "Miami-Dade, FL" }], [], { now }).cameras, null);
   assert.equal(isWeatherStory({ title: "Council meets" }), false);
 });

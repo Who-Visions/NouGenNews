@@ -57,7 +57,7 @@ const handlers = {
   // are made for client-side use; this one reaches the page only when the Weather tab opens, and is never written to disk here.
   weather_globe_config: () => ({ token: process.env.CESIUM_ION_TOKEN_20261030 || process.env.CESIUM_ION_TOKEN || "" }),
   weather_open_credit: (args = {}) => {
-    const url = { "open-meteo": "https://open-meteo.com/", weatherapi: "https://www.weatherapi.com/", rainviewer: "https://www.rainviewer.com/", cesium: "https://cesium.com/" }[String(args.which || "open-meteo")];
+    const url = { "open-meteo": "https://open-meteo.com/", weatherapi: "https://www.weatherapi.com/", rainviewer: "https://www.rainviewer.com/", cesium: "https://cesium.com/", "palm-beach-cameras": "https://pbctrafficstreams.pbc.gov/portal/" }[String(args.which || "open-meteo")];
     if (!url) return false;
     require("electron").shell.openExternal(url);
     return true;

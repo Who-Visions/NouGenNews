@@ -1,3 +1,4 @@
+import { invoke } from "../lib/bridge.js";
 import "./BreakingAlert.css";
 
 // The alert banner: red for a major story several outlets carry, amber for a smaller or local one. It sits at the
@@ -12,6 +13,7 @@ export function BreakingAlert({ alert, onRead, onDismiss }) {
       <span className="ba__label"><i className="ba__dot" aria-hidden="true" />{alert.label || (red ? "Red alert" : "Breaking")}</span>
       <button type="button" className="ba__headline" onClick={onRead} title={alert.headline}>{alert.headline}</button>
       <span className="ba__meta mono">{alert.demo ? "sample" : alert.meta || `${alert.sourceCount} sources · ${ago}`}</span>
+      {alert.cameras && <button type="button" className="ba__read" onClick={() => invoke("weather_open_credit", { which: alert.cameras })}>Live cameras</button>}
       <button type="button" className="ba__read" onClick={onRead}>{alert.demo ? "Got it" : alert.story === null ? "Forecast" : "Read"}</button>
       <button type="button" className="ba__x" aria-label="Dismiss alert" onClick={onDismiss}>&times;</button>
     </div>

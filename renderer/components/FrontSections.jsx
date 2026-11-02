@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { buildEdition } from "../../core/edition.js";
 import { hiResUrl } from "../lib/articleHtml.js";
+import { healImage } from "../lib/imageHeal.js";
 import "./FrontSections.css";
 
 // The sections of the edition under the lead: one channel per section, three stories each.
@@ -20,7 +21,7 @@ export function FrontSections({ stories, terms, counts, onRead, onPickSection })
           <div className="fs__grid">
             {sec.stories.map((s) => (
               <button type="button" key={s.id} className={`fs__card${s.imageUrl ? "" : " fs__card--text"}`} onClick={() => onRead(s)}>
-                {s.imageUrl ? <img src={hiResUrl(s.imageUrl, 560)} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => { if (e.currentTarget.src !== s.imageUrl) e.currentTarget.src = s.imageUrl; }} /> : null}
+                {s.imageUrl ? <img src={hiResUrl(s.imageUrl, 560)} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => healImage(e, { raw: s.imageUrl, link: s.link, onGiveUp: (img) => img.closest(".fs__card")?.classList.add("fs__card--text") })} /> : null}
                 <span className="fs__meta">
                   <b>{s.source}</b><span>{s.readMins} min read</span>
                   {s.libraryHits?.length ? <em title={s.libraryHits.join(", ")}>&#9829; In your library</em> : null}

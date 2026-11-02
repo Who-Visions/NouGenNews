@@ -9,10 +9,10 @@ export function BreakingAlert({ alert, onRead, onDismiss }) {
   const ago = mins < 1 ? "just now" : mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
   return (
     <div className={`ba ba--${alert.level}`} role="alert" aria-live="assertive">
-      <span className="ba__label"><i className="ba__dot" aria-hidden="true" />{red ? "Red alert" : "Breaking"}</span>
+      <span className="ba__label"><i className="ba__dot" aria-hidden="true" />{alert.label || (red ? "Red alert" : "Breaking")}</span>
       <button type="button" className="ba__headline" onClick={onRead} title={alert.headline}>{alert.headline}</button>
-      <span className="ba__meta mono">{alert.demo ? "sample" : `${alert.sourceCount} sources · ${ago}`}</span>
-      <button type="button" className="ba__read" onClick={onRead}>{alert.demo ? "Got it" : "Read"}</button>
+      <span className="ba__meta mono">{alert.demo ? "sample" : alert.meta || `${alert.sourceCount} sources · ${ago}`}</span>
+      <button type="button" className="ba__read" onClick={onRead}>{alert.demo ? "Got it" : alert.story === null ? "Forecast" : "Read"}</button>
       <button type="button" className="ba__x" aria-label="Dismiss alert" onClick={onDismiss}>&times;</button>
     </div>
   );

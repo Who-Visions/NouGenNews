@@ -193,7 +193,7 @@
 .nh-title--line { overflow: hidden; white-space: nowrap; margin: 0; }
 .nh-title__track { display: inline-flex; will-change: transform; }
 .nh-title__text { flex: none; padding-right: 4rem; }
-.nh-title--line.is-running .nh-title__track { animation: nh-title var(--title-s, 14s) linear infinite; }
+.nh-title--line.is-running .nh-title__track { animation: nh-title var(--title-s, 14s) linear 1.5s infinite; }
 .nh-title--line.is-running:hover .nh-title__track, .nh-title--line.is-running:focus-within .nh-title__track { animation-play-state: paused; }
 @keyframes nh-title { to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) {

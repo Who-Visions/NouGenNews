@@ -20,8 +20,11 @@ import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
 import { scoreStory } from "../../core/edition.js";
 import { findAlerts } from "../../core/alerts.js";
+import { officialAlert } from "../../core/weatheralert.js";
 import { dedupeStories } from "../../core/dedupe.js";
 import { clusterStories } from "../../core/cluster.js";
+import { isOpinion, capSources } from "../../core/voices.js";
+import { healImage } from "../lib/imageHeal.js";
 import { feedItems } from "../../core/atom.js";
 import { BreakingAlert } from "./BreakingAlert.jsx";
 import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
@@ -337,6 +340,17 @@ async function kokoroSynth(text, voice) {
 const HERO_COUNT = 18;
 const mergeWire = (list) => clusterStories(dedupeStories(list)).sort(byPlayableThenNew);
 
+// A feed refresh brings bare copies of every story. What the reader already fetched stays, so an open story keeps
+// its body and pictures instead of dropping to the summary and loading again each minute.
+const keepFetched = (prev, next) => {
+  const fetched = new Map(prev.filter((a) => a.full && a.link).map((a) => [a.link, a]));
+  return next.map((s) => {
+    const p = fetched.get(s.link);
+    if (!p || s.full) return s;
+    return { ...s, full: true, contentHtml: p.contentHtml, keyPoints: p.keyPoints, videos: p.videos, readMins: p.readMins, written: p.written, imageUrl: s.imageUrl || p.imageUrl, creator: s.creator || p.creator };
+  });
+};
+
 const byPlayableThenNew = (a, b) => clampTs(b.timestamp) - clampTs(a.timestamp) || String(a.id).localeCompare(String(b.id));
 
 function parseFeedXml(xml, feedMeta) {
@@ -518,7 +532,7 @@ function LowCacheThumb({ article, size = "sm", priority = false }) {
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
+        onError={(e) => healImage(e, { raw: imgUrl, link: article.link, onGiveUp: () => setFailed(true) })}
         style={{
           width: "100%",
           height: "100%",
@@ -652,7 +666,7 @@ export function NewsView() {
     }));
     providerRef.current = Object.fromEntries(results);
     const ids = new Set(feeds.map((f) => f.id));
-    setArticles((prev) => mergeWire(prev.filter((a) => !ids.has(a.feedId)).concat(results.flatMap(([, s]) => s))));
+    setArticles((prev) => keepFetched(prev, mergeWire(prev.filter((a) => !ids.has(a.feedId)).concat(results.flatMap(([, s]) => s)))));
   }, []);
   useEffect(() => { loadProviders(); }, [loadProviders]);
 
@@ -672,7 +686,7 @@ export function NewsView() {
       }
       setLocalVia(via);
       localRef.current = items;
-      setArticles((prev) => mergeWire(prev.filter((a) => a.feedId !== LOCAL_ID).concat(items)));
+      setArticles((prev) => keepFetched(prev, mergeWire(prev.filter((a) => a.feedId !== LOCAL_ID).concat(items))));
       setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: true, count: items.length } }));
     } catch (e) {
       setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: false, error: e?.message || "Failed" } }));
@@ -745,7 +759,7 @@ export function NewsView() {
       // Stories the app can play come first, then newest first.
       aggregated = mergeWire(aggregated.concat(localRef.current, Object.values(providerRef.current).flat()));
       setFeedHealth(healthMap);
-      setArticles(aggregated);
+      setArticles((prev) => keepFetched(prev, aggregated));
       if (placeRef.current) loadLocal(placeRef.current);
       // Only the Refresh button asks the API providers to skip their cache; the automatic pull never does.
       const forced = forceRef.current === true;
@@ -797,7 +811,18 @@ export function NewsView() {
     [articles, libraryTerms]
   );
   const alerts = useMemo(() => findAlerts(withLibrary, { now: clock }), [withLibrary, clock]);
-  const activeAlert = demoAlert || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
+  // Official warnings for the reader's place, checked every two minutes, outrank anything the outlets are saying.
+  const [warnings, setWarnings] = useState([]);
+  useEffect(() => {
+    if (!city) return undefined;
+    let live = true;
+    const check = () => invoke("weather_alerts", { city, region: loadRegion() }).then((w) => { if (live) setWarnings(Array.isArray(w) ? w : w?.alerts || []); }).catch(() => {});
+    check();
+    const t = setInterval(check, 120000);
+    return () => { live = false; clearInterval(t); };
+  }, [city]);
+  const weatherAlert = useMemo(() => officialAlert(warnings, withLibrary, { now: clock, city }), [warnings, withLibrary, clock, city]);
+  const activeAlert = demoAlert || (weatherAlert && !alertsSeen.includes(weatherAlert.key) ? weatherAlert : null) || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
   // A real alert's story leads everything: the hero, the top of the list, and the story that opens in the reader.
   const alertLead = activeAlert && !activeAlert.demo && activeAlert.story ? activeAlert : null;
   const [knowhow, setKnowhow] = useState(loadKnowhow);
@@ -826,7 +851,8 @@ export function NewsView() {
     // The reader's Know-how shapes the wire, but a search finds everything and a breaking alert is never hidden.
     const taste = knowhow.on && !q ? applyKnowhow(base, tasteRules, knowhow.learned, new Set(alertLead ? alertLead.stories.map((s) => s.id) : [])) : null;
     tasteStats.current = taste ? taste.stats : { muted: 0, raised: 0, lowered: 0, flagged: 0, capped: 0 };
-    const ranked = taste ? taste.stories : base;
+    // The outlet limit runs last, because scoring reorders the wire; a search still shows matches in rank order.
+    const ranked = q ? (taste ? taste.stories : base) : capSources(taste ? taste.stories : base);
     if (!alertLead || activeFeed !== "all" || q) return ranked;
     const ids = new Set(alertLead.stories.map((s) => s.id));
     const first = ranked.find((a) => a.id === alertLead.story.id);
@@ -892,8 +918,10 @@ export function NewsView() {
   const readAlert = () => {
     if (!activeAlert) return;
     if (activeAlert.demo) { setDemoAlert(null); return; }
-    markSeen(activeAlert.key);
-    readStory(activeAlert.story);
+    // A warning in force stays up after it is read; only the reader dismisses it.
+    if (activeAlert.kind !== "weather") markSeen(activeAlert.key);
+    if (activeAlert.story) readStory(activeAlert.story);
+    else window.dispatchEvent(new CustomEvent("nn:view", { detail: { view: "weather" } }));
   };
 
   const feedCounts = useMemo(() => {
@@ -1153,7 +1181,9 @@ export function NewsView() {
     const withVideo = filtered.filter((a) => a.videos && a.videos.length);
     if (!alertLead || activeFeed !== "all" || search.trim()) return withVideo.slice(0, HERO_COUNT);
     const lead = filtered.find((a) => a.id === alertLead.story.id) || alertLead.story;
-    return [{ ...lead, alertLevel: alertLead.level }, ...withVideo.filter((a) => a.id !== lead.id)].slice(0, HERO_COUNT);
+    const coverage = alertLead.kind === "weather" ? alertLead.stories.filter((a) => a.id !== lead.id) : [];
+    const ahead = new Set([lead.id, ...coverage.map((a) => a.id)]);
+    return [{ ...lead, alertLevel: alertLead.level }, ...coverage, ...withVideo.filter((a) => !ahead.has(a.id))].slice(0, HERO_COUNT);
   }, [filtered, alertLead, activeFeed, search]);
 
   return (
@@ -1588,7 +1618,8 @@ export function NewsView() {
                       {item.libraryHits?.length ? <span title={item.libraryHits.join(", ")} style={{ color: TOKENS.accentPrimary, fontWeight: 700 }}>♥ In your library</span> : null}
                       {flagsFor(item, tasteRules).length ? <span className="nn-flag" title={flagsFor(item, tasteRules).join(", ")}>⚑ Flagged</span> : null}
                       <span>{item.readMins} min read</span>
-                      {item.alsoFrom && item.alsoFrom.length ? <span title={item.alsoFrom.map((a) => `${a.source}: ${a.title}`).join("\n")}>+{item.alsoFrom.length} {item.alsoFrom.length === 1 ? "source" : "sources"}</span> : null}
+                      {isOpinion(item) ? <span>Opinion</span> : null}
+                      {item.alsoFrom && item.alsoFrom.length ? <span title={item.alsoFrom.map((a) => `${a.opinion ? "[Opinion] " : ""}${a.source}: ${a.title}`).join("\n")}>+{item.alsoFrom.length} {item.alsoFrom.length === 1 ? "source" : "sources"}</span> : null}
                       {item.categories[0] && (
                         <>
                           <span>•</span>
@@ -1787,6 +1818,14 @@ export function NewsView() {
                 {currentArticle.title}
               </h1>
 
+              {/* The story's main picture stays directly under the headline, above the fold. */}
+              {currentArticle.videos?.length && !docked ? (
+                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />
+              ) : (
+                /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
+                <LowCacheThumb article={currentArticle} size="lg" priority={true} />
+              )}
+
               {/* Author & Tags */}
               {(currentArticle.creator || currentArticle.categories.length > 0) && (
                 <div
@@ -1838,12 +1877,6 @@ export function NewsView() {
                 </aside>
               ) : null}
 
-              {currentArticle.videos?.length && !docked ? (
-                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />
-              ) : (
-                /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
-                <LowCacheThumb article={currentArticle} size="lg" priority={true} />
-              )}
               {writing && !currentArticle.written ? (
                 <p style={{ fontSize: 12, color: TOKENS.textMuted, margin: "0 0 10px" }}>NouGen is writing this story from the video…</p>
               ) : null}

@@ -1,7 +1,7 @@
 // Reporting versus opinion, and how much of the feed one outlet may hold. Labels and demotes; never deletes a story.
 
-const OPINION_URL = /\/(opinions?|commentary|editorials?|op-?eds?|columns?|columnists?|perspectives?|analysis)(\/|$)/i;
-const OPINION_TITLE = /^\s*(opinion|commentary|editorial|op-?ed|column|analysis|perspective|hot take)\s*[:|–—-]/i;
+const OPINION_URL = /\/(opinions?|commentary|editorials?|op-?eds?|columns?|columnists?|perspectives?)(\/|$)/i;
+const OPINION_TITLE = /^\s*(opinion|commentary|editorial|op-?ed|column|perspective|hot take)\s*[:|–—-]/i;
 
 export function isOpinion(story) {
   if (OPINION_TITLE.test(String(story?.title || ""))) return true;

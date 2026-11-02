@@ -336,7 +336,7 @@ async function kokoroSynth(text, voice) {
 // One copy of every story, however many sources carried it, then playable first and newest first.
 // How many stories the hero carousel and its drifting "Up next" row hold.
 const HERO_COUNT = 18;
-const mergeWire = (list) => capSources(clusterStories(dedupeStories(list)).sort(byPlayableThenNew));
+const mergeWire = (list) => clusterStories(dedupeStories(list)).sort(byPlayableThenNew);
 
 const byPlayableThenNew = (a, b) => clampTs(b.timestamp) - clampTs(a.timestamp) || String(a.id).localeCompare(String(b.id));
 
@@ -827,7 +827,8 @@ export function NewsView() {
     // The reader's Know-how shapes the wire, but a search finds everything and a breaking alert is never hidden.
     const taste = knowhow.on && !q ? applyKnowhow(base, tasteRules, knowhow.learned, new Set(alertLead ? alertLead.stories.map((s) => s.id) : [])) : null;
     tasteStats.current = taste ? taste.stats : { muted: 0, raised: 0, lowered: 0, flagged: 0, capped: 0 };
-    const ranked = taste ? taste.stories : base;
+    // The outlet limit runs last, because scoring reorders the wire; a search still shows matches in rank order.
+    const ranked = q ? (taste ? taste.stories : base) : capSources(taste ? taste.stories : base);
     if (!alertLead || activeFeed !== "all" || q) return ranked;
     const ids = new Set(alertLead.stories.map((s) => s.id));
     const first = ranked.find((a) => a.id === alertLead.story.id);

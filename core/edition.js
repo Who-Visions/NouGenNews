@@ -1,12 +1,16 @@
 // An edition: the wire laid out as a newspaper. A lead story, a few secondary stories, then a block per
 // section. Placement comes from one score (freshness, video, and whether it touches the reader's library),
 // so every app that builds an edition from the same stories prints the same front page.
+import { isOpinion } from "./voices.js";
 import { FEEDS } from "./feeds.js";
 import { matchStory } from "./library.js";
 
 const HOUR = 3600 * 1000;
 
 // Higher is further up the page.
+// Facts first: labeled opinion gives up about what a library match earns, so it cannot outrank fresh reporting.
+const OPINION_PENALTY = 30;
+
 export function scoreStory(story, { now = Date.now(), terms = [] } = {}) {
   const ageHours = Math.max(0, (now - (story.timestamp || 0)) / HOUR);
   let score = 100 / (1 + ageHours / 6); // half-life of roughly six hours
@@ -14,6 +18,7 @@ export function scoreStory(story, { now = Date.now(), terms = [] } = {}) {
   if (story.imageUrl) score += 4;
   const hits = matchStory(story, terms);
   if (hits.length) score += 60 + 5 * Math.min(hits.length - 1, 3);
+  if (isOpinion(story)) score -= OPINION_PENALTY;
   return score;
 }
 

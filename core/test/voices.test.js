@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { isOpinion, capSources } from "../voices.js";
+import { scoreStory } from "../edition.js";
 import { clusterStories } from "../cluster.js";
 
 test("isOpinion reads the title prefix and the URL section", () => {
@@ -24,4 +25,15 @@ test("reporting leads a cluster over opinion even with a picture, and folded opi
   ]);
   assert.equal(out[0].id, "r");
   assert.equal(out[0].alsoFrom[0].opinion, true);
+});
+
+test("analysis is reporting, not opinion", () => {
+  assert.equal(isOpinion({ title: "Analysis: What the crash data shows", link: "https://x.test/analysis/crash" }), false);
+});
+
+test("fresh reporting outranks older opinion that matched the library", () => {
+  const now = 12 * 3600e3;
+  const opinion = { title: "Opinion | Venezuela", timestamp: 0 };
+  const report = { title: "Jet crash", timestamp: now - 47 * 60e3 };
+  assert.ok(scoreStory(report, { now }) > scoreStory(opinion, { now, terms: ["venezuela"] }));
 });

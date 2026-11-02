@@ -57,6 +57,35 @@ function extractArticle(html, url = "") {
   return { html: textLen(body) >= 200 ? body.trim() : "", videos, title };
 }
 
+const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const decodeTags = (t) => String(t).replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").trim();
+
+// Plain text as readable paragraphs, a few sentences each.
+function paragraphs(text, perParagraph = 4) {
+  const sentences = decodeTags(text).replace(/\s+/g, " ").match(/[^.!?]+[.!?]+["')\]]*\s*|[^.!?]+$/g) || [];
+  const out = [];
+  for (let i = 0; i < sentences.length; i += perParagraph) out.push(`<p>${escapeHtml(sentences.slice(i, i + perParagraph).join("").trim())}</p>`);
+  return out.join("");
+}
+
+// A page with no story in its markup, such as a video page, often still carries the text in its JSON-LD:
+// the article's body, or a video's description and transcript.
+function bodyFromJsonLd(html) {
+  const nodes = [];
+  for (const m of String(html).matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { const j = JSON.parse(m[1]); nodes.push(...(Array.isArray(j) ? j : j["@graph"] || [j])); } catch { /* a malformed block is skipped */ }
+  }
+  for (const n of nodes) {
+    const body = typeof n?.articleBody === "string" ? n.articleBody : "";
+    const transcript = typeof n?.transcript === "string" ? n.transcript : "";
+    const text = body || transcript;
+    if (textLen(text) < 200) continue;
+    const lead = !body && typeof n.description === "string" ? `<p>${escapeHtml(decodeTags(n.description))}</p>` : "";
+    return lead + paragraphs(text);
+  }
+  return "";
+}
+
 const isPublicHost = (h) => !/^(localhost|\[|\d+\.\d+\.\d+\.\d+$)|\.(local|lan|internal)$/i.test(h);
 
 async function articleFetch(raw, http = fetchSafe) {
@@ -67,6 +96,7 @@ async function articleFetch(raw, http = fetchSafe) {
   if (!res.ok) throw new Error(`Article error: HTTP ${res.status}`);
   const html = (await res.text()).slice(0, MAX_BYTES);
   const out = extractArticle(html, u.toString());
+  if (!out.html) out.html = bodyFromJsonLd(html);
   // Who wrote it, when, and the gist: from the page's own tags and the body we kept, no model involved.
   const meta = extractMeta(html, u.toString());
   const text = squash(out.html.replace(/<h\d\b[^>]*>[\s\S]*?<\/h\d>/gi, " ").replace(/<\/(p|li|blockquote)>/gi, ". ").replace(/\.(\s*\.)+/g, "."));
@@ -83,4 +113,4 @@ async function articleFetch(raw, http = fetchSafe) {
   return out;
 }
 
-module.exports = { articleFetch, extractArticle, findVideos };
+module.exports = { articleFetch, extractArticle, findVideos, bodyFromJsonLd };

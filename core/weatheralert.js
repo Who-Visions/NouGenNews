@@ -47,6 +47,8 @@ export function officialAlert(warnings, stories, { now = Date.now(), city = "" }
     meta: `${w.source || "Weather service"}${until ? ` · until ${until}` : ""}`,
     story: coverage[0] || null,
     stories: coverage,
+    // Traffic cameras are linked, never embedded: the portal's terms bar redistributing them.
+    cameras: level === "red" && /\bpalm beach\b/i.test(w.areas || "") ? "palm-beach-cameras" : null,
     sourceCount: 1,
     timestamp: Date.parse(w.effective || "") || now,
   };

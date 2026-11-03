@@ -88,11 +88,51 @@ function bodyFromJsonLd(html) {
 
 const isPublicHost = (h) => !/^(localhost|\[|\d+\.\d+\.\d+\.\d+$)|\.(local|lan|internal)$/i.test(h);
 
-async function articleFetch(raw, http = fetchSafe) {
+// The reader, the picture healer and the tail carousel can all ask one site for pages at once, and a site that
+// answers 429 once keeps answering it. So the real network path shares a per-host queue (two at a time, a short
+// gap between starts), remembers a page for a few minutes, and remembers a refusal long enough to stop asking.
+const HOST_GAP_MS = 250;
+const HOST_PARALLEL = 2;
+const PAGE_TTL_MS = 10 * 60 * 1000;
+const REFUSED_TTL_MS = 60 * 1000;
+const hosts = new Map();
+const pages = new Map();
+
+function gatedFetch(url, opts, now = Date.now) {
+  const hit = pages.get(url);
+  if (hit && hit.until > now()) return hit.promise;
+  const host = new URL(url).hostname;
+  const lane = hosts.get(host) || { running: 0, queue: [], last: 0 };
+  hosts.set(host, lane);
+  const promise = new Promise((resolve, reject) => {
+    lane.queue.push({ url, opts, resolve, reject });
+    pump(lane);
+  });
+  pages.set(url, { promise, until: now() + PAGE_TTL_MS });
+  promise.then(
+    (res) => { if (!res.ok) pages.set(url, { promise, until: now() + (res.status === 429 || res.status === 503 ? REFUSED_TTL_MS : 0) }); },
+    () => pages.delete(url),
+  );
+  return promise;
+}
+
+function pump(lane) {
+  if (lane.running >= HOST_PARALLEL || !lane.queue.length) return;
+  const wait = Math.max(0, lane.last + HOST_GAP_MS - Date.now());
+  lane.running++;
+  const job = lane.queue.shift();
+  setTimeout(() => {
+    lane.last = Date.now();
+    fetchSafe(job.url, job.opts).then(job.resolve, job.reject).finally(() => { lane.running--; pump(lane); });
+  }, wait);
+  pump(lane);
+}
+
+async function articleFetch(raw, http = null) {
   let u;
   try { u = new URL(String(raw || "").trim()); } catch { throw new Error("Article error: bad URL"); }
   if (u.protocol !== "https:" || !isPublicHost(u.hostname)) throw new Error("Article error: public https pages only");
-  const res = await http(u.toString(), { headers: { Accept: "text/html", "User-Agent": "Mozilla/5.0 NouGenNews" } });
+  const res = await (http || gatedFetch)(u.toString(), { headers: { Accept: "text/html", "User-Agent": "Mozilla/5.0 NouGenNews" } });
   if (!res.ok) throw new Error(`Article error: HTTP ${res.status}`);
   const html = (await res.text()).slice(0, MAX_BYTES);
   const out = extractArticle(html, u.toString());

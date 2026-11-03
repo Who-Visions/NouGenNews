@@ -966,10 +966,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
-  min-width: 240px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 .wg__btn {
+  white-space: nowrap;
+  min-height: 28px;
   padding: 4px 10px;
   font: inherit;
   font-size: 11px;
@@ -992,6 +995,18 @@
 .wg__btn:disabled {
   opacity: 0.45;
   cursor: default;
+}
+.wg__layers {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+  border-left: 1px solid var(--wp-line);
+  border-right: 1px solid var(--wp-line);
+}
+.wg__count {
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
 }
 .wg__scrubber {
   flex: 1;
@@ -1111,8 +1126,10 @@
     margin: 8px;
   }
 }
-.wg__cam { position: absolute; top: 12px; left: 12px; z-index: 5; width: min(420px, calc(100% - 24px)); margin: 0; background: #000; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 6px; overflow: hidden; }
-.wg__cam-video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
-.wg__cam-wait { display: grid; place-items: center; color: #ccc; font-size: 12px; }
-.wg__cam figcaption { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; font-size: 13px; color: #fff; }
-.wg__cam button { padding: 0 6px; font-size: 18px; line-height: 1; color: #fff; background: none; border: 0; cursor: pointer; }
+.wg__cam { position: absolute; top: 12px; left: 12px; z-index: 5; width: min(400px, calc(100% - 24px)); margin: 0; background: #1c1c1c; border: 1px solid var(--wp-line-strong); border-radius: 4px; overflow: hidden; }
+.wg__cam-video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; }
+.wg__cam figcaption { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 10px; font-size: 12px; color: var(--wp-text); }
+.wg__cam-live { flex: none; padding: 1px 5px; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--wp-danger); border: 1px solid var(--wp-danger); border-radius: 2px; }
+.wg__cam-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wg__cam-x { flex: none; width: 28px; height: 28px; font-size: 18px; line-height: 1; color: var(--wp-muted); background: none; border: 0; border-radius: 3px; cursor: pointer; }
+.wg__cam-x:hover { color: var(--wp-text); background: #333333; }

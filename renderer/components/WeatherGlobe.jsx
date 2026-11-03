@@ -154,7 +154,7 @@ export function WeatherGlobe({ lat, lon, place }) {
       {cam ? (
         <figure className="wg__cam">
           <video key={cam.id} ref={videoEl} className="wg__cam-video" poster={camFrame || undefined} autoPlay muted playsInline aria-label={cam.name} />
-          <figcaption>{cam.name}<button type="button" aria-label="Close camera" onClick={() => setCam(null)}>&times;</button></figcaption>
+          <figcaption><span className="wg__cam-live mono">Live</span><span className="wg__cam-name">{cam.name}</span><button type="button" className="wg__cam-x" aria-label="Close camera" onClick={() => setCam(null)}>&times;</button></figcaption>
         </figure>
       ) : null}
 
@@ -175,6 +175,7 @@ export function WeatherGlobe({ lat, lon, place }) {
             <button type="button" className="wg__btn" onClick={() => post({ type: "home" })}>
               Home
             </button>
+            <div className="wg__layers" role="group" aria-label="Map layers">
             <button
               type="button"
               className={`wg__btn ${radarOn ? "on" : ""}`}
@@ -186,15 +187,16 @@ export function WeatherGlobe({ lat, lon, place }) {
             </button>
             {cameras.length ? (
               <button type="button" className={`wg__btn ${camerasOn ? "on" : ""}`} onClick={toggleCameras} aria-pressed={camerasOn}>
-                Cameras {cameras.length}
+                Cameras <span className="wg__count">{cameras.length}</span>
               </button>
             ) : null}
             <button type="button" className={`wg__btn ${buildingsOn ? "on" : ""}`} onClick={toggleBuildings} aria-pressed={buildingsOn}>
-              3D buildings
+              Buildings
             </button>
             <button type="button" className={`wg__btn ${warningsOn ? "on" : ""}`} onClick={toggleWarnings} aria-pressed={warningsOn}>
-              Warnings{shapes.length ? ` ${shapes.length}` : ""}
+              Warnings{shapes.length ? <span className="wg__count">{shapes.length}</span> : null}
             </button>
+            </div>
             {count > 1 ? (
               <button
                 type="button"

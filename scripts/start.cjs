@@ -11,6 +11,17 @@ const missing = OPTIONAL.filter((name) => !env[name]);
 const found = readSecrets(missing);
 for (const name of missing) if (found[name]) env[name] = found[name];
 
+// A built page with its script or stylesheet missing opens as a black window with no error (two builds writing into
+// dist at once, or one cut short). Rebuild once before opening rather than show that.
+const { missingFiles } = require("./dist-check.cjs");
+const dist = path.resolve(__dirname, "..", "dist");
+if (missingFiles(dist).length) {
+  console.log("dist is incomplete (" + missingFiles(dist).join(", ") + "); rebuilding before launch...");
+  require("node:child_process").spawnSync(process.execPath, [path.resolve(__dirname, "..", "node_modules", "vite", "bin", "vite.js"), "build"], { cwd: path.resolve(__dirname, ".."), stdio: "inherit" });
+  const still = missingFiles(dist);
+  if (still.length) console.error("dist is still incomplete after a rebuild (" + still.join(", ") + "): the window will be blank. Is another build running in this folder?");
+}
+
 // Anything after `npm start --` goes to Electron (for example --remote-debugging-port=9333 --user-data-dir=...).
 const electron = require("electron");
 const child = spawn(electron, [path.resolve(__dirname, ".."), ...process.argv.slice(2)], { stdio: "inherit", env, windowsHide: false });

@@ -36,9 +36,6 @@ The system relies on several core techniques that define its operational advanta
 
 Data persistence leverages a single batched SQLite transaction for atomic writes, ensuring data integrity without the overhead of numerous individual fsync operations. Image assets are managed via Domain-Wide Delegation with Google Drive, utilizing a proxy endpoint (`/api/media/[fileId]`) for zero API cost storage.
 
-## 🔗 Links
-
-- [Source Repository](<https://github.com/Who-Visions/NouGenNews>)
 # Configure
 cp .env.example .env.local
 # Add your service-account.json for Google Drive access
@@ -74,3 +71,7 @@ Uses Domain-Wide Delegation with a service account to store article images in `d
 | Visibility | public |
 
 <!-- nougen:fleet-role:end -->
+
+## 🔗 Links
+
+- [Source Repository](<https://github.com/Who-Visions/NouGenNews>)

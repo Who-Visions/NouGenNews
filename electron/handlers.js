@@ -66,6 +66,14 @@ const handlers = {
     require("electron").shell.openExternal(url);
     return true;
   },
+  alert_cameras: async (args = {}) => {
+    const [lat, lon] = await require("./weather").locate(String(args.city || "").slice(0, 80), String(args.region || "").slice(0, 80));
+    return require("./eyecams").nearestFrames(lat, lon);
+  },
+  camera_stream: (args = {}) => require("./trafficcams").streamUrl(String(args.id || "")),
+  map_warnings: (args = {}) => require("./weather").warningShapes(Number(args.lat), Number(args.lon)),
+  map_cameras: (args = {}) => require("./trafficcams").camerasNear(Number(args.lat), Number(args.lon)),
+  camera_frame: (args = {}) => require("./trafficcams").cameraFrame(String(args.id || "")),
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),
   // The reader's own place from Windows' location service, only when they ask (electron/geo.js).
   locate_me: () => require("./geo").locateMe(),

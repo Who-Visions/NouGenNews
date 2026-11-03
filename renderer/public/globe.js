@@ -5,6 +5,11 @@
   var viewer = null;
   var layers = [];
   var home = null;
+  var camDots = [];
+  var warnShapes = [];
+  var warnOn = true;
+  var buildings = null;
+  var buildingsLoading = false;
   var up = function (m) { parent.postMessage(m, "*"); };
 
   function fail(message) { up({ type: "error", message: String(message || "The globe stopped") }); }
@@ -40,6 +45,12 @@
         return layer;
       });
     }
+    var click = new C.ScreenSpaceEventHandler(viewer.scene.canvas);
+    click.setInputAction(function (e) {
+      var hit = viewer.scene.pick(e.position);
+      var cam = hit && hit.id && hit.id.camera;
+      if (cam) up({ type: "camera", id: cam.id, name: cam.name });
+    }, C.ScreenSpaceEventType.LEFT_CLICK);
     up({ type: "started", frames: layers.length });
   }
 
@@ -51,6 +62,41 @@
       else if (m.type === "frame" && viewer) {
         for (var i = 0; i < layers.length; i++) layers[i].alpha = m.on && i === m.index ? 0.7 : 0;
         viewer.scene.requestRender();
+      } else if (m.type === "cameras" && viewer) {
+        var C = window.Cesium;
+        (m.cameras || []).forEach(function (c) {
+          var dot = viewer.entities.add({ position: C.Cartesian3.fromDegrees(c.lon, c.lat), point: { pixelSize: 9, color: C.Color.fromCssColorString("#4ea3ff"), outlineColor: C.Color.WHITE, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+          dot.camera = { id: c.id, name: c.name };
+          camDots.push(dot);
+        });
+        viewer.scene.requestRender();
+      } else if (m.type === "warnings" && viewer) {
+        var Cz = window.Cesium;
+        warnShapes.forEach(function (e) { viewer.entities.remove(e); });
+        warnShapes = (m.shapes || []).map(function (s) {
+          var flat = [];
+          s.ring.forEach(function (p) { flat.push(p[0], p[1]); });
+          return viewer.entities.add({ show: warnOn, polygon: { hierarchy: Cz.Cartesian3.fromDegreesArray(flat), material: Cz.Color.RED.withAlpha(0.3), outline: false } });
+        });
+        viewer.scene.requestRender();
+      } else if (m.type === "layer" && viewer) {
+        if (m.name === "warnings") warnOn = !!m.on;
+        (m.name === "cameras" ? camDots : warnShapes).forEach(function (e) { e.show = !!m.on; });
+        viewer.scene.requestRender();
+      } else if (m.type === "buildings" && viewer) {
+        var Cb = window.Cesium;
+        if (buildings) buildings.show = !!m.on;
+        else if (m.on && !buildingsLoading) {
+          buildingsLoading = true;
+          Cb.createOsmBuildingsAsync().then(function (set) {
+            buildings = viewer.scene.primitives.add(set);
+            viewer.scene.requestRender();
+          }).catch(function (err) { buildingsLoading = false; up({ type: "buildings-error", message: String(err && err.message || err) }); });
+        }
+        if (m.on) viewer.camera.flyTo({ destination: Cb.Cartesian3.fromDegrees(m.lon, m.lat - 0.04, 2500), orientation: { heading: 0, pitch: Cb.Math.toRadians(-30), roll: 0 }, duration: 1.5 });
+        viewer.scene.requestRender();
+      } else if (m.type === "focus" && viewer) {
+        viewer.camera.flyTo({ destination: window.Cesium.Cartesian3.fromDegrees(m.lon, m.lat, 70000), duration: 1.2 });
       } else if (m.type === "home" && viewer && home) viewer.camera.flyTo({ destination: home.destination, duration: 1.2 });
     } catch (err) { fail(err && err.message); }
   });

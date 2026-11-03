@@ -180,3 +180,10 @@ test("OpenWeather backup maps conditions and needs a key", async () => {
   const got = await fetchOpenWeather("Miami", "Florida", { key: "k", get: async (_u, p) => ({ name: p.q, main: { temp: 80 }, weather: [{ id: 800, icon: "01d" }] }) });
   assert.equal(got.place, "Miami,Florida");
 });
+
+test("warning outlines keep polygons and skip alerts without one", () => {
+  const { parseNwsShapes } = require("../weather");
+  const ring = [[-80, 26], [-80.1, 26], [-80.1, 26.1], [-80, 26]];
+  const got = parseNwsShapes({ features: [{ properties: { event: "Flash Flood Warning" }, geometry: { type: "Polygon", coordinates: [ring] } }, { properties: { event: "Wind Advisory" }, geometry: null }] });
+  assert.deepEqual(got, [{ event: "Flash Flood Warning", ring }]);
+});

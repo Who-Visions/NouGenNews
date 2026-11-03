@@ -66,6 +66,7 @@ const handlers = {
     const [lat, lon] = await require("./weather").locate(String(args.city || "").slice(0, 80), String(args.region || "").slice(0, 80));
     return require("./eyecams").nearestFrames(lat, lon);
   },
+  camera_stream: (args = {}) => require("./trafficcams").streamUrl(String(args.id || "")),
   map_cameras: (args = {}) => require("./trafficcams").camerasNear(Number(args.lat), Number(args.lon)),
   camera_frame: (args = {}) => require("./trafficcams").cameraFrame(String(args.id || "")),
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),

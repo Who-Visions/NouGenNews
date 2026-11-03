@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, session } = require("electron");
 const path = require("node:path");
 const { handlers } = require("./handlers");
 
@@ -50,6 +50,10 @@ app.whenReady().then(() => {
     const fn = Object.prototype.hasOwnProperty.call(handlers, cmd) ? handlers[cmd] : null;
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);
+  });
+  // The county's streams carry no cross-origin header, which the page's video player needs. This host only.
+  session.defaultSession.webRequest.onHeadersReceived({ urls: ["https://pbctrafficstreams.pbc.gov/hls/*"] }, (details, done) => {
+    done({ responseHeaders: { ...details.responseHeaders, "Access-Control-Allow-Origin": ["*"] } });
   });
   createWindow();
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });

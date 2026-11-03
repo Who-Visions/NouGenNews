@@ -51,4 +51,10 @@ async function cameraFrame(id, { http = fetch } = {}) {
   return `data:image/jpeg;base64,${Buffer.from(await res.arrayBuffer()).toString("base64")}`;
 }
 
-module.exports = { parseStreams, camerasNear, cameraFrame };
+// One camera's live stream address.
+const streamUrl = (id) => {
+  if (!/^[A-Za-z0-9-]+$/.test(String(id))) throw new Error("bad camera id");
+  return `${BASE}/hls/public/vf2/${id}_high/index.m3u8`;
+};
+
+module.exports = { streamUrl, parseStreams, camerasNear, cameraFrame };

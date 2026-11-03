@@ -1307,7 +1307,7 @@ export function NewsView() {
       )}
 
       {/* ─── TOP TELEMETRY & FILTER BAR ─── */}
-      <BreakingAlert alert={activeAlert} onRead={readAlert} onDismiss={dismissAlert} />
+      <BreakingAlert alert={activeAlert} city={city} onRead={readAlert} onDismiss={dismissAlert} />
       {!mobileReading && <Masthead storyCount={withLibrary.filter(inWire).length} libraryCount={withLibrary.filter((a) => inWire(a) && a.libraryHits?.length).length} ticker={(intro) => <BreakingTicker intro={intro} stories={withLibrary.filter(inWire)} terms={libraryTerms} onOpen={(a) => readStory(a)} />} />}
       <div
         className="news-toolbar"

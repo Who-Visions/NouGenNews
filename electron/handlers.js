@@ -63,6 +63,10 @@ const handlers = {
     require("electron").shell.openExternal(url);
     return true;
   },
+  alert_cameras: async (args = {}) => {
+    const [lat, lon] = await require("./weather").locate(String(args.city || "").slice(0, 80), String(args.region || "").slice(0, 80));
+    return require("./eyecams").nearestFrames(lat, lon);
+  },
   // The county's own camera page in an app window: its terms bar re-serving the streams, so the page is shown whole.
   live_cameras: () => {
     if (camerasWin && !camerasWin.isDestroyed()) { camerasWin.focus(); return true; }

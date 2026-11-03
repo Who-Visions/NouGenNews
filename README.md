@@ -39,3 +39,38 @@ Data persistence leverages a single batched SQLite transaction for atomic writes
 ## 🔗 Links
 
 - [Source Repository](<https://github.com/Who-Visions/NouGenNews>)
+# Configure
+cp .env.example .env.local
+# Add your service-account.json for Google Drive access
+
+# Run pipeline
+npx tsx scripts/enrich_articles_with_real_images.ts
+
+# Start server
+npm run dev
+```
+
+## 🗄️ Google Drive Integration
+
+Uses Domain-Wide Delegation with a service account to store article images in `dave@whovisions.com`'s Google Drive at zero API cost.
+
+- **Folder**: `NouGenAi-site/news/`
+- **Proxy**: `/api/media/[fileId]` returns raw image bytes
+- **Auth**: JWT with `subject` delegation
+
+## 📄 License
+
+© 2026 Who Visions LLC. All rights reserved.
+
+<!-- nougen:fleet-role:begin (generated from NouGenRelay fleet/manifest.json; edit the manifest, not this block) -->
+## Fleet role
+
+| | |
+|---|---|
+| Role | news intelligence pipeline |
+| Kind | satellite |
+| Status | canonical |
+| Canonical for | news |
+| Visibility | public |
+
+<!-- nougen:fleet-role:end -->

@@ -1,4 +1,3 @@
-import { invoke } from "../lib/bridge.js";
 import { AlertCameras } from "./AlertCameras.jsx";
 import "./BreakingAlert.css";
 
@@ -15,7 +14,7 @@ export function BreakingAlert({ alert, city, onRead, onDismiss }) {
       <span className="ba__label"><i className="ba__dot" aria-hidden="true" />{alert.label || (red ? "Red alert" : "Breaking")}</span>
       <button type="button" className="ba__headline" onClick={onRead} title={alert.headline}>{alert.headline}</button>
       <span className="ba__meta mono">{alert.demo ? "sample" : alert.meta || `${alert.sourceCount} sources · ${ago}`}</span>
-      {alert.cameras && <button type="button" className="ba__read" onClick={() => invoke("live_cameras")}>Live cameras</button>}
+      {alert.cameras && <button type="button" className="ba__read" onClick={() => window.dispatchEvent(new CustomEvent("nn:weather"))}>Live cameras</button>}
       <button type="button" className="ba__read" onClick={onRead}>{alert.demo ? "Got it" : alert.story === null ? "Forecast" : "Read"}</button>
       <button type="button" className="ba__x" aria-label="Dismiss alert" onClick={onDismiss}>&times;</button>
     </div>

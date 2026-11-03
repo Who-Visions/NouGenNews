@@ -40,6 +40,12 @@
         return layer;
       });
     }
+    var click = new C.ScreenSpaceEventHandler(viewer.scene.canvas);
+    click.setInputAction(function (e) {
+      var hit = viewer.scene.pick(e.position);
+      var cam = hit && hit.id && hit.id.camera;
+      if (cam) up({ type: "camera", id: cam.id, name: cam.name });
+    }, C.ScreenSpaceEventType.LEFT_CLICK);
     up({ type: "started", frames: layers.length });
   }
 
@@ -51,6 +57,15 @@
       else if (m.type === "frame" && viewer) {
         for (var i = 0; i < layers.length; i++) layers[i].alpha = m.on && i === m.index ? 0.7 : 0;
         viewer.scene.requestRender();
+      } else if (m.type === "cameras" && viewer) {
+        var C = window.Cesium;
+        (m.cameras || []).forEach(function (c) {
+          var dot = viewer.entities.add({ position: C.Cartesian3.fromDegrees(c.lon, c.lat), point: { pixelSize: 9, color: C.Color.fromCssColorString("#4ea3ff"), outlineColor: C.Color.WHITE, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+          dot.camera = { id: c.id, name: c.name };
+        });
+        viewer.scene.requestRender();
+      } else if (m.type === "focus" && viewer) {
+        viewer.camera.flyTo({ destination: window.Cesium.Cartesian3.fromDegrees(m.lon, m.lat, 70000), duration: 1.2 });
       } else if (m.type === "home" && viewer && home) viewer.camera.flyTo({ destination: home.destination, duration: 1.2 });
     } catch (err) { fail(err && err.message); }
   });

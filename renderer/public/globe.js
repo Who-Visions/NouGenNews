@@ -5,6 +5,9 @@
   var viewer = null;
   var layers = [];
   var home = null;
+  var camDots = [];
+  var warnShapes = [];
+  var warnOn = true;
   var up = function (m) { parent.postMessage(m, "*"); };
 
   function fail(message) { up({ type: "error", message: String(message || "The globe stopped") }); }
@@ -62,7 +65,21 @@
         (m.cameras || []).forEach(function (c) {
           var dot = viewer.entities.add({ position: C.Cartesian3.fromDegrees(c.lon, c.lat), point: { pixelSize: 9, color: C.Color.fromCssColorString("#4ea3ff"), outlineColor: C.Color.WHITE, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
           dot.camera = { id: c.id, name: c.name };
+          camDots.push(dot);
         });
+        viewer.scene.requestRender();
+      } else if (m.type === "warnings" && viewer) {
+        var Cz = window.Cesium;
+        warnShapes.forEach(function (e) { viewer.entities.remove(e); });
+        warnShapes = (m.shapes || []).map(function (s) {
+          var flat = [];
+          s.ring.forEach(function (p) { flat.push(p[0], p[1]); });
+          return viewer.entities.add({ show: warnOn, polygon: { hierarchy: Cz.Cartesian3.fromDegreesArray(flat), material: Cz.Color.RED.withAlpha(0.3), outline: false } });
+        });
+        viewer.scene.requestRender();
+      } else if (m.type === "layer" && viewer) {
+        if (m.name === "warnings") warnOn = !!m.on;
+        (m.name === "cameras" ? camDots : warnShapes).forEach(function (e) { e.show = !!m.on; });
         viewer.scene.requestRender();
       } else if (m.type === "focus" && viewer) {
         viewer.camera.flyTo({ destination: window.Cesium.Cartesian3.fromDegrees(m.lon, m.lat, 70000), duration: 1.2 });

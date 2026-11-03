@@ -8,6 +8,8 @@
   var camDots = [];
   var warnShapes = [];
   var warnOn = true;
+  var buildings = null;
+  var buildingsLoading = false;
   var up = function (m) { parent.postMessage(m, "*"); };
 
   function fail(message) { up({ type: "error", message: String(message || "The globe stopped") }); }
@@ -80,6 +82,18 @@
       } else if (m.type === "layer" && viewer) {
         if (m.name === "warnings") warnOn = !!m.on;
         (m.name === "cameras" ? camDots : warnShapes).forEach(function (e) { e.show = !!m.on; });
+        viewer.scene.requestRender();
+      } else if (m.type === "buildings" && viewer) {
+        var Cb = window.Cesium;
+        if (buildings) buildings.show = !!m.on;
+        else if (m.on && !buildingsLoading) {
+          buildingsLoading = true;
+          Cb.createOsmBuildingsAsync().then(function (set) {
+            buildings = viewer.scene.primitives.add(set);
+            viewer.scene.requestRender();
+          }).catch(function (err) { buildingsLoading = false; up({ type: "buildings-error", message: String(err && err.message || err) }); });
+        }
+        if (m.on) viewer.camera.flyTo({ destination: Cb.Cartesian3.fromDegrees(m.lon, m.lat - 0.04, 2500), orientation: { heading: 0, pitch: Cb.Math.toRadians(-30), roll: 0 }, duration: 1.5 });
         viewer.scene.requestRender();
       } else if (m.type === "focus" && viewer) {
         viewer.camera.flyTo({ destination: window.Cesium.Cartesian3.fromDegrees(m.lon, m.lat, 70000), duration: 1.2 });

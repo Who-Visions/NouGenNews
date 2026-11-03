@@ -22,6 +22,7 @@ export function WeatherGlobe({ lat, lon, place }) {
   const [camerasOn, setCamerasOn] = useState(true);
   const [shapes, setShapes] = useState([]);
   const [warningsOn, setWarningsOn] = useState(true);
+  const [buildingsOn, setBuildingsOn] = useState(false);
   const [cam, setCam] = useState(null); // { id, name }
   const [camFrame, setCamFrame] = useState("");
 
@@ -61,6 +62,9 @@ export function WeatherGlobe({ lat, lon, place }) {
         setCameras(list);
         post({ type: "cameras", cameras: list });
         post({ type: "focus", lat, lon });
+      } else if (m.type === "buildings-error") {
+        setBuildingsOn(false);
+        setError(String(m.message || "3D buildings unavailable"));
       } else if (m.type === "camera") {
         setCamFrame("");
         setCam({ id: String(m.id), name: String(m.name || "") });
@@ -101,6 +105,11 @@ export function WeatherGlobe({ lat, lon, place }) {
     post({ type: "layer", name: "cameras", on });
     if (on) post({ type: "focus", lat, lon });
     else setCam(null);
+  };
+  const toggleBuildings = () => {
+    const on = !buildingsOn;
+    setBuildingsOn(on);
+    post({ type: "buildings", on, lat, lon });
   };
   const toggleWarnings = () => {
     const on = !warningsOn;
@@ -180,6 +189,9 @@ export function WeatherGlobe({ lat, lon, place }) {
                 Cameras {cameras.length}
               </button>
             ) : null}
+            <button type="button" className={`wg__btn ${buildingsOn ? "on" : ""}`} onClick={toggleBuildings} aria-pressed={buildingsOn}>
+              3D buildings
+            </button>
             <button type="button" className={`wg__btn ${warningsOn ? "on" : ""}`} onClick={toggleWarnings} aria-pressed={warningsOn}>
               Warnings{shapes.length ? ` ${shapes.length}` : ""}
             </button>

@@ -122,7 +122,7 @@ export function WeatherGlobe({ lat, lon, place }) {
       if (!live || !videoEl.current) return;
       hls.loadSource(url);
       hls.attachMedia(videoEl.current);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => { videoEl.current?.play().catch(() => {}); });
+      hls.on(Hls.Events.FRAG_BUFFERED, () => { if (videoEl.current?.paused) videoEl.current.play().catch(() => {}); });
     }).catch(() => {});
     return () => { live = false; clearInterval(timer); hls.destroy(); };
   }, [cam]);

@@ -7,6 +7,7 @@ const path = require("node:path");
 // The assistant's Ollama Cloud keys, read from the keymaker on first use and kept in this process only.
 let assistantKeys = null;
 
+let camerasWin = null;
 const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
@@ -57,9 +58,18 @@ const handlers = {
   // are made for client-side use; this one reaches the page only when the Weather tab opens, and is never written to disk here.
   weather_globe_config: () => ({ token: process.env.CESIUM_ION_TOKEN_20261030 || process.env.CESIUM_ION_TOKEN || "" }),
   weather_open_credit: (args = {}) => {
-    const url = { "open-meteo": "https://open-meteo.com/", weatherapi: "https://www.weatherapi.com/", rainviewer: "https://www.rainviewer.com/", cesium: "https://cesium.com/", "palm-beach-cameras": "https://pbctrafficstreams.pbc.gov/portal/" }[String(args.which || "open-meteo")];
+    const url = { "open-meteo": "https://open-meteo.com/", weatherapi: "https://www.weatherapi.com/", rainviewer: "https://www.rainviewer.com/", cesium: "https://cesium.com/" }[String(args.which || "open-meteo")];
     if (!url) return false;
     require("electron").shell.openExternal(url);
+    return true;
+  },
+  // The county's own camera page in an app window: its terms bar re-serving the streams, so the page is shown whole.
+  live_cameras: () => {
+    if (camerasWin && !camerasWin.isDestroyed()) { camerasWin.focus(); return true; }
+    const { BrowserWindow } = require("electron");
+    camerasWin = new BrowserWindow({ width: 1200, height: 800, title: "Live cameras", autoHideMenuBar: true, webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false } });
+    camerasWin.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    camerasWin.loadURL("https://pbctrafficstreams.pbc.gov/portal/");
     return true;
   },
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),

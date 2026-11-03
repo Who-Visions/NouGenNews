@@ -7,7 +7,6 @@ const path = require("node:path");
 // The assistant's Ollama Cloud keys, read from the keymaker on first use and kept in this process only.
 let assistantKeys = null;
 
-let camerasWin = null;
 const handlers = {
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
@@ -67,15 +66,8 @@ const handlers = {
     const [lat, lon] = await require("./weather").locate(String(args.city || "").slice(0, 80), String(args.region || "").slice(0, 80));
     return require("./eyecams").nearestFrames(lat, lon);
   },
-  // The county's own camera page in an app window: its terms bar re-serving the streams, so the page is shown whole.
-  live_cameras: () => {
-    if (camerasWin && !camerasWin.isDestroyed()) { camerasWin.focus(); return true; }
-    const { BrowserWindow } = require("electron");
-    camerasWin = new BrowserWindow({ width: 1200, height: 800, title: "Live cameras", autoHideMenuBar: true, webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false } });
-    camerasWin.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    camerasWin.loadURL("https://pbctrafficstreams.pbc.gov/portal/");
-    return true;
-  },
+  map_cameras: (args = {}) => require("./trafficcams").camerasNear(Number(args.lat), Number(args.lon)),
+  camera_frame: (args = {}) => require("./trafficcams").cameraFrame(String(args.id || "")),
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),
   // The reader's own place from Windows' location service, only when they ask (electron/geo.js).
   locate_me: () => require("./geo").locateMe(),

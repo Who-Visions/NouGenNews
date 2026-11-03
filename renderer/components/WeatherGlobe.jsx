@@ -16,6 +16,9 @@ export function WeatherGlobe({ lat, lon, place }) {
   const [playing, setPlaying] = useState(true);
   const [frame, setFrame] = useState(0);
   const [radar, setRadar] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [cam, setCam] = useState(null); // { id, name }
+  const [camFrame, setCamFrame] = useState("");
 
   const post = useCallback((m) => {
     const w = frameEl.current && frameEl.current.contentWindow;
@@ -48,6 +51,14 @@ export function WeatherGlobe({ lat, lon, place }) {
         });
       } else if (m.type === "started") {
         setPhase("ready");
+        const list = await invoke("map_cameras", { lat, lon }).catch(() => []);
+        if (dead || !Array.isArray(list) || !list.length) return;
+        setCameras(list);
+        post({ type: "cameras", cameras: list });
+        post({ type: "focus", lat, lon });
+      } else if (m.type === "camera") {
+        setCamFrame("");
+        setCam({ id: String(m.id), name: String(m.name || "") });
       } else if (m.type === "error") {
         setError(String(m.message || "The globe stopped"));
         setPhase((p) => (p === "ready" ? p : "error"));
@@ -65,6 +76,16 @@ export function WeatherGlobe({ lat, lon, place }) {
     if (phase === "ready") post({ type: "frame", index: frame, on: radarOn });
   }, [frame, radarOn, phase, post]);
 
+  // The open camera's frame, renewed while it stays open.
+  useEffect(() => {
+    if (!cam) return undefined;
+    let live = true;
+    const pull = () => invoke("camera_frame", { id: cam.id }).then((src) => { if (live) setCamFrame(src); }).catch(() => {});
+    pull();
+    const t = setInterval(pull, 5000);
+    return () => { live = false; clearInterval(t); };
+  }, [cam]);
+
   const count = radar ? radar.frames.length : 0;
   useEffect(() => {
     if (!playing || !radarOn || count < 2 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
@@ -79,6 +100,13 @@ export function WeatherGlobe({ lat, lon, place }) {
   return (
     <div className="wg" aria-label={`3D Weather Globe for ${place}`}>
       <iframe ref={frameEl} className="wg__map" src="./globe.html" title={`Globe centred on ${place}`} />
+
+      {cam ? (
+        <figure className="wg__cam">
+          {camFrame ? <img src={camFrame} alt={cam.name} /> : <div className="wg__cam-wait mono">Loading camera…</div>}
+          <figcaption>{cam.name}<button type="button" aria-label="Close camera" onClick={() => setCam(null)}>&times;</button></figcaption>
+        </figure>
+      ) : null}
 
       {phase === "loading" ? (
         <div className="wg__note mono">Loading instrument map…</div>
@@ -106,6 +134,11 @@ export function WeatherGlobe({ lat, lon, place }) {
             >
               Radar
             </button>
+            {cameras.length ? (
+              <button type="button" className="wg__btn" onClick={() => post({ type: "focus", lat, lon })}>
+                {cameras.length} cameras
+              </button>
+            ) : null}
             {count > 1 ? (
               <button
                 type="button"

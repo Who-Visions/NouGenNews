@@ -20,3 +20,7 @@
 @keyframes ba-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
 @media (prefers-reduced-motion: reduce) { .ba--red, .ba__dot { animation: none; } }
 @media (max-width: 760px) { .ba { flex-wrap: wrap; } .ba__headline { flex-basis: 100%; white-space: normal; order: 3; } }
+.ba-cams { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; padding: 8px 16px; background: #000; }
+.ba-cam { margin: 0; }
+.ba-cam img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; }
+.ba-cam figcaption { padding-top: 4px; font-size: 12px; color: #ccc; }

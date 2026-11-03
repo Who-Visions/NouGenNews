@@ -122,6 +122,7 @@ export function WeatherGlobe({ lat, lon, place }) {
       if (!live || !videoEl.current) return;
       hls.loadSource(url);
       hls.attachMedia(videoEl.current);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => { videoEl.current?.play().catch(() => {}); });
     }).catch(() => {});
     return () => { live = false; clearInterval(timer); hls.destroy(); };
   }, [cam]);
@@ -143,7 +144,7 @@ export function WeatherGlobe({ lat, lon, place }) {
 
       {cam ? (
         <figure className="wg__cam">
-          <video ref={videoEl} className="wg__cam-video" poster={camFrame || undefined} autoPlay muted playsInline aria-label={cam.name} />
+          <video key={cam.id} ref={videoEl} className="wg__cam-video" poster={camFrame || undefined} autoPlay muted playsInline aria-label={cam.name} />
           <figcaption>{cam.name}<button type="button" aria-label="Close camera" onClick={() => setCam(null)}>&times;</button></figcaption>
         </figure>
       ) : null}

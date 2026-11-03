@@ -34,3 +34,12 @@ export function catchupLabel(count, since, now = Date.now()) {
   const when = sameDay ? clock : `${d.toLocaleDateString(undefined, { weekday: "short" })} ${clock}`;
   return `${count > MAX_NEW ? `${MAX_NEW}+` : count} new since ${when}`;
 }
+
+/** The few new stories worth a returning reader's time: highest score first, so a catch-up leads with what matters, not what is merely newest. */
+export function topNew(fresh, score, n = 8) {
+  return (fresh || [])
+    .map((s, i) => ({ s, i, v: Number(score(s)) || 0 }))
+    .sort((a, b) => b.v - a.v || a.i - b.i)
+    .slice(0, n)
+    .map((x) => x.s);
+}

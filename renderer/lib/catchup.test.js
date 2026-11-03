@@ -43,3 +43,11 @@ test("label counts, caps and says nothing when there is nothing", () => {
   assert.match(catchupLabel(9, NOW - H, NOW), /^9 new since /);
   assert.match(catchupLabel(250, NOW - H, NOW), /^99\+ new since /);
 });
+
+import { topNew } from "./catchup.js";
+test("topNew leads with the highest score, keeps newest-first on ties, and caps", () => {
+  const f = [{ id: "a", v: 1 }, { id: "b", v: 5 }, { id: "c", v: 5 }, { id: "d", v: 0 }];
+  assert.deepEqual(topNew(f, (s) => s.v, 3).map((s) => s.id), ["b", "c", "a"]);
+  assert.deepEqual(topNew(null, () => 0), []);
+  assert.deepEqual(topNew([{ id: "x" }], () => NaN).map((s) => s.id), ["x"]);
+});

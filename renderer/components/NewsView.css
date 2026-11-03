@@ -230,3 +230,4 @@
 /* The wire has hundreds of cards. Cards off screen are not laid out or painted until they scroll near: the long list
    scrolls without stutter and holds less memory (measured: 95th-percentile frame 71ms -> 20ms, total memory -13%). */
 .news-feed-list > * { content-visibility: auto; contain-intrinsic-size: auto 150px; }
+.catchup-copy strong em { font-style: normal; font-weight: 500; color: #9ca3af; }

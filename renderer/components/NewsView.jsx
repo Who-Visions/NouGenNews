@@ -15,7 +15,7 @@ import { Lightbox, photoIndex } from "./Lightbox.jsx";
 import { AssistantPanel } from "./AssistantPanel.jsx";
 import { ShardsLitePanel } from "./ShardsLitePanel.jsx";
 import { clampTs } from "../lib/age.js";
-import { loadSince, stampVisit, newSince, catchupLabel } from "../lib/catchup.js";
+import { loadSince, stampVisit, newSince, catchupLabel, topNew } from "../lib/catchup.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
@@ -896,6 +896,8 @@ export function NewsView() {
     return () => { clearInterval(t); window.removeEventListener("pagehide", bye); bye(); };
   }, []);
   const fresh = useMemo(() => newSince(withLibrary.filter(inWire), sinceRef.current), [withLibrary]);
+  // What the banner leads with and the brief plays: the new stories that matter most, not the newest dozen.
+  const freshTop = useMemo(() => topNew(fresh, (a) => scoreStory(a, { now: Date.now(), terms: libraryTerms }), 8), [fresh, libraryTerms]);
   const freshIds = useMemo(() => new Set(fresh.map((a) => a.id)), [fresh]);
 
   const filtered = useMemo(() => {
@@ -1491,12 +1493,12 @@ export function NewsView() {
         <div className="catchup" role="status" data-testid="catchup-banner">
           <span className="catchup-pulse" aria-hidden="true" />
           <span className="catchup-copy">
-            <strong>{catchupLabel(fresh.length, sinceRef.current)}</strong>
-            <span className="catchup-lead">{fresh[0].title}</span>
+            <strong>{catchupLabel(fresh.length, sinceRef.current)} <em>· top {freshTop.length} in the brief</em></strong>
+            <span className="catchup-lead">{freshTop[0].title}</span>
           </span>
           <button type="button" className="catchup-go" data-testid="catchup-go" onClick={() => {
-            setSelectedArticleId(fresh[0].id);
-            speechRef.current?.startBriefing(fresh.slice(0, 12), prefs, (a) => setSelectedArticleId(a.id));
+            setSelectedArticleId(freshTop[0].id);
+            speechRef.current?.startBriefing(freshTop, prefs, (a) => setSelectedArticleId(a.id));
           }}>
             <span aria-hidden="true">▶</span> Catch me up
           </button>

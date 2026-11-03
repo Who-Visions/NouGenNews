@@ -19,6 +19,9 @@ export function WeatherGlobe({ lat, lon, place }) {
   const [frame, setFrame] = useState(0);
   const [radar, setRadar] = useState(null);
   const [cameras, setCameras] = useState([]);
+  const [camerasOn, setCamerasOn] = useState(true);
+  const [shapes, setShapes] = useState([]);
+  const [warningsOn, setWarningsOn] = useState(true);
   const [cam, setCam] = useState(null); // { id, name }
   const [camFrame, setCamFrame] = useState("");
 
@@ -77,6 +80,33 @@ export function WeatherGlobe({ lat, lon, place }) {
   useEffect(() => {
     if (phase === "ready") post({ type: "frame", index: frame, on: radarOn });
   }, [frame, radarOn, phase, post]);
+
+  // Warning outlines, renewed while the map is open.
+  useEffect(() => {
+    if (phase !== "ready") return undefined;
+    let live = true;
+    const pull = () => invoke("map_warnings", { lat, lon }).then((s) => {
+      if (!live || !Array.isArray(s)) return;
+      setShapes(s);
+      post({ type: "warnings", shapes: s });
+    }).catch(() => {});
+    pull();
+    const t = setInterval(pull, 120000);
+    return () => { live = false; clearInterval(t); };
+  }, [phase, lat, lon, post]);
+
+  const toggleCameras = () => {
+    const on = !camerasOn;
+    setCamerasOn(on);
+    post({ type: "layer", name: "cameras", on });
+    if (on) post({ type: "focus", lat, lon });
+    else setCam(null);
+  };
+  const toggleWarnings = () => {
+    const on = !warningsOn;
+    setWarningsOn(on);
+    post({ type: "layer", name: "warnings", on });
+  };
 
   // The open camera: its still at once, then the live stream, kept as close to the live edge as the stream allows.
   // If the stream fails the still keeps renewing.
@@ -145,10 +175,13 @@ export function WeatherGlobe({ lat, lon, place }) {
               Radar
             </button>
             {cameras.length ? (
-              <button type="button" className="wg__btn" onClick={() => post({ type: "focus", lat, lon })}>
-                {cameras.length} cameras
+              <button type="button" className={`wg__btn ${camerasOn ? "on" : ""}`} onClick={toggleCameras} aria-pressed={camerasOn}>
+                Cameras {cameras.length}
               </button>
             ) : null}
+            <button type="button" className={`wg__btn ${warningsOn ? "on" : ""}`} onClick={toggleWarnings} aria-pressed={warningsOn}>
+              Warnings{shapes.length ? ` ${shapes.length}` : ""}
+            </button>
             {count > 1 ? (
               <button
                 type="button"

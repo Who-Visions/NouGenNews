@@ -15,6 +15,7 @@ import { Lightbox, photoIndex } from "./Lightbox.jsx";
 import { AssistantPanel } from "./AssistantPanel.jsx";
 import { ShardsLitePanel } from "./ShardsLitePanel.jsx";
 import { clampTs } from "../lib/age.js";
+import { loadSince, stampVisit, newSince, catchupLabel } from "../lib/catchup.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
@@ -884,6 +885,19 @@ export function NewsView() {
     return () => ctrl.abort();
   }, [wireLang, searchFiltered, prefs.ollamaModel, ollamaInfo.best]);
 
+  // Since you last looked: fixed at launch, so the count means "new to you", not "new this minute".
+  const sinceRef = useRef(loadSince());
+  const [catchupHidden, setCatchupHidden] = useState(false);
+  useEffect(() => {
+    stampVisit();
+    const t = setInterval(() => stampVisit(), 60000);
+    const bye = () => stampVisit();
+    window.addEventListener("pagehide", bye);
+    return () => { clearInterval(t); window.removeEventListener("pagehide", bye); bye(); };
+  }, []);
+  const fresh = useMemo(() => newSince(withLibrary.filter(inWire), sinceRef.current), [withLibrary]);
+  const freshIds = useMemo(() => new Set(fresh.map((a) => a.id)), [fresh]);
+
   const filtered = useMemo(() => {
     if (wireLang === "orig") return searchFiltered;
     return searchFiltered.map((a) => wireTranslatedMap[`${a.id}::${wireLang}`] || a);
@@ -1473,6 +1487,23 @@ export function NewsView() {
         </div>
       </div>
 
+      {fresh.length > 0 && !catchupHidden && !mobileReading && !search.trim() && (
+        <div className="catchup" role="status" data-testid="catchup-banner">
+          <span className="catchup-pulse" aria-hidden="true" />
+          <span className="catchup-copy">
+            <strong>{catchupLabel(fresh.length, sinceRef.current)}</strong>
+            <span className="catchup-lead">{fresh[0].title}</span>
+          </span>
+          <button type="button" className="catchup-go" data-testid="catchup-go" onClick={() => {
+            setSelectedArticleId(fresh[0].id);
+            speechRef.current?.startBriefing(fresh.slice(0, 12), prefs, (a) => setSelectedArticleId(a.id));
+          }}>
+            <span aria-hidden="true">▶</span> Catch me up
+          </button>
+          <button type="button" className="catchup-x" aria-label="Dismiss" onClick={() => setCatchupHidden(true)}>×</button>
+        </div>
+      )}
+
       {playable.length > 0 && !mobileReading && (
         <NewsHero
           key={alertLead ? alertLead.key : "hero"}
@@ -1583,7 +1614,7 @@ export function NewsView() {
                           textOverflow: "ellipsis",
                         }}
                       >
-                        {item.source}
+                        {freshIds.has(item.id) && <i className="nn-new" title="New since you last looked">NEW</i>}{item.source}
                       </span>
                       <span
                         style={{

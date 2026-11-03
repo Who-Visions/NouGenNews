@@ -8,6 +8,10 @@ const path = require("node:path");
 let assistantKeys = null;
 
 const handlers = {
+  // API keys on the Settings page (electron/keys.js): status only goes back, never a value.
+  keys_list: () => require("./keys").listKeys({ userDir: app.getPath("userData") }),
+  keys_save: (args = {}) => require("./keys").saveKey({ userDir: app.getPath("userData"), crypt: require("electron").safeStorage, name: String(args.name || ""), value: args.value }),
+  keys_clear: (args = {}) => require("./keys").clearKey({ userDir: app.getPath("userData"), name: String(args.name || "") }),
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
@@ -55,7 +59,7 @@ const handlers = {
   weather_radar: () => require("./weather").radarFrames(),
   // What the 3D globe needs: a Cesium ion token (assets:read, geocode) from the keymaker via the launcher. Cesium ion tokens
   // are made for client-side use; this one reaches the page only when the Weather tab opens, and is never written to disk here.
-  weather_globe_config: () => ({ token: process.env.CESIUM_ION_TOKEN_20261030 || process.env.CESIUM_ION_TOKEN || "" }),
+  weather_globe_config: () => ({ token: process.env.CESIUM_ION_TOKEN || process.env.CESIUM_ION_TOKEN_20261030 || "" }),
   weather_open_credit: (args = {}) => {
     const url = { "open-meteo": "https://open-meteo.com/", weatherapi: "https://www.weatherapi.com/", rainviewer: "https://www.rainviewer.com/", cesium: "https://cesium.com/" }[String(args.which || "open-meteo")];
     if (!url) return false;

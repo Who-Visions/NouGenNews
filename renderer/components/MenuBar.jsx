@@ -4,7 +4,7 @@ import { CornerClock } from "./CornerClock.jsx";
 import { CastButton } from "./CastButton.jsx";
 import "./MenuBar.css";
 
-// The tabs: News and Weather. App owns which one is in front and announces it; clicking asks App to switch.
+// The tabs: News, Weather and Settings. App owns which one is in front and announces it; clicking asks App to switch.
 function ViewTabs() {
   const [view, setView] = useState(() => document.body.dataset.view || "news");
   useEffect(() => {
@@ -13,9 +13,9 @@ function ViewTabs() {
     return () => window.removeEventListener("nn:view-state", on);
   }, []);
   const tab = (id, label, key) => (
-    <button type="button" role="tab" aria-selected={view === id} className={`menubar__tab${view === id ? " is-on" : ""}`} title={`${label} (${key})`} onClick={() => window.dispatchEvent(new CustomEvent("nn:view", { detail: { view: id } }))}>{label}</button>
+    <button type="button" role="tab" aria-selected={view === id} className={`menubar__tab${view === id ? " is-on" : ""}`} title={key ? `${label} (${key})` : label} onClick={() => window.dispatchEvent(new CustomEvent("nn:view", { detail: { view: id } }))}>{label}</button>
   );
-  return <div className="menubar__tabs" role="tablist" aria-label="Pages">{tab("news", "News", "N")}{tab("weather", "Weather", "W")}</div>;
+  return <div className="menubar__tabs" role="tablist" aria-label="Pages">{tab("news", "News", "N")}{tab("weather", "Weather", "W")}{tab("settings", "Settings")}</div>;
 }
 
 // A visible Refresh button: pulls every feed and asks the API providers for fresh data. It shows what the wire is doing
@@ -64,6 +64,7 @@ const MENUS = [
   ] },
   { name: "Configuration", items: [
     { label: "Settings…", keys: "M", run: press("m") },
+    { label: "API keys…", keys: "", run: () => window.dispatchEvent(new CustomEvent("nn:view", { detail: { view: "settings" } })) },
     { label: "Cycle translation", keys: "T", run: press("t") },
     { sep: true },
   ] },

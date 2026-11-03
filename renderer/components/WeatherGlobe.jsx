@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
 import { invoke } from "../lib/bridge.js";
 
 const clockOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -10,6 +11,7 @@ const clockOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", m
 // imagery from Cesium ion, rain from RainViewer, a marker at the place's coordinates. Nothing on it is drawn from a model.
 export function WeatherGlobe({ lat, lon, place }) {
   const frameEl = useRef(null);
+  const videoEl = useRef(null);
   const [phase, setPhase] = useState("loading"); // loading | ready | error
   const [error, setError] = useState("");
   const [radarOn, setRadarOn] = useState(true);
@@ -76,14 +78,22 @@ export function WeatherGlobe({ lat, lon, place }) {
     if (phase === "ready") post({ type: "frame", index: frame, on: radarOn });
   }, [frame, radarOn, phase, post]);
 
-  // The open camera's frame, renewed while it stays open.
+  // The open camera: its still at once, then the live stream, kept as close to the live edge as the stream allows.
+  // If the stream fails the still keeps renewing.
   useEffect(() => {
     if (!cam) return undefined;
     let live = true;
+    let timer = null;
     const pull = () => invoke("camera_frame", { id: cam.id }).then((src) => { if (live) setCamFrame(src); }).catch(() => {});
     pull();
-    const t = setInterval(pull, 5000);
-    return () => { live = false; clearInterval(t); };
+    const hls = new Hls({ enableWorker: false, lowLatencyMode: true, liveSyncDurationCount: 1, liveMaxLatencyDurationCount: 3, maxLiveSyncPlaybackRate: 1.5, backBufferLength: 0 });
+    hls.on(Hls.Events.ERROR, (_e, d) => { if (d.fatal && !timer) { hls.destroy(); timer = setInterval(pull, 5000); } });
+    invoke("camera_stream", { id: cam.id }).then((url) => {
+      if (!live || !videoEl.current) return;
+      hls.loadSource(url);
+      hls.attachMedia(videoEl.current);
+    }).catch(() => {});
+    return () => { live = false; clearInterval(timer); hls.destroy(); };
   }, [cam]);
 
   const count = radar ? radar.frames.length : 0;
@@ -103,7 +113,7 @@ export function WeatherGlobe({ lat, lon, place }) {
 
       {cam ? (
         <figure className="wg__cam">
-          {camFrame ? <img src={camFrame} alt={cam.name} /> : <div className="wg__cam-wait mono">Loading camera…</div>}
+          <video ref={videoEl} className="wg__cam-video" poster={camFrame || undefined} autoPlay muted playsInline aria-label={cam.name} />
           <figcaption>{cam.name}<button type="button" aria-label="Close camera" onClick={() => setCam(null)}>&times;</button></figcaption>
         </figure>
       ) : null}

@@ -107,6 +107,10 @@ app.whenReady().then(() => {
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);
   });
+  // The county's streams carry no cross-origin header, which the page's video player needs. This host only.
+  session.defaultSession.webRequest.onHeadersReceived({ urls: ["https://pbctrafficstreams.pbc.gov/hls/*"] }, (details, done) => {
+    done({ responseHeaders: { ...details.responseHeaders, "Access-Control-Allow-Origin": ["*"] } });
+  });
   createWindow(splash);
   initAutoUpdater();
   require("./ttsport").attachTtsPort({

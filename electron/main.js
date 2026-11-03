@@ -4,6 +4,11 @@ const { handlers } = require("./handlers");
 
 const DEV_URL = process.env.NOUGENNEWS_DEV_URL;
 
+function isAppFrame(frame) {
+  if (!frame || frame.parent) return false;
+  return DEV_URL ? frame.url.startsWith(DEV_URL) : frame.url.startsWith("file:");
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
@@ -47,7 +52,9 @@ app.on("web-contents-created", (_e, contents) => {
 
 app.whenReady().then(() => {
   require("./keys").applySaved({ userDir: app.getPath("userData"), crypt: safeStorage });
-  ipcMain.handle("cmd", (_e, cmd, args) => {
+  ipcMain.handle("cmd", (e, cmd, args) => {
+    // Key commands answer only the app's own top-level page.
+    if (String(cmd).startsWith("keys_") && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
     const fn = Object.prototype.hasOwnProperty.call(handlers, cmd) ? handlers[cmd] : null;
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);

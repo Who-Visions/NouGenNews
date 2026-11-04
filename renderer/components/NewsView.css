@@ -231,3 +231,6 @@
    scrolls without stutter and holds less memory (measured: 95th-percentile frame 71ms -> 20ms, total memory -13%). */
 .news-feed-list > * { content-visibility: auto; contain-intrinsic-size: auto 150px; }
 .catchup-copy strong em { font-style: normal; font-weight: 500; color: #9ca3af; }
+
+/* A comfortable line length for reading: about 70 characters (it was about 95; 60ch because ch is the width of a digit, wider than most letters). Pictures keep the full column. */
+.news-view-container .article-native-content > :is(p, ul, ol, blockquote, h2, h3, h4) { max-width: 60ch; }

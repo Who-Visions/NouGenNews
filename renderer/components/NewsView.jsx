@@ -1921,8 +1921,8 @@ export function NewsView() {
               <div
                 className="article-native-content"
                 style={{
-                  fontSize: 15.5,
-                  lineHeight: 1.78,
+                  fontSize: 17,
+                  lineHeight: 1.72,
                   color: "#d1d5db",
                 }}
                 onClick={(e) => {

@@ -27,3 +27,7 @@
 .menubar__tab { padding: 0 12px; font: inherit; font-size: 12px; color: var(--muted, #bdb8ad); background: none; border: 0; border-radius: 4px; cursor: pointer; }
 .menubar__tab:hover { color: var(--text, #f2eee6); }
 .menubar__tab.is-on { color: #0b0b0d; background: var(--accent, #e8b86d); font-weight: 600; }
+
+/* Click targets are at least 24px tall (WCAG 2.2 target size); the bar is 28px, so the buttons sit 2px inside it. */
+.menubar__tab { min-height: 24px; align-self: center; display: inline-flex; align-items: center; }
+.menubar__restart, .menubar__refresh { margin-top: 2px; margin-bottom: 2px; min-height: 24px; }

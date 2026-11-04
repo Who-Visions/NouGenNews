@@ -234,3 +234,13 @@
 
 /* A comfortable line length for reading: about 70 characters (it was about 95; 60ch because ch is the width of a digit, wider than most letters). Pictures keep the full column. */
 .news-view-container .article-native-content > :is(p, ul, ol, blockquote, h2, h3, h4) { max-width: 60ch; }
+
+/* Story videos sit in the story. A played video that has scrolled above the reading pane floats at its bottom-left
+   corner (the same element, switched to fixed, so playback is not interrupted); the x puts it back. */
+.avid { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; }
+.avid__box { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }
+.avid__box > iframe, .avid__box > video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+.avid__box.is-floating { position: fixed; inset: auto; width: min(340px, 34vw); aspect-ratio: 16 / 9; z-index: 45; border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75); }
+.avid__close { position: absolute; top: 4px; right: 4px; z-index: 2; width: 26px; height: 26px; padding: 0; font: 600 18px/1 inherit; color: #f2eee6; background: rgba(0, 0, 0, 0.7); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; cursor: pointer; }
+.avid__close:hover { background: rgba(232, 184, 109, 0.9); color: #0b0b0d; }
+.avid__close:focus-visible { outline: 2px solid #e8b86d; outline-offset: 2px; }

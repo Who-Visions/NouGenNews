@@ -10,6 +10,6 @@
 .lbx__close:hover, .lbx__step:hover { background: rgba(255, 255, 255, 0.18); }
 .lbx :focus-visible { outline: 2px solid var(--nn-accent, #e8b86d); outline-offset: 2px; }
 .news-article-canvas img { cursor: zoom-in; }
-.news-article-canvas .vdock__thumb img, .news-article-canvas .tail img { cursor: pointer; }
+.news-article-canvas .tail img { cursor: pointer; }
 @keyframes lbx-in { from { background: rgba(0, 0, 0, 0); } to { background: rgba(0, 0, 0, 0.92); } }
 @media (prefers-reduced-motion: reduce) { .lbx { animation: none; } }

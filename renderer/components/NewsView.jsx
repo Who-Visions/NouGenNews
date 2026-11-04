@@ -10,7 +10,6 @@ import { LangMenu } from "./LangMenu.jsx";
 import { NewsHero } from "./NewsHero.jsx";
 import { Ago } from "./Ago.jsx";
 import { imagesFromXmlItem, imagesFromHtml, bestImage } from "../../core/images.js";
-import { VideoDock, useWide } from "./VideoDock.jsx";
 import { Lightbox, photoIndex } from "./Lightbox.jsx";
 import { AssistantPanel } from "./AssistantPanel.jsx";
 import { ShardsLitePanel } from "./ShardsLitePanel.jsx";
@@ -98,6 +97,8 @@ function findVideos(text) {
 }
 
 // The story's videos, played in the app: YouTube through the loopback embed page (electron/embed.js), files directly.
+// They sit in the story, under the headline. A video that has been played and then scrolled out of view floats at the
+// bottom-left of the reading pane so the story can be read while it plays (see VideoSlot).
 function ArticleVideos({ videos, embedPort, autoplay = false, fallback = null }) {
   const [failed, setFailed] = useState(() => new Set());
   if (!videos || !videos.length) return fallback;
@@ -107,20 +108,65 @@ function ArticleVideos({ videos, embedPort, autoplay = false, fallback = null })
   return (
     <div className="article-videos" style={{ display: "grid", gap: 12, marginBottom: 18 }}>
       {shown.filter((v) => !failed.has(v.id || v.url)).map((v) => (
-        <div key={v.id || v.url} style={{ position: "relative", aspectRatio: "16 / 9", background: "#000", borderRadius: TOKENS.radiusLg, overflow: "hidden" }}>
-          {v.kind === "youtube" ? (
-            <iframe
-              title="Video"
-              src={embedPort && embedPort !== "web" ? `http://localhost:${embedPort}/embed?id=${v.id}${autoplay ? "&autoplay=1" : ""}` : `https://www.youtube.com/embed/${v.id}?playsinline=1${autoplay ? "&autoplay=1" : ""}`}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          ) : (
-            <video src={v.url} controls preload="metadata" playsInline onError={() => setFailed((p) => new Set(p).add(v.id || v.url))} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-          )}
-        </div>
+        <VideoSlot key={v.id || v.url} v={v} embedPort={embedPort} autoplay={autoplay} onFail={() => setFailed((p) => new Set(p).add(v.id || v.url))} />
       ))}
+    </div>
+  );
+}
+
+// One video. The slot keeps its place in the story; the player inside it switches to a fixed position when the video
+// has been played and the slot has scrolled above the reading pane. The same element is moved by CSS (never remounted),
+// so playback carries on without a break. A cross-origin YouTube player cannot report "playing", so a click on it
+// (the window loses focus to the iframe) counts as played; a file video reports play itself.
+function VideoSlot({ v, embedPort, autoplay, onFail }) {
+  const slot = useRef(null);
+  const [played, setPlayed] = useState(!!autoplay);
+  const [away, setAway] = useState(false);
+  const [closed, setClosed] = useState(false);
+  const [spot, setSpot] = useState({ left: 16, bottom: 80 });
+
+  useEffect(() => {
+    if (v.kind !== "youtube") return undefined;
+    const onBlur = () => setTimeout(() => { if (document.activeElement && document.activeElement === slot.current?.querySelector("iframe")) setPlayed(true); }, 0);
+    window.addEventListener("blur", onBlur);
+    return () => window.removeEventListener("blur", onBlur);
+  }, [v]);
+
+  useEffect(() => {
+    const el = slot.current;
+    const pane = el && el.closest(".news-article-canvas");
+    if (!el || !pane) return undefined;
+    const place = () => {
+      const r = pane.getBoundingClientRect();
+      setSpot({ left: Math.round(r.left + 14), bottom: Math.round(window.innerHeight - r.bottom + 76) });
+    };
+    place();
+    const io = new IntersectionObserver(([e]) => {
+      const above = !e.isIntersecting && e.boundingClientRect.bottom <= (e.rootBounds ? e.rootBounds.top + 1 : 1);
+      setAway(above);
+      if (!above) setClosed(false);
+    }, { root: pane, threshold: 0 });
+    io.observe(el);
+    const ro = new ResizeObserver(place);
+    ro.observe(pane);
+    window.addEventListener("resize", place);
+    return () => { io.disconnect(); ro.disconnect(); window.removeEventListener("resize", place); };
+  }, []);
+
+  const floating = played && away && !closed;
+  const src = v.kind === "youtube"
+    ? (embedPort && embedPort !== "web" ? `http://localhost:${embedPort}/embed?id=${v.id}${autoplay ? "&autoplay=1" : ""}` : `https://www.youtube.com/embed/${v.id}?playsinline=1${autoplay ? "&autoplay=1" : ""}`)
+    : "";
+  return (
+    <div className="avid" ref={slot}>
+      <div className={`avid__box${floating ? " is-floating" : ""}`} style={floating ? { left: spot.left, bottom: spot.bottom } : undefined}>
+        {v.kind === "youtube" ? (
+          <iframe title="Video" src={src} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+        ) : (
+          <video src={v.url} controls preload="metadata" playsInline onPlay={() => setPlayed(true)} onError={onFail} />
+        )}
+        {floating ? <button type="button" className="avid__close" onClick={() => setClosed(true)} aria-label="Put the video back in the story" title="Put the video back in the story">{"\u00d7"}</button> : null}
+      </div>
     </div>
   );
 }
@@ -1090,20 +1136,14 @@ export function NewsView() {
   const tail = useMemo(() => splitTail(currentArticle?.contentHtml || ""), [currentArticle?.contentHtml]);
   // Each picture once: the lead picture and repeats inside the body are dropped from the body.
   const articleBody = useMemo(() => dropDuplicateImages(dropTrailingImages(dropAdLabels(tail.body)), currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
-  // With room beside the article, its videos dock to the right instead of sitting in the text.
-  const wideEnough = useWide(1500);
-  // Two ways to read: "view" docks the videos and a large photo carousel beside the story; "read" is the plain magazine column.
-  const [readerMode, setReaderModeState] = useState(() => { try { return localStorage.getItem("nn.readerMode") === "read" ? "read" : "view"; } catch { return "view"; } });
-  const setReaderMode = useCallback((m) => { setReaderModeState(m); try { localStorage.setItem("nn.readerMode", m); } catch { /* storage unavailable */ } }, []);
-  // Every picture of the story goes to the carousel (the lead first) and also stays where it is: under the headline and in the text.
+  // Every picture of the story, the lead first: the lightbox steps through them. They stay where they are in the story.
   const photos = useMemo(() => collectPhotos(articleBody, currentArticle?.imageUrl), [articleBody, currentArticle?.imageUrl]);
-  const docked = wideEnough && readerMode === "view" && (!!currentArticle?.videos?.length || photos.length > 1);
   const shownBody = articleBody;
   // A picture clicked anywhere in the story opens large, growing out of where it was.
   const [lightbox, setLightbox] = useState(null);
   const openPicture = useCallback((e) => {
     const img = e.target && e.target.closest ? e.target.closest("img") : null;
-    if (!img || img.closest(".vdock__thumb, .tail, .news-mobile-back")) return;
+    if (!img || img.closest(".tail, .news-mobile-back")) return;
     const r = img.getBoundingClientRect();
     if (r.width < 80 || r.height < 60) return;
     const src = img.currentSrc || img.src;
@@ -1176,7 +1216,6 @@ export function NewsView() {
       if (!filtered.length) return;
       const idx = filtered.findIndex((a) => a.id === currentArticle?.id);
       if (e.key === "Enter") { e.preventDefault(); readStory(currentArticle || filtered[0]); return; }
-      if (e.key === "v" || e.key === "V") { e.preventDefault(); setReaderMode(readerMode === "view" ? "read" : "view"); return; }
       if (e.key === "l" || e.key === "L") { e.preventDefault(); listenTo(currentArticle || filtered[0]); return; }
       if (e.key === "ArrowDown" || e.key === "j" || e.key === "J") {
         e.preventDefault();
@@ -1190,7 +1229,7 @@ export function NewsView() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtered, currentArticle?.id, helpOpen, mobileReading, wireLang, fetchAllFeeds, readStory, listenTo, readerMode, setReaderMode]);
+  }, [filtered, currentArticle?.id, helpOpen, mobileReading, wireLang, fetchAllFeeds, readStory, listenTo, ]);
 
   // The stories the hero can play: the ones with a video, newest first.
   const playable = useMemo(() => {
@@ -1682,7 +1721,7 @@ export function NewsView() {
           }}
         >
           {currentArticle ? (
-            <div className={docked ? "reader-with-dock" : undefined}>
+            <>
             <article style={{ maxWidth: 740, margin: "0 auto" }}>
               <button
                 type="button"
@@ -1852,7 +1891,7 @@ export function NewsView() {
               </h1>
 
               {/* The story's main picture stays directly under the headline, above the fold. */}
-              {currentArticle.videos?.length && !docked ? (
+              {currentArticle.videos?.length ? (
                 <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />
               ) : (
                 /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
@@ -1934,9 +1973,7 @@ export function NewsView() {
                 dangerouslySetInnerHTML={{ __html: shownBody }}
               />
               <div className="news-reader-bar">
-                <button type="button" className="nh-btn" aria-pressed={readerMode === "view"} title="Switch between the magazine column and the photo gallery view" onClick={() => setReaderMode(readerMode === "view" ? "read" : "view")}>
-                  {readerMode === "view" ? "Magazine" : "Gallery"} <kbd>V</kbd>
-                </button>
+                
                 <select className="nh-btn voice-pick" aria-label="Read-aloud voice" title="Voice for Listen" value={prefs.ttsEngine === "kokoro" ? prefs.kokoroVoice : "system"} onChange={(e) => (e.target.value === "system" ? updatePrefs({ ttsEngine: "system", ttsChosen: true }) : updatePrefs({ ttsEngine: "kokoro", kokoroVoice: e.target.value, ttsChosen: true }))}>
                   {KOKORO_VOICES.map((v) => <option key={v.id} value={v.id}>Kokoro · {v.label}</option>)}
                   <option value="system">System voice</option>
@@ -1953,8 +1990,7 @@ export function NewsView() {
                 {tail.items.length ? <TailCarousel items={tail.items} onOpen={openInApp} /> : <span className="mono">J next · K prev · Esc back</span>}
               </div>
             </article>
-            {docked ? <VideoDock large videos={currentArticle.videos} photos={photos} embedPort={embedPort} autoplay={loadAutoplay()} label={currentArticle.title} /> : null}
-            </div>
+            </>
           ) : (
             <div
               style={{

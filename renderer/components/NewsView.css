@@ -239,7 +239,10 @@
 .news-article-canvas .article-native-content { font-size: clamp(15px, 14px + 0.35cqi, 19px); text-wrap: pretty; }
 .news-article-canvas .article-native-content :is(h2, h3, h4) { text-wrap: balance; }
 /* Pictures in the story are shown whole, never cropped. */
-.news-article-canvas .article-native-content :is(img, picture img) { width: auto; max-width: 100%; height: auto; max-height: 80vh; object-fit: contain; aspect-ratio: auto; }
+.news-article-canvas .article-native-content :is(img, picture img) { display: block; margin-inline: auto; width: auto; max-width: 100%; height: auto; max-height: 80vh; object-fit: contain; aspect-ratio: auto; }
+/* Pictures and their captions sit centred in the column. */
+.news-article-canvas .article-native-content :is(figure, picture, video, iframe) { display: block; margin-inline: auto; text-align: center; }
+.news-article-canvas .article-native-content figcaption { text-align: center; }
 
 /* Story videos sit in the story. A played video that has scrolled above the reading pane floats at its bottom-left
    corner (the same element, switched to fixed, so playback is not interrupted); the x puts it back. */

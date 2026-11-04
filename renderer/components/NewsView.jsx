@@ -399,6 +399,32 @@ const keepFetched = (prev, next) => {
   });
 };
 
+// The wire snapshot: the last few days of stories, kept between launches so a restart shows them, not just the feeds'
+// current items. Bodies and pictures are not kept; a story's picture is found again when it is shown.
+const WIRE_KEEP_MS = 3 * 86400000;
+const WIRE_KEEP_MAX = 500;
+function loadWireSnapshot() {
+  try {
+    const list = JSON.parse(localStorage.getItem("nn.wireSnapshot") || "[]");
+    const cutoff = Date.now() - WIRE_KEEP_MS;
+    return Array.isArray(list) ? list.filter((s) => s && s.link && clampTs(s.timestamp) >= cutoff) : [];
+  } catch { return []; }
+}
+function saveWireSnapshot(stories) {
+  try {
+    const cutoff = Date.now() - WIRE_KEEP_MS;
+    const keep = stories
+      .filter((s) => s.link && s.title && clampTs(s.timestamp) >= cutoff)
+      .sort((a, b) => clampTs(b.timestamp) - clampTs(a.timestamp))
+      .slice(0, WIRE_KEEP_MAX)
+      .map(({ id, feedId, title, link, source, badge, lang, categories, desc, timestamp, imageUrl, creator }) => ({
+        id, feedId, title, link, source, badge, lang, categories, timestamp, creator,
+        desc: String(desc || "").slice(0, 400), imageUrl: imageUrl || "",
+      }));
+    localStorage.setItem("nn.wireSnapshot", JSON.stringify(keep));
+  } catch { /* storage full or unavailable: the snapshot is only a convenience */ }
+}
+
 const byPlayableThenNew = (a, b) => clampTs(b.timestamp) - clampTs(a.timestamp) || String(a.id).localeCompare(String(b.id));
 
 function parseFeedXml(xml, feedMeta) {
@@ -810,8 +836,13 @@ export function NewsView() {
         }
       });
 
+      // Feeds only carry their latest items, so yesterday's stories would vanish on restart. The snapshot brings back
+      // what the app saw in the last few days; fresh copies win where a link appears in both.
+      const seen = new Set(aggregated.concat(localRef.current, Object.values(providerRef.current).flat()).map((s) => s.link));
+      const kept = loadWireSnapshot().filter((s) => !seen.has(s.link));
       // Stories the app can play come first, then newest first.
-      aggregated = mergeWire(aggregated.concat(localRef.current, Object.values(providerRef.current).flat()));
+      aggregated = mergeWire(aggregated.concat(localRef.current, Object.values(providerRef.current).flat(), kept));
+      saveWireSnapshot(aggregated);
       setFeedHealth(healthMap);
       setArticles((prev) => keepFetched(prev, aggregated));
       if (placeRef.current) loadLocal(placeRef.current);

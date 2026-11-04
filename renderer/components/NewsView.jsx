@@ -417,9 +417,11 @@ function saveWireSnapshot(stories) {
       .filter((s) => s.link && s.title && clampTs(s.timestamp) >= cutoff)
       .sort((a, b) => clampTs(b.timestamp) - clampTs(a.timestamp))
       .slice(0, WIRE_KEEP_MAX)
-      .map(({ id, feedId, title, link, source, badge, lang, categories, desc, timestamp, imageUrl, creator }) => ({
+      .map(({ id, feedId, title, link, source, badge, lang, categories, desc, timestamp, imageUrl, creator, videos }) => ({
         id, feedId, title, link, source, badge, lang, categories, timestamp, creator,
         desc: String(desc || "").slice(0, 400), imageUrl: imageUrl || "",
+        // The hero plays stories with a video: a restored story keeps its videos so it stays eligible.
+        videos: Array.isArray(videos) ? videos.slice(0, 3).map(({ kind, id: vid, url }) => ({ kind, id: vid, url })) : [],
       }));
     localStorage.setItem("nn.wireSnapshot", JSON.stringify(keep));
   } catch { /* storage full or unavailable: the snapshot is only a convenience */ }

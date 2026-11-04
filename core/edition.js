@@ -91,3 +91,19 @@ export function heroScore(story, { now = Date.now(), terms = [], heat = 1 } = {}
   if (isOpinion(story)) score -= OPINION_PENALTY;
   return score;
 }
+
+// Keeps order, moving stories past the `max`-th on one topic (2+ shared key words with an earlier story) to the end,
+// so one huge story leads without taking every slot.
+export function capTopics(stories, max = 6, { minShared = 2 } = {}) {
+  const topics = []; // { words, n }
+  const kept = [];
+  const over = [];
+  for (const s of stories || []) {
+    const w = heatWords(s.title);
+    const t = topics.find((tp) => { let n = 0; for (const x of w) if (tp.words.has(x) && ++n >= minShared) return true; return false; });
+    if (!t) { topics.push({ words: w, n: 1 }); kept.push(s); continue; }
+    for (const x of w) t.words.add(x);
+    (++t.n > max ? over : kept).push(s);
+  }
+  return [...kept, ...over];
+}

@@ -87,3 +87,10 @@ test("hero: unrelated stories sharing one word do not heat each other", async ()
   ], { now });
   assert.equal(heat.get("a"), 1);
 });
+
+test("hero: one topic holds at most max slots before other stories", async () => {
+  const { capTopics } = await import("../edition.js");
+  const m = Array.from({ length: 8 }, (_, i) => ({ id: "m" + i, title: `Democrats midterm Congress result ${i}` }));
+  const out = capTopics([...m, { id: "x", title: "Superman Lois cameo" }], 6);
+  assert.equal(out[6].id, "x");
+});

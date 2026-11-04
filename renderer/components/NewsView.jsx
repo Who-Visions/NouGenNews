@@ -19,7 +19,7 @@ import { loadSince, stampVisit, newSince, catchupLabel, topNew } from "../lib/ca
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
-import { scoreStory, topicHeat, heroScore } from "../../core/edition.js";
+import { scoreStory, topicHeat, heroScore, capTopics } from "../../core/edition.js";
 import { findAlerts } from "../../core/alerts.js";
 import { officialAlert } from "../../core/weatheralert.js";
 import { dedupeStories } from "../../core/dedupe.js";
@@ -1306,10 +1306,11 @@ export function NewsView() {
     const now = Date.now();
     const heat = topicHeat(articles, { now });
     const score = (a) => heroScore(a, { now, terms: libraryTerms, heat: heat.get(a.id) || 1 });
-    const withVideo = capSources(
+    // At most two per outlet and six per topic, so the night's big story leads without taking every slot.
+    const withVideo = capTopics(capSources(
       filtered.filter((a) => (a.videos && a.videos.length) || a.imageUrl).map((a) => [a, score(a)]).sort((x, y) => y[1] - x[1]).map((x) => x[0]),
       2,
-    );
+    ), 6);
     if (!alertLead || activeFeed !== "all" || search.trim()) return withVideo.slice(0, HERO_COUNT);
     const lead = filtered.find((a) => a.id === alertLead.story.id) || alertLead.story;
     const coverage = alertLead.kind === "weather" ? alertLead.stories.filter((a) => a.id !== lead.id) : [];

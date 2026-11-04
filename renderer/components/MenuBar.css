@@ -1,0 +1,33 @@
+.menubar { display: flex; height: 28px; flex: 0 0 28px; background: #000; border-bottom: 1px solid var(--line); position: relative; z-index: 50; }
+.menubar__menu { position: relative; }
+.menubar__menu > button { height: 100%; padding: 0 12px; font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 0; cursor: pointer; }
+.menubar__menu > button:hover, .menubar__menu > button.is-open { background: var(--panel-hover); }
+.menubar__list {
+  position: absolute; top: 100%; left: 0; min-width: 240px; margin: 0; padding: 4px; list-style: none;
+  background: rgba(10, 10, 10, 0.95); backdrop-filter: url(#nn-liquid) blur(28px) saturate(180%); -webkit-backdrop-filter: url(#nn-liquid) blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 12px 32px rgba(0, 0, 0, 0.7);
+}
+.menubar__list button { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; padding: 6px 10px; font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 0; border-radius: 3px; cursor: pointer; text-align: left; }
+.menubar__list button:hover { background: rgba(232, 184, 109, 0.18); }
+.menubar__list kbd { font: 600 11px/1.4 Consolas, monospace; color: var(--muted); }
+.menubar__sep { height: 1px; margin: 4px 6px; background: rgba(255, 255, 255, 0.14); }
+.menubar :focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.no-glass .menubar__list { backdrop-filter: none; -webkit-backdrop-filter: none; background: #0e0e0e; }
+.menubar__restart { margin: 3px 8px 3px 0; padding: 0 10px; font: inherit; font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.menubar__restart:hover { background: var(--panel-hover); }
+.menubar__refresh { margin: 3px 8px 3px 0; padding: 0 10px; font: inherit; font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; white-space: nowrap; }
+.menubar__refresh:hover:not(:disabled) { background: var(--panel-hover); }
+.menubar__refresh:disabled { cursor: progress; opacity: 0.8; }
+.menubar__spin { display: inline-block; }
+.menubar__refresh.is-busy .menubar__spin { animation: menubar-spin 900ms linear infinite; }
+@keyframes menubar-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .menubar__refresh.is-busy .menubar__spin { animation: none; } }
+.menubar__tabs { display: flex; gap: 2px; margin: 3px 12px 3px 6px; padding: 2px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line, rgba(255, 255, 255, 0.14)); border-radius: 6px; }
+.menubar__tab { padding: 0 12px; font: inherit; font-size: 12px; color: var(--muted, #bdb8ad); background: none; border: 0; border-radius: 4px; cursor: pointer; }
+.menubar__tab:hover { color: var(--text, #f2eee6); }
+.menubar__tab.is-on { color: #0b0b0d; background: var(--accent, #e8b86d); font-weight: 600; }
+
+/* Click targets are at least 24px tall (WCAG 2.2 target size); the bar is 28px, so the buttons sit 2px inside it. */
+.menubar__tab { min-height: 24px; align-self: center; display: inline-flex; align-items: center; }
+.menubar__restart, .menubar__refresh { margin-top: 2px; margin-bottom: 2px; min-height: 24px; }

@@ -1,0 +1,7 @@
+.mast { flex: none; margin: 0 0 10px; text-align: center; }
+.mast__title { margin: 6px 0 4px; font: 500 clamp(34px, 4.2vw, 54px)/1 var(--font-head); letter-spacing: -0.02em; color: var(--nn-text, #f2eee6); }
+.mast__rule { height: 1px; background: var(--nn-line-strong, rgba(255, 255, 255, 0.22)); }
+.mast__rule--double { height: 4px; background: transparent; border-top: 1px solid var(--nn-line-strong, rgba(255, 255, 255, 0.22)); border-bottom: 1px solid var(--nn-line-strong, rgba(255, 255, 255, 0.22)); }
+.mast__line { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 2px; font: 600 10px/1 var(--font-mono, Consolas, monospace); letter-spacing: 0.1em; text-transform: uppercase; color: var(--nn-dim, #8f8a80); }
+.mast__day { font: italic 500 13px/1 var(--font-head); letter-spacing: 0; text-transform: none; color: var(--nn-muted, #bdb8ad); }
+@media (max-width: 720px) { .mast__line { flex-direction: column; gap: 4px; } }

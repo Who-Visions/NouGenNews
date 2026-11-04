@@ -299,10 +299,15 @@ export function embedSocialPosts(html) {
   if (!html) return html;
   // A quote box that is only a post placeholder: replace the whole box.
   return html.replace(/<blockquote\b[^>]*>([\s\S]*?)<\/blockquote>/gi, (whole, inner) => {
-    const href = (inner.match(/href="([^"]+)"/i) || [])[1];
     const text = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    // Only placeholder boxes (short text); a real pull quote that merely links a post keeps its words.
-    if (!href || text.length > 400) return whole;
-    return socialFrame(href.replace(/&amp;/g, "&")) || whole;
+    // Only embed boxes (short text); a real pull quote that merely links a post keeps its words.
+    if (text.length > 600) return whole;
+    // Any link in the box may be the post: a tweet box leads with t.co and pic.twitter.com links and names its own
+    // status link last, on the "— Name (@handle) date" line.
+    for (const [, href] of inner.matchAll(/href="([^"]+)"/gi)) {
+      const frame = socialFrame(href.replace(/&amp;/g, "&"));
+      if (frame) return frame;
+    }
+    return whole;
   });
 }

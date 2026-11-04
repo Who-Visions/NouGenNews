@@ -23,8 +23,8 @@ if (missingFiles(dist).length) {
 }
 
 // Anything after `npm start --` goes to Electron (for example --remote-debugging-port=9333 --user-data-dir=...).
-// NOUGEN_DEBUG_PORT=9333 opens Chrome DevTools Protocol on 127.0.0.1 so the running app can be read (its stored wire,
-// its DOM). Off unless asked for: whatever can reach that port can run code inside the app.
+// NOUGEN_DEBUG_PORT=9463 opens Chrome DevTools Protocol on 127.0.0.1 so the running app can be read (its stored wire,
+// its DOM). Pick a port outside Windows' reserved ranges (`netsh int ipv4 show excludedportrange protocol=tcp`; 9277-9376 is reserved on this machine and fails with "bind() ... forbidden"). Off unless asked for: whatever can reach that port can run code inside the app.
 const debugArgs = [];
 if (env.NOUGEN_DEBUG_PORT) {
   const port = Number(env.NOUGEN_DEBUG_PORT);

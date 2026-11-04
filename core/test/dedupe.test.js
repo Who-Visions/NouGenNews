@@ -45,3 +45,22 @@ test("search-page links are not an identity: different searches are different st
   assert.equal(canonicalUrl(a.link), "");
   assert.equal(dedupeStories([a, b]).length, 2);
 });
+
+test("distinct stories that differ only by a query parameter stay distinct; tracking parameters do not", () => {
+  const out = dedupeStories([
+    { id: "1", title: "First independent video story", link: "https://www.youtube.com/watch?v=11111111111" },
+    { id: "2", title: "Second unrelated video story", link: "https://www.youtube.com/watch?v=22222222222" },
+  ]);
+  assert.deepEqual(out.map((x) => x.id), ["1", "2"]);
+  assert.equal(canonicalUrl("https://a.test/story?utm_source=x&fbclid=y"), canonicalUrl("https://a.test/story"));
+});
+
+test("a replacement keeps every alias pointing at the live story", () => {
+  const out = dedupeStories([
+    { id: "a", title: "An identical syndicated headline", link: "https://a.test/story" },
+    { id: "b", title: "An identical syndicated headline", link: "https://b.test/story", imageUrl: "https://img.test/b.jpg" },
+    { id: "c", title: "Updated headline for original article", link: "https://a.test/story", imageUrl: "https://img.test/c.jpg", desc: "More complete reporting" },
+  ]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].id, "c");
+});

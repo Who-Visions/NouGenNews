@@ -279,3 +279,30 @@ export function dropAdLabels(html, doc = typeof document !== "undefined" ? docum
   }
   return removed ? host.innerHTML : source;
 }
+
+// Social posts a story quotes arrive as placeholders: a quote box holding only a "View this post on Instagram" link
+// (the publisher's embed script is stripped). Each placeholder names its post, so it becomes the post itself, framed
+// from the platform's own embed page. Runs after sanitizing, on links the sanitizer already let through.
+const SOCIAL = [
+  { re: /https?:\/\/(?:www\.)?instagram\.com\/(?:[\w.]+\/)?(p|reel|tv)\/([\w-]+)/i, src: (m) => `https://www.instagram.com/${m[1]}/${m[2]}/embed/captioned/`, cls: "ig" },
+  { re: /https?:\/\/(?:www\.)?(?:twitter|x)\.com\/\w+\/status\/(\d+)/i, src: (m) => `https://platform.twitter.com/embed/Tweet.html?id=${m[1]}&theme=dark&dnt=true`, cls: "x" },
+  { re: /https?:\/\/(?:www\.)?tiktok\.com\/@[\w.]+\/video\/(\d+)/i, src: (m) => `https://www.tiktok.com/embed/v2/${m[1]}`, cls: "tt" },
+];
+function socialFrame(href) {
+  for (const s of SOCIAL) {
+    const m = href.match(s.re);
+    if (m) return `<figure class="nn-social nn-social--${s.cls}"><iframe src="${s.src(m)}" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups" title="Embedded post"></iframe></figure>`;
+  }
+  return null;
+}
+export function embedSocialPosts(html) {
+  if (!html) return html;
+  // A quote box that is only a post placeholder: replace the whole box.
+  return html.replace(/<blockquote\b[^>]*>([\s\S]*?)<\/blockquote>/gi, (whole, inner) => {
+    const href = (inner.match(/href="([^"]+)"/i) || [])[1];
+    const text = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    // Only placeholder boxes (short text); a real pull quote that merely links a post keeps its words.
+    if (!href || text.length > 400) return whole;
+    return socialFrame(href.replace(/&amp;/g, "&")) || whole;
+  });
+}

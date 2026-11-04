@@ -253,3 +253,10 @@
 .avid__close { position: absolute; top: 4px; right: 4px; z-index: 2; width: 26px; height: 26px; padding: 0; font: 600 18px/1 inherit; color: #f2eee6; background: rgba(0, 0, 0, 0.7); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; cursor: pointer; }
 .avid__close:hover { background: rgba(232, 184, 109, 0.9); color: #0b0b0d; }
 .avid__close:focus-visible { outline: 2px solid #e8b86d; outline-offset: 2px; }
+
+/* Social posts the story quotes, shown as the posts themselves, centred. */
+.news-article-canvas .article-native-content .nn-social { margin: 20px auto; width: min(540px, 100%); border: 0; padding: 0; }
+.nn-social iframe { display: block; width: 100%; border: 0; border-radius: 8px; background: #fff; }
+.nn-social--ig iframe { height: 760px; }
+.nn-social--x iframe { height: 560px; background: transparent; }
+.nn-social--tt iframe { height: 740px; }

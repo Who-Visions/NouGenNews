@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
-import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, dropAdLabels } from "../lib/articleHtml.js";
+import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, dropAdLabels, embedSocialPosts } from "../lib/articleHtml.js";
 import { TailCarousel } from "./TailCarousel.jsx";
 import { BreakingTicker } from "./BreakingTicker.jsx";
 import { FrontSections } from "./FrontSections.jsx";
@@ -1154,7 +1154,7 @@ export function NewsView() {
   const articleBody = useMemo(() => dropDuplicateImages(dropTrailingImages(dropAdLabels(tail.body)), currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
   // Every picture of the story, the lead first: the lightbox steps through them. They stay where they are in the story.
   const photos = useMemo(() => collectPhotos(articleBody, currentArticle?.imageUrl), [articleBody, currentArticle?.imageUrl]);
-  const shownBody = articleBody;
+  const shownBody = useMemo(() => embedSocialPosts(articleBody), [articleBody]);
   // A picture clicked anywhere in the story opens large, growing out of where it was.
   const [lightbox, setLightbox] = useState(null);
   const openPicture = useCallback((e) => {

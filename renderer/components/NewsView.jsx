@@ -124,7 +124,7 @@ function VideoSlot({ v, embedPort, autoplay, onFail }) {
   const [played, setPlayed] = useState(!!autoplay);
   const [away, setAway] = useState(false);
   const [closed, setClosed] = useState(false);
-  const [spot, setSpot] = useState({ left: 16, bottom: 80 });
+  const [spot, setSpot] = useState({ right: 16, bottom: 80 });
 
   useEffect(() => {
     if (v.kind !== "youtube") return undefined;
@@ -139,7 +139,7 @@ function VideoSlot({ v, embedPort, autoplay, onFail }) {
     if (!el || !pane) return undefined;
     const place = () => {
       const r = pane.getBoundingClientRect();
-      setSpot({ left: Math.round(r.left + 14), bottom: Math.round(window.innerHeight - r.bottom + 76) });
+      setSpot({ right: Math.round(window.innerWidth - r.right + 14), bottom: Math.round(window.innerHeight - r.bottom + 76) });
     };
     place();
     const io = new IntersectionObserver(([e]) => {
@@ -160,7 +160,7 @@ function VideoSlot({ v, embedPort, autoplay, onFail }) {
     : "";
   return (
     <div className="avid" ref={slot}>
-      <div className={`avid__box${floating ? " is-floating" : ""}`} style={floating ? { left: spot.left, bottom: spot.bottom } : undefined}>
+      <div className={`avid__box${floating ? " is-floating" : ""}`} style={floating ? { right: spot.right, bottom: spot.bottom } : undefined}>
         {v.kind === "youtube" ? (
           <iframe title="Video" src={src} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
         ) : (

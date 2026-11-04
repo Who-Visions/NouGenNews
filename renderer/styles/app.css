@@ -12,8 +12,10 @@ body {
 .app-shell { display: flex; flex: 1 1 auto; min-height: 0; min-width: 0; }
 .app-main { flex: 1 1 auto; min-width: 0; overflow: hidden; }
 
-/* Thin matte scrollbars, app-wide. */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* No visible scroll bars, app-wide (operator ruling 2026-11-04). Everything still scrolls by wheel, trackpad, touch
+   and keys. */
+* { scrollbar-width: none; }
+::-webkit-scrollbar { width: 0; height: 0; display: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-thumb:hover { background: #555; }

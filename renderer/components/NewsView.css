@@ -260,3 +260,4 @@
 .nn-social--ig iframe { height: 760px; }
 .nn-social--x iframe { height: 560px; background: transparent; }
 .nn-social--tt iframe { height: 740px; }
+.nn-social iframe { overflow: hidden; transition: height 160ms ease-out; }

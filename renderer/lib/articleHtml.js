@@ -291,7 +291,7 @@ const SOCIAL = [
 function socialFrame(href) {
   for (const s of SOCIAL) {
     const m = href.match(s.re);
-    if (m) return `<figure class="nn-social nn-social--${s.cls}"><iframe src="${s.src(m)}" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups" title="Embedded post"></iframe></figure>`;
+    if (m) return `<figure class="nn-social nn-social--${s.cls}"><iframe src="${s.src(m)}" scrolling="no" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups" title="Embedded post"></iframe></figure>`;
   }
   return null;
 }

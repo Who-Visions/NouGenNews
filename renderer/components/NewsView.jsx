@@ -1155,6 +1155,22 @@ export function NewsView() {
   // Every picture of the story, the lead first: the lightbox steps through them. They stay where they are in the story.
   const photos = useMemo(() => collectPhotos(articleBody, currentArticle?.imageUrl), [articleBody, currentArticle?.imageUrl]);
   const shownBody = useMemo(() => embedSocialPosts(articleBody), [articleBody]);
+  // Embedded posts report their own height (Instagram: {type:"MEASURE"}; X: twttr.embed resize). Each frame takes that
+  // height, so a post shows whole with no scroll bar of its own.
+  useEffect(() => {
+    const onMsg = (e) => {
+      if (!/^https:\/\/(www\.instagram\.com|platform\.twitter\.com|www\.tiktok\.com)$/.test(e.origin)) return;
+      let d = e.data;
+      if (typeof d === "string") { try { d = JSON.parse(d); } catch { return; } }
+      const h = d?.details?.height ?? d?.["twttr.embed"]?.params?.[0]?.height ?? d?.height;
+      if (!Number.isFinite(+h) || +h < 80) return;
+      for (const f of document.querySelectorAll(".nn-social iframe")) {
+        if (f.contentWindow === e.source) { f.style.height = `${Math.ceil(+h)}px`; break; }
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
   // A picture clicked anywhere in the story opens large, growing out of where it was.
   const [lightbox, setLightbox] = useState(null);
   const openPicture = useCallback((e) => {

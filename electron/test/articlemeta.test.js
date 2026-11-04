@@ -77,3 +77,11 @@ test("found on live pages: a bare 'By' is not an author, captions and mid-senten
   const s = sentences("Photograph: Visit Norway A still from the tourist board film shown here. ” but added that the incident does look like a hack on the exchange. Getty Images file picture of the actor at an event. The exchange has frozen about three billion dollars of affected assets so far.");
   assert.deepEqual(s, ["The exchange has frozen about three billion dollars of affected assets so far."]);
 });
+
+test("summary skips comment invitations and related-story timestamps", () => {
+  const { summarize } = require("../articlemeta");
+  const text = "The studio confirmed the film will start shooting in March with the full cast returning. A second report says the director has signed a new deal. What are your thoughts about the movie? Movies 7 hours ago . Fans expect a trailer before summer. Insiders say the budget is larger than the last entry.";
+  const out = summarize(text, "Film starts shooting", 5);
+  assert.ok(out.length >= 3);
+  assert.ok(!out.some((s) => /your thoughts|hours ago/i.test(s)), JSON.stringify(out));
+});

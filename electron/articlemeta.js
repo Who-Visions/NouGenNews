@@ -115,8 +115,11 @@ function sentences(text) {
 
 // Extractive summary: the n best sentences, returned in reading order. Score = title overlap + keyword density (sum and
 // adjacent-pair) + closeness to ~20 words + an early-position bonus, as newspaper does.
+// Page furniture that survives extraction as a "sentence": an invitation to comment, or a related-story timestamp.
+const CHROME_SENTENCE = /\b(your thoughts|let us know|leave a comment|share your|what do you think|sound off)\b|\b\d+\s+(second|minute|hour|day|week)s?\s+ago\b/i;
+
 function summarize(text, title = "", n = 4) {
-  const sents = sentences(text);
+  const sents = sentences(text).filter((s) => !CHROME_SENTENCE.test(s));
   if (sents.length <= n) return sents;
   const keys = keywords(text, title, 10);
   const score = new Map(keys.map((w, i) => [w, (keys.length - i) / keys.length]));

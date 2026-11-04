@@ -160,4 +160,9 @@ async function kokoroSynthFast(args, { server = (shared = shared || new KokoroSe
   }
 }
 
-module.exports = { kokoroSynth, kokoroSynthFast, KokoroServer, kokoroPython };
+// Loads the model for a voice ahead of the first Listen click. Never throws: warming is a courtesy, not a requirement.
+function kokoroWarm(voice, { server = (shared = shared || new KokoroServer()) } = {}) {
+  return server.warm(voice).then(() => true, () => false);
+}
+
+module.exports = { kokoroSynth, kokoroSynthFast, kokoroWarm, KokoroServer, kokoroPython };

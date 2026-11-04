@@ -28,6 +28,8 @@ const handlers = {
   youtube_feed: () => require("./youtube").fetchYoutube({ userDir: app.getPath("userData") }).then((r) => ({ items: r.items, channels: r.channels })),
   // Read-aloud with a Kokoro neural voice (scripts/kokoro_sidecar.py); the WAV comes back as base64.
   tts_kokoro_synth: (args = {}) => require("./kokoro").kokoroSynthFast({ text: String(args.text || "").slice(0, 60000), voice: String(args.voice || "") }),
+  // Loads the Kokoro model for the chosen voice so the first Listen starts fast.
+  tts_kokoro_warm: (args = {}) => require("./kokoro").kokoroWarm(String(args.voice || "")),
   // A video written up as a news article by NouGen (transcript via nougentube, local Ollama writer, the video's source links).
   tube_article: (args = {}) => require("./tubenews").tubeArticle({
     id: String(args.id || ""), title: String(args.title || "").slice(0, 300), desc: String(args.desc || "").slice(0, 6000), channel: String(args.channel || "").slice(0, 100),

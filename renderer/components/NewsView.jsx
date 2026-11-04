@@ -14,6 +14,7 @@ import { Lightbox, photoIndex } from "./Lightbox.jsx";
 import { AssistantPanel } from "./AssistantPanel.jsx";
 import { ShardsLitePanel } from "./ShardsLitePanel.jsx";
 import { clampTs } from "../lib/age.js";
+import { loadRead, markRead } from "../lib/readstate.js";
 import { loadSince, stampVisit, newSince, catchupLabel, topNew } from "../lib/catchup.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
@@ -645,6 +646,11 @@ export function NewsView() {
 
   useEffect(() => () => speechRef.current?.stop(), []);
 
+  // Load the Kokoro model in the background for the chosen voice, so the first Listen does not wait for it.
+  useEffect(() => {
+    if (prefs.ttsEngine === "kokoro" && prefs.kokoroVoice) invoke("tts_kokoro_warm", { voice: prefs.kokoroVoice }).catch(() => {});
+  }, [prefs.ttsEngine, prefs.kokoroVoice]);
+
   useEffect(() => {
     let active = true;
     probeOllamaModels().then((info) => {
@@ -934,6 +940,7 @@ export function NewsView() {
   // Since you last looked: fixed at launch, so the count means "new to you", not "new this minute".
   const sinceRef = useRef(loadSince());
   const [catchupHidden, setCatchupHidden] = useState(false);
+  const [readIds, setReadIds] = useState(loadRead);
   useEffect(() => {
     stampVisit();
     const t = setInterval(() => stampVisit(), 60000);
@@ -941,7 +948,7 @@ export function NewsView() {
     window.addEventListener("pagehide", bye);
     return () => { clearInterval(t); window.removeEventListener("pagehide", bye); bye(); };
   }, []);
-  const fresh = useMemo(() => newSince(withLibrary.filter(inWire), sinceRef.current), [withLibrary]);
+  const fresh = useMemo(() => newSince(withLibrary.filter(inWire), sinceRef.current).filter((a) => !readIds.has(a.id)), [withLibrary, readIds]);
   // What the banner leads with and the brief plays: the new stories that matter most, not the newest dozen.
   const freshTop = useMemo(() => topNew(fresh, (a) => scoreStory(a, { now: Date.now(), terms: libraryTerms }), 8), [fresh, libraryTerms]);
   const freshIds = useMemo(() => new Set(fresh.map((a) => a.id)), [fresh]);
@@ -1121,6 +1128,14 @@ export function NewsView() {
     }, 4000);
     return () => clearTimeout(t);
   }, [articles]);
+
+  // A story that has been in front of the reader for a moment counts as seen: it dims in the wire and leaves the catch-up count.
+  useEffect(() => {
+    const id = currentArticle && currentArticle.id;
+    if (!id || document.body.dataset.view !== "news") return undefined;
+    const t = setTimeout(() => setReadIds((r) => markRead(r, id)), 2500);
+    return () => clearTimeout(t);
+  }, [currentArticle?.id]);
 
   // A story the reader opens is kept with its whole text, so the archive holds more than the headline and summary.
   useEffect(() => {
@@ -1676,6 +1691,7 @@ export function NewsView() {
                         margin: "0 0 4px",
                         lineHeight: 1.32,
                         color: isSelected ? "#ffffff" : TOKENS.textPrimary,
+                        opacity: readIds.has(item.id) && !isSelected ? 0.55 : 1,
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",

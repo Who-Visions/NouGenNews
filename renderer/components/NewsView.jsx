@@ -19,7 +19,7 @@ import { loadSince, stampVisit, newSince, catchupLabel, topNew } from "../lib/ca
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
-import { scoreStory } from "../../core/edition.js";
+import { scoreStory, topicHeat, heroScore } from "../../core/edition.js";
 import { findAlerts } from "../../core/alerts.js";
 import { officialAlert } from "../../core/weatheralert.js";
 import { dedupeStories } from "../../core/dedupe.js";
@@ -1302,10 +1302,12 @@ export function NewsView() {
     // as the front page ranks them (freshness, library, a video bonus, opinion last) plus how many outlets carry it,
     // at most two per outlet. Only video stories once filled it, so the sites that attach a clip to everything took
     // every slot and the night's real news never led.
+    // Importance is how many outlets are on the story (topicHeat, over the whole wire), then freshness; the library lifts.
     const now = Date.now();
-    const heroScore = (a) => scoreStory(a, { now, terms: libraryTerms }) + 10 * Math.min((a.coverage || 1) - 1, 4);
+    const heat = topicHeat(articles, { now });
+    const score = (a) => heroScore(a, { now, terms: libraryTerms, heat: heat.get(a.id) || 1 });
     const withVideo = capSources(
-      filtered.filter((a) => (a.videos && a.videos.length) || a.imageUrl).map((a) => [a, heroScore(a)]).sort((x, y) => y[1] - x[1]).map((x) => x[0]),
+      filtered.filter((a) => (a.videos && a.videos.length) || a.imageUrl).map((a) => [a, score(a)]).sort((x, y) => y[1] - x[1]).map((x) => x[0]),
       2,
     );
     if (!alertLead || activeFeed !== "all" || search.trim()) return withVideo.slice(0, HERO_COUNT);
@@ -1313,7 +1315,7 @@ export function NewsView() {
     const coverage = alertLead.kind === "weather" ? alertLead.stories.filter((a) => a.id !== lead.id) : [];
     const ahead = new Set([lead.id, ...coverage.map((a) => a.id)]);
     return [{ ...lead, alertLevel: alertLead.level }, ...coverage, ...withVideo.filter((a) => !ahead.has(a.id))].slice(0, HERO_COUNT);
-  }, [filtered, alertLead, activeFeed, search, libraryTerms]);
+  }, [filtered, articles, alertLead, activeFeed, search, libraryTerms]);
 
   return (
     <div

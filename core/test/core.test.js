@@ -59,3 +59,31 @@ test("pruneTerms drops a term that matches too much of the wire", () => {
   assert.deepEqual(pruneTerms(stories, ["Matter", "Frieren"]), []);
   assert.deepEqual(pruneTerms(stories.slice(40), ["Matter", "Frieren"], { maxShare: 0.9 }), ["Matter", "Frieren"]);
 });
+
+test("hero: a story many outlets are on outranks a fresher library match", async () => {
+  const { topicHeat, heroScore } = await import("../edition.js");
+  const now = Date.parse("2026-11-04T07:00:00Z");
+  const h = 3600e3;
+  const wire = [
+    { id: "lib", title: "Superman & Lois star on a DCU cameo", source: "ComicBook", timestamp: now - 2 * h },
+    { id: "m1", title: "Democrats win control of Congress in midterm landslide", source: "CBS", timestamp: now - 3 * h },
+    { id: "m2", title: "Midterm landslide: Democrats take Congress", source: "NBC", timestamp: now - 3 * h },
+    { id: "m3", title: "How Democrats won Congress in the midterm", source: "Politico", timestamp: now - 4 * h },
+    { id: "m4", title: "Democrats flip Congress as midterm votes counted", source: "AP", timestamp: now - 4 * h },
+  ];
+  const heat = topicHeat(wire, { now });
+  assert.equal(heat.get("lib"), 1);
+  assert.ok(heat.get("m1") >= 4);
+  const s = (st) => heroScore(st, { now, terms: ["Superman"], heat: heat.get(st.id) });
+  assert.ok(s(wire[1]) > s(wire[0]));
+});
+
+test("hero: unrelated stories sharing one word do not heat each other", async () => {
+  const { topicHeat } = await import("../edition.js");
+  const now = Date.now();
+  const heat = topicHeat([
+    { id: "a", title: "Apple unveils iPhone 18 Pro", source: "Verge", timestamp: now },
+    { id: "b", title: "Apple orchard harvest hits record", source: "Farm", timestamp: now },
+  ], { now });
+  assert.equal(heat.get("a"), 1);
+});

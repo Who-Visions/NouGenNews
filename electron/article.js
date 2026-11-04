@@ -100,7 +100,7 @@ const pages = new Map();
 
 function gatedFetch(url, opts, now = Date.now) {
   const hit = pages.get(url);
-  if (hit && hit.until > now()) return hit.promise;
+  if (hit && hit.until > now()) return hit.promise.then((res) => res.clone());
   const host = new URL(url).hostname;
   const lane = hosts.get(host) || { running: 0, queue: [], last: 0 };
   hosts.set(host, lane);
@@ -113,7 +113,7 @@ function gatedFetch(url, opts, now = Date.now) {
     (res) => { if (!res.ok) pages.set(url, { promise, until: now() + (res.status === 429 || res.status === 503 ? REFUSED_TTL_MS : 0) }); },
     () => pages.delete(url),
   );
-  return promise;
+  return promise.then((res) => res.clone()); // the cached original is never read, so each caller can read its own copy
 }
 
 function pump(lane) {

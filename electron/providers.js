@@ -290,14 +290,23 @@ async function fetchProvider({ id, env = process.env, file, http = fetchSafe, no
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   };
+  // The file is read again at the end and only this provider's own entry and usage are written onto it: other providers
+  // run at the same time and would otherwise be overwritten by this snapshot.
+  const commit = (items) => {
+    const fresh = load(file);
+    fresh.entries = fresh.entries || {};
+    fresh.usage = fresh.usage || {};
+    fresh.usage[id] = use;
+    if (items) fresh.entries[id] = { at: t, items };
+    save(file, fresh);
+  };
   try {
     const items = (await p.run({ key, get, now })).slice(0, 60);
-    if (!items.length) { save(file, data); return stale; }
-    data.entries[id] = { at: t, items };
-    save(file, data);
+    if (!items.length) { commit(); return stale; }
+    commit(items);
     return { items, cached: false };
   } catch {
-    save(file, data); // the requests that were made still count
+    commit(); // the requests that were made still count
     return stale;
   }
 }

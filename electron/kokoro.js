@@ -42,6 +42,7 @@ function kokoroSynth({ text, voice, script = path.join(__dirname, "..", "scripts
         resolve(b64);
       } catch (e) { reject(new Error(`Kokoro audio missing: ${e.message}`)); }
     });
+    child.stdin.on?.("error", () => { /* the child is gone; 'close' reports the failure */ });
     child.stdin.end(t, "utf8");
   });
 }
@@ -86,6 +87,7 @@ class KokoroServer {
           if (p) { this.pending.delete(msg.id); clearTimeout(p.timer); this._touch(); p.resolve(msg); }
         }
       });
+      child.stdin.on?.("error", () => { /* the child is gone; 'close' fails every waiting request */ });
       child.stderr.on("data", () => { /* model download and library chatter; failures come back as answers */ });
       const down = (why) => {
         clearTimeout(startTimer);

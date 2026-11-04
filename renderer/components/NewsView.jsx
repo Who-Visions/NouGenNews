@@ -1738,7 +1738,7 @@ export function NewsView() {
         >
           {currentArticle ? (
             <>
-            <article style={{ maxWidth: 740, margin: "0 auto" }}>
+            <article style={{ width: "100%" }}>
               <button
                 type="button"
                 className="news-mobile-back"

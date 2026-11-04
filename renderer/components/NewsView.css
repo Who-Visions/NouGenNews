@@ -132,7 +132,7 @@
 .news-feed-list [role="option"][aria-selected="true"]::before {
   content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--nn-accent); border-radius: 1px;
 }
-.news-article-canvas article { max-width: 68ch; }
+.news-article-canvas article { max-width: none; width: 100%; }
 .news-article-canvas .article-native-content { font-size: 15px; line-height: 1.7; }
 .news-article-canvas .article-native-content img, .news-article-canvas .article-native-content video { max-width: 100%; height: auto; border-radius: var(--nn-radius); }
 .news-article-canvas .article-native-content a { color: var(--nn-accent); text-decoration: underline; text-decoration-color: var(--nn-line-strong); }
@@ -232,8 +232,8 @@
 .news-feed-list > * { content-visibility: auto; contain-intrinsic-size: auto 150px; }
 .catchup-copy strong em { font-style: normal; font-weight: 500; color: #9ca3af; }
 
-/* A comfortable line length for reading: about 70 characters (it was about 95; 60ch because ch is the width of a digit, wider than most letters). Pictures keep the full column. */
-.news-view-container .article-native-content > :is(p, ul, ol, blockquote, h2, h3, h4) { max-width: 60ch; }
+/* The reader uses the full width of its pane (operator ruling 2026-11-03): text, pictures and panels alike. */
+.news-view-container .article-native-content > :is(p, ul, ol, blockquote, h2, h3, h4) { max-width: none; }
 
 /* Story videos sit in the story. A played video that has scrolled above the reading pane floats at its bottom-left
    corner (the same element, switched to fixed, so playback is not interrupted); the x puts it back. */

@@ -232,8 +232,21 @@
 .news-feed-list > * { content-visibility: auto; contain-intrinsic-size: auto 150px; }
 .catchup-copy strong em { font-style: normal; font-weight: 500; color: #9ca3af; }
 
-/* The reader uses the full width of its pane (operator ruling 2026-11-03): text, pictures and panels alike. */
+/* The reader uses the full width of its pane (operator ruling 2026-11-03). Lines stay readable by flowing the body into
+   ~42-character columns once the pane is wide enough for two; headings, pictures, quotes and tables span every column,
+   and each heading restarts the flow so a section never makes you scroll back up far. Type scales with the pane, not
+   the window. Pattern: CSS-Tricks "Revisiting CSS Multi-Column Layout" (2025-01-27), 45-85 character line research. */
+.news-article-canvas article { container-type: inline-size; }
 .news-view-container .article-native-content > :is(p, ul, ol, blockquote, h2, h3, h4) { max-width: none; }
+.news-article-canvas .article-native-content { font-size: clamp(15px, 14px + 0.35cqi, 19px); text-wrap: pretty; hyphens: auto; }
+.news-article-canvas .article-native-content :is(h2, h3, h4) { text-wrap: balance; break-after: avoid; }
+@container (min-width: 900px) {
+  .news-article-canvas .article-native-content { column-width: 42ch; column-gap: 3rem; column-rule: 1px solid var(--nn-line); }
+  .news-article-canvas .article-native-content :is(h2, h3, h4, figure, picture, video, iframe, table, pre, blockquote, hr),
+  .news-article-canvas .article-native-content > :is(img, div:has(img, video, iframe)) { column-span: all; }
+  .news-article-canvas .article-native-content :is(p, li, figure, img) { break-inside: avoid-column; }
+  .news-article-canvas .article-native-content > p:first-child::first-letter { float: left; font-size: 3.4em; line-height: 0.85; padding: 4px 8px 0 0; font-family: var(--font-serif, "Newsreader Variable", Georgia, serif); color: var(--nn-accent); }
+}
 
 /* Story videos sit in the story. A played video that has scrolled above the reading pane floats at its bottom-left
    corner (the same element, switched to fixed, so playback is not interrupted); the x puts it back. */

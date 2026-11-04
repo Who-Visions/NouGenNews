@@ -1298,13 +1298,22 @@ export function NewsView() {
 
   // The stories the hero can play: the ones with a video, newest first.
   const playable = useMemo(() => {
-    const withVideo = filtered.filter((a) => a.videos && a.videos.length);
+    // The hero carries the biggest stories, not only the ones with a clip: anything with a picture or a video, ranked
+    // as the front page ranks them (freshness, library, a video bonus, opinion last) plus how many outlets carry it,
+    // at most two per outlet. Only video stories once filled it, so the sites that attach a clip to everything took
+    // every slot and the night's real news never led.
+    const now = Date.now();
+    const heroScore = (a) => scoreStory(a, { now, terms: libraryTerms }) + 10 * Math.min((a.coverage || 1) - 1, 4);
+    const withVideo = capSources(
+      filtered.filter((a) => (a.videos && a.videos.length) || a.imageUrl).map((a) => [a, heroScore(a)]).sort((x, y) => y[1] - x[1]).map((x) => x[0]),
+      2,
+    );
     if (!alertLead || activeFeed !== "all" || search.trim()) return withVideo.slice(0, HERO_COUNT);
     const lead = filtered.find((a) => a.id === alertLead.story.id) || alertLead.story;
     const coverage = alertLead.kind === "weather" ? alertLead.stories.filter((a) => a.id !== lead.id) : [];
     const ahead = new Set([lead.id, ...coverage.map((a) => a.id)]);
     return [{ ...lead, alertLevel: alertLead.level }, ...coverage, ...withVideo.filter((a) => !ahead.has(a.id))].slice(0, HERO_COUNT);
-  }, [filtered, alertLead, activeFeed, search]);
+  }, [filtered, alertLead, activeFeed, search, libraryTerms]);
 
   return (
     <div

@@ -1756,13 +1756,6 @@ export function NewsView() {
           {currentArticle ? (
             <>
             <article style={{ width: "100%" }}>
-              <button
-                type="button"
-                className="news-mobile-back"
-                onClick={() => setMobileReading(false)}
-              >
-                ← Back to Wire
-              </button>
               {/* Article Metadata Header */}
               <div
                 style={{
@@ -1775,6 +1768,9 @@ export function NewsView() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" className="news-mobile-back" aria-label="Back to the wire" title="Back to the wire" onClick={() => setMobileReading(false)}>
+                    ←
+                  </button>
                   <span
                     style={{
                       background: `${currentArticle.accent}22`,

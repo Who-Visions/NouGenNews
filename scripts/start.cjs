@@ -23,6 +23,14 @@ if (missingFiles(dist).length) {
 }
 
 // Anything after `npm start --` goes to Electron (for example --remote-debugging-port=9333 --user-data-dir=...).
+// NOUGEN_DEBUG_PORT=9333 opens Chrome DevTools Protocol on 127.0.0.1 so the running app can be read (its stored wire,
+// its DOM). Off unless asked for: whatever can reach that port can run code inside the app.
+const debugArgs = [];
+if (env.NOUGEN_DEBUG_PORT) {
+  const port = Number(env.NOUGEN_DEBUG_PORT);
+  if (Number.isInteger(port) && port > 1024 && port < 65536) debugArgs.push(`--remote-debugging-port=${port}`);
+  else console.error(`NOUGEN_DEBUG_PORT must be a port number between 1025 and 65535; debug port not opened.`);
+}
 const electron = require("electron");
-const child = spawn(electron, [path.resolve(__dirname, ".."), ...process.argv.slice(2)], { stdio: "inherit", env, windowsHide: false });
+const child = spawn(electron, [path.resolve(__dirname, ".."), ...debugArgs, ...process.argv.slice(2)], { stdio: "inherit", env, windowsHide: false });
 child.on("exit", (code) => process.exit(code ?? 0));

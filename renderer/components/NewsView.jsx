@@ -556,7 +556,8 @@ function LowCacheThumb({ article, size = "sm", priority = false }) {
         isBanner
           ? {
               width: "100%",
-              maxHeight: 360,
+              display: "flex",
+              justifyContent: "center",
               borderRadius: TOKENS.radiusMd,
               overflow: "hidden",
               marginBottom: 22,
@@ -575,18 +576,18 @@ function LowCacheThumb({ article, size = "sm", priority = false }) {
       }
     >
       <img
-        src={optimizeLowCacheUrl(imgUrl, isBanner ? 920 : 160)}
+        src={optimizeLowCacheUrl(imgUrl, isBanner ? 1800 : 160)}
         alt=""
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         referrerPolicy="no-referrer"
         onError={(e) => healImage(e, { raw: imgUrl, link: article.link, onGiveUp: () => setFailed(true) })}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          display: "block",
-        }}
+        // The lead picture is shown whole (never cropped): full width, natural height, letterboxed past 75% of the window.
+        style={
+          isBanner
+            ? { width: "100%", height: "auto", maxHeight: "75vh", objectFit: "contain", display: "block" }
+            : { width: "100%", height: "100%", objectFit: "cover", display: "block" }
+        }
       />
     </div>
   );

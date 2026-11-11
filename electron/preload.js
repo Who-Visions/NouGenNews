@@ -18,6 +18,12 @@ function openTtsPort() {
     if (data.ok) w.resolve(data.wav);
     else w.reject(new Error(data.error || "TTS failed"));
   };
+  // When the other end closes, fail every waiting request and forget the dead port so the next call reopens one.
+  // Without this, a pending ttsSynth promise hangs forever and the dead port is reused.
+  port1.onclose = () => {
+    ttsPort = null;
+    for (const [id, w] of ttsWaiting) { ttsWaiting.delete(id); w.reject(new Error("TTS channel closed")); }
+  };
   ttsPort = port1;
   return ttsPort;
 }

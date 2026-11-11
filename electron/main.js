@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, safeStorage, screen, dialog, session } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, screen, dialog, session, nativeImage } = require("electron");
 const { lockAllSessions } = require("./permissions");
 const { setIdentity, singleInstance, guardRenderer, withTaskbarProgress } = require("./window-life");
+const { loadAppIcon } = require("./appicon");
 
 // Same identity as the installer (package.json build.appId) so Windows attributes notifications to the app.
 setIdentity(app, require("../package.json"));
@@ -43,6 +44,7 @@ function createWindow(splash) {
     minHeight: FLOOR.height,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
+    icon: loadAppIcon({ nativeImage, platform: process.platform }),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

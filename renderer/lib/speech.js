@@ -286,6 +286,7 @@ export function createSpeechController({
     session += 1;
     abort?.abort();
     abort = null;
+    keepAwake(false);
     if (player) { try { player.pause(); } catch { /* ignore */ } }
     playerStop?.();
     try { synth?.cancel(); } catch { /* nothing playing */ }
@@ -364,6 +365,7 @@ export function createSpeechController({
     if (!chunks.length || mine !== session) return resolve(false);
     const { voice, notice } = selectBestVoice(synth.getVoices?.() || [], lang, prefs.voices?.[lang]);
     emit({ status: "speaking", voiceName: voice?.name || "default voice", lang, notice });
+    keepAwake(true);
     let i = 0;
     const next = () => {
       if (mine !== session) return resolve(false);
@@ -385,7 +387,7 @@ export function createSpeechController({
       const result = await speakKokoro(text, opts);
       if (result !== "failed") return result === "done";
     }
-    return speakSystem(text, opts);
+    return speakSystem(text, opts).finally(() => keepAwake(false));
   };
 
   const speakArticle = async (article, prefs = DEFAULT_PREFS) => {

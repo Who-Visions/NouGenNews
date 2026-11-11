@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, screen } = require("electron");
+const { fitWindowSize } = require("./window-size");
 const path = require("node:path");
 const { handlers } = require("./handlers");
 
@@ -10,9 +11,10 @@ function isAppFrame(frame) {
 }
 
 function createWindow() {
+  const size = fitWindowSize(screen.getPrimaryDisplay().workAreaSize);
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: size.width,
+    height: size.height,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
     webPreferences: {

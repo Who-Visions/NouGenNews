@@ -8,3 +8,14 @@ export async function synthSpeech(text, voice) {
   const b64 = await invoke("tts_kokoro_synth", { text, voice });
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
 }
+
+// The assistant, streamed: onEvent hears { type: "thinking" | "tool" | "tool_done" | "answer" | "error" | "cancelled" }.
+// Returns a function that stops the question. Falls back to the one-shot invoke when the preload has no port.
+export function askAssistant(args, onEvent) {
+  if (typeof window.nougennews?.askStream === "function") return window.nougennews.askStream(args, onEvent);
+  let stopped = false;
+  invoke("assistant_ask", args)
+    .then((r) => { if (!stopped) onEvent({ type: "answer", answer: r.answer, model: r.model }); })
+    .catch((err) => { if (!stopped) onEvent({ type: "error", message: String((err && err.message) || err) }); });
+  return () => { stopped = true; onEvent({ type: "cancelled" }); };
+}

@@ -72,7 +72,9 @@ async function fetchSafe(url, opts = {}, { timeoutMs = DEFAULT_TIMEOUT_MS, retri
   for (let i = 0; i < attempts; i += 1) {
     if (i > 0) await sleep(RETRY_DELAYS_MS[i - 1]);
     try {
-      const signal = opts.signal || AbortSignal.timeout(timeoutMs);
+      // The caller's signal (cancel) and the timeout both apply. Taking the caller's alone dropped the timeout, so
+      // a hung model never failed and a streamed assistant question waited forever.
+      const signal = opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
       const res = await globalThis.fetch(url, { ...opts, signal });
       if (canRetry && RETRYABLE_STATUS.has(res.status) && i < attempts - 1) {
         lastErr = new Error(`HTTP ${res.status}`);

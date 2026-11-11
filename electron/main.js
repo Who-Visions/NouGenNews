@@ -89,7 +89,7 @@ app.on("web-contents-created", (_e, contents) => {
 
 app.whenReady().then(() => {
   if (!primaryInstance) return;
-  // Deny camera, mic, location, notifications, devices... to all web content, sidebar sites included (permissions.js).
+  // Permissions: fullscreen and sanitized clipboard writes only, for web content and sidebar browser (permissions.js).
   lockAllSessions({ app, session, log: (m) => console.log(`[permissions] ${m}`) });
   // Long archive jobs show taskbar progress until they finish.
   for (const cmd of ["archive_promote", "archive_export"]) {
@@ -99,9 +99,9 @@ app.whenReady().then(() => {
   const splash = showSplash();
   require("./keys").applySaved({ userDir: app.getPath("userData"), crypt: safeStorage });
   ipcMain.handle("cmd", (e, cmd, args) => {
-    // Key commands answer only the app's own top-level page.
-    const appOnly = String(cmd).startsWith("keys_") || cmd === "open_external" || cmd === "archive_reveal";
-    if (appOnly && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
+    // Every command answers only the app's own top-level page (security checklist: validate the sender of all IPC
+    // messages). Embedded players and sidebar pages never get the bridge; this holds even if one somehow did.
+    if (!isAppFrame(e.senderFrame)) throw new Error("Not allowed");
     const fn = Object.prototype.hasOwnProperty.call(handlers, cmd) ? handlers[cmd] : null;
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);

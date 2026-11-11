@@ -59,6 +59,11 @@ app.whenReady().then(() => {
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);
   });
+  require("./ttsport").attachTtsPort({
+    ipcMain,
+    isAppFrame,
+    synth: (args) => require("./kokoro").kokoroSynthFast(args),
+  });
   createWindow();
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });

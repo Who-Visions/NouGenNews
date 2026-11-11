@@ -21,7 +21,8 @@
     "typecheck": "tsc --noEmit",
     "validate:python": "npm run py:audit",
     "validate": "npm run lint && npm run typecheck && npm run build:vinext && npm run validate:python",
-    "start:plain": "electron ."
+    "start:plain": "electron .",
+    "dist": "vite build && electron-builder --win nsis"
   },
   "dependencies": {
     "@extractus/article-extractor": "^8.1.0",
@@ -41,6 +42,7 @@
     "cloudinary": "^2.10.0",
     "cross-env": "^7.0.3",
     "discord.js": "^14.27.0",
+    "electron-updater": "^6.8.11",
     "express": "^4.22.2",
     "firebase": "^12.16.0",
     "firebase-admin": "^13.10.0",
@@ -78,6 +80,7 @@
     "@vitejs/plugin-rsc": "^0.5.28",
     "cli-progress": "^3.12.0",
     "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "jsdom": "^29.1.1",
@@ -102,5 +105,35 @@
   },
   "type": "module",
   "main": "electron/main.js",
-  "description": "NouGenNews: topic news reader (Electron) with the Next.js feed pipeline"
+  "description": "NouGenNews: topic news reader (Electron) with the Next.js feed pipeline",
+  "productName": "NouGenNews",
+  "build": {
+    "appId": "com.nougenai.nougennews",
+    "productName": "NouGenNews",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "electron/assets/splash.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Who-Visions",
+        "repo": "NouGenNews"
+      }
+    ]
+  }
 }

@@ -10,6 +10,7 @@ let mainWindow = null;
 const primaryInstance = singleInstance(app, () => mainWindow);
 if (!primaryInstance) app.quit();
 const { fitWindowSize, FLOOR } = require("./window-size");
+const { placeWindow, loadState, trackWindow } = require("./window-place");
 const path = require("node:path");
 const { handlers, assistantOptions } = require("./handlers");
 const { serveAssistantPort } = require("./assistant-port");
@@ -35,13 +36,15 @@ function isAppFrame(frame) {
 }
 
 function createWindow(splash) {
-  const size = fitWindowSize(screen.getPrimaryDisplay().workAreaSize);
+  // Last position on the display it was on, or centred on the cursor's display and sized to fit (window-place.js).
+  const userDir = app.getPath("userData");
+  const place = placeWindow({ saved: loadState(userDir), screen });
   const win = new BrowserWindow({
-    width: size.width,
-    height: size.height,
+    ...place.bounds,
     // The same floor the fit uses, enforced by the window: a resize cannot shrink it below a usable layout.
     minWidth: FLOOR.width,
     minHeight: FLOOR.height,
+    show: false,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
     icon: loadAppIcon({ nativeImage, platform: process.platform }),
@@ -53,6 +56,10 @@ function createWindow(splash) {
       webviewTag: true,
     },
   });
+  // attachSplash shows the window when it is ready (with its own safety timeout). maximize() on a hidden window
+  // would show it early on Windows, so a restored maximized state is applied once it is shown.
+  if (place.maximized) win.once("show", () => win.maximize());
+  trackWindow({ win, screen, userDir });
   require("./zoom").attachZoom(win);
   // No pop-ups, ever: links open in the in-app sidebar.
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

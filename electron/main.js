@@ -22,10 +22,24 @@ function isAppFrame(frame) {
   return DEV_URL ? frame.url.startsWith(DEV_URL) : frame.url.startsWith("file:");
 }
 
+// Preferred size, shrunk to fit the work area of the display under the cursor (small laptops, scaled screens).
+const PREFERRED = { width: 1440, height: 900 };
+function fitToDisplay() {
+  const { screen } = require("electron");
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const width = Math.min(PREFERRED.width, area.width);
+  const height = Math.min(PREFERRED.height, area.height);
+  return {
+    width,
+    height,
+    x: Math.round(area.x + (area.width - width) / 2),
+    y: Math.round(area.y + (area.height - height) / 2),
+  };
+}
+
 function createWindow(splash) {
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    ...fitToDisplay(),
     show: false,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
@@ -70,7 +84,8 @@ app.whenReady().then(() => {
   require("./keys").applySaved({ userDir: app.getPath("userData"), crypt: safeStorage });
   ipcMain.handle("cmd", (e, cmd, args) => {
     // Key commands answer only the app's own top-level page.
-    if (String(cmd).startsWith("keys_") && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
+    const appOnly = String(cmd).startsWith("keys_") || cmd === "open_external" || cmd === "archive_reveal";
+    if (appOnly && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
     const fn = Object.prototype.hasOwnProperty.call(handlers, cmd) ? handlers[cmd] : null;
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);

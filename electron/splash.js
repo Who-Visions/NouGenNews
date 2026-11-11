@@ -10,9 +10,14 @@ function showSplash() {
   if (typeof ImageView !== "function") return null;
   const image = nativeImage.createFromPath(path.join(__dirname, "assets", "splash.png"));
   if (image.isEmpty()) return null;
+  // Center on the display under the cursor, where the main window will open.
+  const { screen } = require("electron");
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const win = new BaseWindow({
     width: SIZE,
     height: SIZE,
+    x: Math.round(area.x + (area.width - SIZE) / 2),
+    y: Math.round(area.y + (area.height - SIZE) / 2),
     frame: false,
     resizable: false,
     movable: false,

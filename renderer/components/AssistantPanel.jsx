@@ -33,8 +33,8 @@ export function stepLabel(s) {
   return "";
 }
 
-// A side panel that answers questions about the wire and the open story (electron/assistant.js: gemma4:31b on Ollama
-// Cloud, the resident local model as fallback). It says which model answered and shows errors as they are.
+// A side panel that answers questions about the wire and the open story (electron/assistant.js: Nemotron hosted by
+// NVIDIA, the resident local model as fallback). It says which model answered and shows errors as they are.
 export function AssistantPanel({ articles, current, onClose }) {
   const [turns, setTurns] = useState([]);
   const [text, setText] = useState("");

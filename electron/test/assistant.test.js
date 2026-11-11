@@ -1,17 +1,17 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { ask, chatRound, makeTools, KEY_NAMES } = require("../assistant");
+const { ask, chatRound, chatCloud, fromOpenAI, makeTools, KEY_NAMES, CLOUD_MODELS } = require("../assistant");
 
 const wire = [
   { id: "a1", title: "Star Trek's DeForest Kelley nearly unrecognizable on Gunsmoke", source: "TVLine", age: "21h", desc: "A look back", url: "https://x.test/a1" },
   { id: "a2", title: "SpaceX no longer needs NASA", source: "Ars Technica", age: "13h", desc: "Space agency", url: "" },
 ];
 
-const reply = (message, status = 200) => ({ ok: status === 200, status, json: async () => ({ message }) });
+// Both answer shapes: NVIDIA (OpenAI choices) for the cloud and Ollama's native message for the local model.
+const reply = (message, status = 200) => ({ ok: status === 200, status, json: async () => ({ message, choices: message ? [{ message, finish_reason: "stop" }] : [] }) });
 
-test("key names cover the generic key first and every account key", () => {
-  assert.equal(KEY_NAMES[0], "OLLAMACLOUD_API_KEY");
-  assert.ok(KEY_NAMES.length >= 15);
+test("the cloud is NVIDIA, keyed from the keymaker's NVIDIA_API_KEY", () => {
+  assert.deepEqual(KEY_NAMES, ["NVIDIA_API_KEY"]);
   assert.ok(KEY_NAMES.every((n) => /^[A-Z0-9_]{3,64}$/.test(n)));
 });
 
@@ -29,23 +29,45 @@ test("read_article strips tags and falls back to the description", async () => {
   assert.equal(await t.read_article({ id: "nope" }), "No such story id on the wire.");
 });
 
-test("a rate-limited key rotates to the next one, then the answer comes from the cloud model", async () => {
+test("a model the account lacks (404) or a busy one (429) moves to the next model; a refused key to the next key", async () => {
   const seen = [];
   const http = async (url, opts) => {
-    const auth = opts.headers.Authorization;
-    seen.push(`${url.split("/api")[0]}|${auth}`);
-    return auth === "Bearer k1" ? reply(null, 429) : reply({ role: "assistant", content: "ok" });
+    const auth = opts.headers.Authorization, model = JSON.parse(opts.body).model;
+    seen.push(`${auth}|${model}`);
+    if (auth === "Bearer k1") return reply(null, 401);
+    return model === CLOUD_MODELS[0] ? reply(null, 404) : reply({ role: "assistant", content: "ok" });
   };
   const r = await chatRound({ keys: ["k1", "k2"], http, messages: [] });
-  assert.equal(r.model, "gemma4:31b");
-  assert.deepEqual(seen, ["https://ollama.com|Bearer k1", "https://ollama.com|Bearer k2"]);
+  assert.equal(r.model, CLOUD_MODELS[1]);
+  assert.deepEqual(seen, [`Bearer k1|${CLOUD_MODELS[0]}`, `Bearer k2|${CLOUD_MODELS[0]}`, `Bearer k2|${CLOUD_MODELS[1]}`]);
+});
+
+test("NVIDIA gets OpenAI messages: string arguments, call ids, and tool results tied to them", async () => {
+  let body = null;
+  const http = async (url, opts) => { body = JSON.parse(opts.body); return reply({ role: "assistant", content: "done" }); };
+  await chatCloud({ key: "k", model: "m", http, messages: [
+    { role: "user", content: "q" },
+    { role: "assistant", content: "", tool_calls: [{ id: "call_9", function: { name: "search_wire", arguments: { query: "spacex" } } }] },
+    { role: "tool", tool_name: "search_wire", tool_call_id: "call_9", content: "[a2] SpaceX" },
+  ] });
+  assert.equal(body.messages[1].tool_calls[0].id, "call_9");
+  assert.equal(body.messages[1].tool_calls[0].type, "function");
+  assert.equal(body.messages[1].tool_calls[0].function.arguments, '{"query":"spacex"}');
+  assert.deepEqual(body.messages[2], { role: "tool", tool_call_id: "call_9", content: "[a2] SpaceX" });
+  const back = fromOpenAI({ content: "", tool_calls: [{ id: "c1", type: "function", function: { name: "read_article", arguments: '{"id":"a1"}' } }] });
+  assert.deepEqual(back.tool_calls[0], { id: "c1", function: { name: "read_article", arguments: { id: "a1" } } });
+});
+
+test("a reply cut off mid tool call is never run", async () => {
+  const http = async () => ({ ok: true, status: 200, json: async () => ({ choices: [{ finish_reason: "length", message: { content: "", tool_calls: [{ id: "x", function: { name: "brief_topic", arguments: '{"topic":' } }] } }] }) });
+  await assert.rejects(chatCloud({ key: "k", model: "m", http, messages: [] }), /cut off/);
 });
 
 test("with no working key the local model answers, and with nothing up the error names both", async () => {
   const local = async (url) => (url.startsWith("http://localhost") ? reply({ role: "assistant", content: "local" }) : reply(null, 401));
   const r = await chatRound({ keys: ["k1"], http: local, messages: [] });
   assert.equal(r.model, "gemma4:e2b-qat");
-  await assert.rejects(chatRound({ keys: ["k1"], http: async () => reply(null, 503), messages: [] }), /No model answered \(cloud: Ollama HTTP 503; local: Ollama HTTP 503\)/);
+  await assert.rejects(chatRound({ keys: ["k1"], http: async () => reply(null, 503), messages: [] }), /No model answered \(cloud: NVIDIA HTTP 503; local: Ollama HTTP 503\)/);
 });
 
 test("a malformed request is not retried on every key", async () => {
@@ -67,12 +89,14 @@ test("the loop runs the model's tool call, echoes the result, and returns the fi
   };
   const out = await ask({ question: "what about Gunsmoke?", wire, keys: ["k1"], http });
   assert.equal(out.answer, "TVLine, 21h: Kelley on Gunsmoke.");
-  assert.equal(out.model, "gemma4:31b");
+  assert.equal(out.model, CLOUD_MODELS[0]);
   const second = sent[1];
   assert.equal(second.at(-1).role, "tool");
-  assert.equal(second.at(-1).tool_name, "search_wire");
-  assert.match(second.at(-1).content, /\[a1\]/);
+  // OpenAI shape on the wire: the result is tied to the call by id (a call without one gets call_0).
   assert.equal(second.at(-2).role, "assistant");
+  assert.equal(second.at(-2).tool_calls[0].function.name, "search_wire");
+  assert.equal(second.at(-1).tool_call_id, second.at(-2).tool_calls[0].id);
+  assert.match(second.at(-1).content, /\[a1\]/);
 });
 
 test("an unknown tool is answered, not thrown", async () => {

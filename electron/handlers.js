@@ -104,7 +104,7 @@ const handlers = {
     shell.openExternal(url);
     return true;
   },
-  // The assistant (electron/assistant.js): gemma4:31b on Ollama Cloud with the keymaker's keys, local model as fallback.
+  // The assistant (electron/assistant.js): NVIDIA-hosted Nemotron with the keymaker's NVIDIA_API_KEY, local model as fallback.
   // The renderer sends the wire it is showing; keys are read here once and never go back to the page.
   assistant_ask: async (args = {}) => require("./assistant").ask(assistantOptions(args)),
 };

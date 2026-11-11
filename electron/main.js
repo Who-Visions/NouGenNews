@@ -59,6 +59,11 @@ app.whenReady().then(() => {
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);
   });
+  require("./updater").setupAutoUpdate({
+    app,
+    autoUpdater: require("electron").autoUpdater,
+    log: (msg) => console.log(`[updater] ${msg}`),
+  });
   require("./ttsport").attachTtsPort({
     ipcMain,
     isAppFrame,

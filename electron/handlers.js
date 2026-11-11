@@ -98,6 +98,22 @@ const handlers = {
     const out = require("./archive").appArchive(app).exportTo(path.join(app.getPath("documents"), "NouGenNews Archive"));
     return { file: out.file, count: out.count };
   },
+  // Shows the archive export folder in Explorer. The path is the app's own, never one the page supplies.
+  archive_reveal: () => {
+    const { shell } = require("electron");
+    const dir = path.join(app.getPath("documents"), "NouGenNews Archive");
+    return shell.openPath(dir).then((err) => !err);
+  },
+  // "Open in browser" for the article the reader is viewing. main.js only answers this for the app's own page
+  // (like keys_*); only http(s) URLs are accepted, and the length is capped.
+  open_external: (args = {}) => {
+    const url = String(args.url || "");
+    if (url.length > 2048 || !/^https?:\/\//i.test(url)) return false;
+    let parsed;
+    try { parsed = new URL(url); } catch { return false; }
+    require("electron").shell.openExternal(parsed.href);
+    return true;
+  },
   // Opens the NouGen Shards page in the reader's browser: only the address upgradeInfo names, nothing the page supplies.
   archive_open_upgrade: () => {
     const { shell } = require("electron");

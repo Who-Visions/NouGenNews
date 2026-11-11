@@ -2,6 +2,19 @@ const { app, BrowserWindow, ipcMain, safeStorage, screen } = require("electron")
 const { fitWindowSize } = require("./window-size");
 const path = require("node:path");
 const { handlers } = require("./handlers");
+const { showSplash, attachSplash } = require("./splash");
+const { initAutoUpdater } = require("./updater");
+const { systemPreferences } = require("electron");
+
+// Windows/macOS accent color for the renderer theme: window.<bridge>.cmd("system_accent").
+handlers.system_accent = () => {
+  try {
+    const hex = systemPreferences.getAccentColor(); // "RRGGBBAA"
+    return hex ? `#${hex.slice(0, 6)}` : null;
+  } catch {
+    return null; // not available on this platform
+  }
+};
 
 const DEV_URL = process.env.NOUGENNEWS_DEV_URL;
 
@@ -10,7 +23,7 @@ function isAppFrame(frame) {
   return DEV_URL ? frame.url.startsWith(DEV_URL) : frame.url.startsWith("file:");
 }
 
-function createWindow() {
+function createWindow(splash) {
   const size = fitWindowSize(screen.getPrimaryDisplay().workAreaSize);
   const win = new BrowserWindow({
     width: size.width,
@@ -30,6 +43,7 @@ function createWindow() {
   win.webContents.on("will-navigate", (e, url) => {
     if (!DEV_URL || !url.startsWith(DEV_URL)) e.preventDefault();
   });
+  attachSplash(win, splash);
   if (DEV_URL) win.loadURL(DEV_URL);
   else win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
 }
@@ -58,20 +72,23 @@ app.on("web-contents-created", (_e, contents) => {
 });
 
 app.whenReady().then(() => {
+  const splash = showSplash();
   require("./keys").applySaved({ userDir: app.getPath("userData"), crypt: safeStorage });
   ipcMain.handle("cmd", (e, cmd, args) => {
     // Key commands answer only the app's own top-level page.
-    if (String(cmd).startsWith("keys_") && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
+    const appOnly = String(cmd).startsWith("keys_") || cmd === "open_external" || cmd === "archive_reveal";
+    if (appOnly && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
     const fn = Object.prototype.hasOwnProperty.call(handlers, cmd) ? handlers[cmd] : null;
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);
   });
+  createWindow(splash);
+  initAutoUpdater();
   require("./ttsport").attachTtsPort({
     ipcMain,
     isAppFrame,
     synth: (args) => require("./kokoro").kokoroSynthFast(args),
   });
-  createWindow();
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

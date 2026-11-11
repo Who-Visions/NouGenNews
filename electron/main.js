@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, safeStorage, screen, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, screen, dialog, session } = require("electron");
+const { lockAllSessions } = require("./permissions");
 const { setIdentity, singleInstance, guardRenderer, withTaskbarProgress } = require("./window-life");
 
 // Same identity as the installer (package.json build.appId) so Windows attributes notifications to the app.
@@ -88,6 +89,8 @@ app.on("web-contents-created", (_e, contents) => {
 
 app.whenReady().then(() => {
   if (!primaryInstance) return;
+  // Deny camera, mic, location, notifications, devices... to all web content, sidebar sites included (permissions.js).
+  lockAllSessions({ app, session, log: (m) => console.log(`[permissions] ${m}`) });
   // Long archive jobs show taskbar progress until they finish.
   for (const cmd of ["archive_promote", "archive_export"]) {
     const run = handlers[cmd];

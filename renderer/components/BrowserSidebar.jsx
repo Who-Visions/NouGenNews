@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./BrowserSidebar.css";
+import { invoke } from "../lib/bridge.js";
 
 // Links open here, beside the news, never in an outside window. News code asks with
 // window.dispatchEvent(new CustomEvent("nn:browse", { detail: { url } })).
@@ -47,6 +48,7 @@ export function BrowserSidebar() {
       <header className="browser-sidebar__bar">
         <button type="button" onClick={() => viewRef.current?.goBack?.()} aria-label="Back">&#8592;</button>
         <span className="browser-sidebar__url" title={shown || url}>{shown || url}</span>
+        <button type="button" onClick={() => invoke("open_external", { url: shown || url }).catch(() => {})} aria-label="Open in your browser" title="Open in your browser">&#8599;</button>
         <button type="button" onClick={() => setUrl(null)} aria-label="Close browser">Close<kbd>Esc</kbd></button>
       </header>
       <webview ref={viewRef} className="browser-sidebar__view" src={url} partition="persist:nn-browse" />

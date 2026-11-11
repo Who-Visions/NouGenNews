@@ -51,6 +51,21 @@ function createWindow(splash) {
       webviewTag: true,
     },
   });
+  // If the window's display is unplugged or rescaled away, bring it back onto a visible display.
+  const { screen } = require("electron");
+  const keepOnScreen = () => {
+    if (win.isDestroyed()) return;
+    const b = win.getBounds();
+    const visible = screen.getAllDisplays().some(({ workArea: a }) =>
+      b.x < a.x + a.width && b.x + b.width > a.x && b.y < a.y + a.height && b.y + b.height > a.y);
+    if (!visible) win.setBounds(fitToDisplay());
+  };
+  screen.on("display-removed", keepOnScreen);
+  screen.on("display-metrics-changed", keepOnScreen);
+  win.on("closed", () => {
+    screen.removeListener("display-removed", keepOnScreen);
+    screen.removeListener("display-metrics-changed", keepOnScreen);
+  });
   // No pop-ups, ever: links open in the in-app sidebar.
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (e, url) => {

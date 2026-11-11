@@ -88,6 +88,9 @@ export function ShardsLitePanel({ onClose }) {
           ) : null}
           <button type="button" className="sl__btn" onClick={exportNow} disabled={busy || !stats || !stats.count}>Export my archive</button>
           {note ? <p className="sl__note" role="status">{note}</p> : null}
+          {note.startsWith("Saved ") ? (
+            <button type="button" className="sl__btn" onClick={() => invoke("archive_reveal").catch(() => {})}>Show folder</button>
+          ) : null}
         </section>
 
         {info ? (

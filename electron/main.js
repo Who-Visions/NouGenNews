@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, safeStorage, autoUpdater, Notification } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, autoUpdater, Notification, nativeImage } = require("electron");
 const path = require("node:path");
 const { handlers } = require("./handlers");
 const { handleSquirrelEvent, createUpdater } = require("./updater");
+const { loadAppIcon } = require("./appicon");
 
 // Squirrel.Windows install/update/uninstall runs: make or remove the shortcuts and quit before any window opens.
 const squirrelQuitting = handleSquirrelEvent({
@@ -22,6 +23,7 @@ function createWindow() {
     height: 900,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
+    icon: loadAppIcon({ nativeImage, platform: process.platform }),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -74,7 +76,7 @@ app.whenReady().then(() => {
     log: (m) => console.log(`[update] ${m}`),
     onReady: (name) => {
       if (!Notification.isSupported()) return;
-      const n = new Notification({ title: "NouGenNews update ready",
+      const n = new Notification({ title: "NouGenNews update ready", icon: loadAppIcon({ nativeImage, platform: process.platform }),
         body: `${name || "A new version"} is downloaded. Click to restart now, or it installs the next time you open the app.` });
       n.on("click", () => updater.restart());
       n.show();

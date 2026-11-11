@@ -26,6 +26,7 @@ module.exports = {
     name: "NouGenNews",
     executableName: "NouGenNews",
     asar: true,
+    icon: path.join(__dirname, "electron", "assets", "icon"),   // packager adds .ico on Windows
     derefSymlinks: true,                    // nougen-shards-lite is a file: dependency (a link to a sibling folder)
     ignore: (p) => !keep(p),
     win32metadata: { CompanyName: "Who Visions", ProductName: "NouGenNews", FileDescription: "NouGenNews" },
@@ -39,6 +40,9 @@ module.exports = {
         authors: "Who Visions",
         description: "NouGenNews desktop app",
         setupExe: "NouGenNewsSetup.exe",
+        setupIcon: path.join(__dirname, "electron", "assets", "icon.ico"),
+        // Apps & Features icon: Squirrel fetches it by URL (resolves once the icon is on main).
+        iconUrl: "https://raw.githubusercontent.com/Who-Visions/NouGenNews/main/electron/assets/icon.ico",
         noMsi: true,
       },
     },

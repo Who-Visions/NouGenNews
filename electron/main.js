@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, systemPreferences } = require("electron");
 const path = require("node:path");
 const { handlers, assistantOptions } = require("./handlers");
 const { serveAssistantPort } = require("./assistant-port");
@@ -73,6 +73,14 @@ app.whenReady().then(() => {
     if (!isAppFrame(e.senderFrame)) { port.close(); return; }
     serveAssistantPort(port, assistantOptions(args && typeof args === "object" ? args : {}), { ask: require("./assistant").ask });
   });
+  // The reader changed the Windows accent color: pages that follow it repaint (Settings > Use the Windows accent color).
+  if (typeof systemPreferences.on === "function" && process.platform !== "linux") {
+    systemPreferences.on("accent-color-changed", (_e, color) => {
+      const osui = require("./osui");
+      const hex = osui.readableOnDark(osui.accentHex(color));
+      if (hex) for (const w of BrowserWindow.getAllWindows()) w.webContents.send("os-accent", hex);
+    });
+  }
   createWindow();
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });

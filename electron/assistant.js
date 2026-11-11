@@ -205,7 +205,11 @@ async function chatRound(opts) {
 }
 
 // The assistant loop: the model asks for tools, we run them, until it answers in text.
-async function ask({ question, wire = [], current = null, history = [], keys = [], http, readArticle = async () => ({}), recall, archive, weather, brief, signal }) {
+// onStep (optional) hears progress as it happens, for a streaming reply over a MessagePort (electron/assistant-port.js):
+// { type: "thinking", round } before each model round, { type: "tool", tool, detail } before each tool and
+// { type: "tool_done", tool, ms, error } after it. A listener that throws is ignored; it can never break the answer.
+async function ask({ question, wire = [], current = null, history = [], keys = [], http, readArticle = async () => ({}), recall, archive, weather, brief, signal, onStep }) {
+  const step = (s) => { try { if (onStep) onStep(s); } catch (_) { /* a closed port must not cost the answer */ } };
   const tools = makeTools({ wire, readArticle, recall, archive, weather, brief });
   const open = current && current.title ? `The reader has this story open: "${current.title}" (${current.source || "unknown"}).\n${String(current.text || "").slice(0, 3000)}` : "";
   const messages = [
@@ -215,6 +219,7 @@ async function ask({ question, wire = [], current = null, history = [], keys = [
   ];
   let usedModel = "";
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
+    step({ type: "thinking", round: round + 1 });
     const { data, model } = await chatRound({ keys, http, signal, messages });
     usedModel = model;
     const msg = data.message;
@@ -226,7 +231,12 @@ async function ask({ question, wire = [], current = null, history = [], keys = [
       const name = c.function && c.function.name;
       const args = (c.function && c.function.arguments) || {};
       const fn = Object.prototype.hasOwnProperty.call(tools, name) ? tools[name] : null;
-      const out = fn ? await Promise.resolve(fn(args)).catch((e) => `Tool error: ${e.message}`) : `Unknown tool: ${name}`;
+      const detail = String(args.query || args.topic || args.id || args.place || args.city || "").slice(0, 120);
+      step({ type: "tool", tool: name, detail });
+      const t0 = Date.now();
+      let failed = !fn;
+      const out = fn ? await Promise.resolve(fn(args)).catch((e) => { failed = true; return `Tool error: ${e.message}`; }) : `Unknown tool: ${name}`;
+      step({ type: "tool_done", tool: name, ms: Date.now() - t0, error: failed });
       messages.push({ role: "tool", tool_name: name, content: String(out) });
     }
   }

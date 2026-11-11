@@ -106,7 +106,12 @@ const handlers = {
   },
   // The assistant (electron/assistant.js): gemma4:31b on Ollama Cloud with the keymaker's keys, local model as fallback.
   // The renderer sends the wire it is showing; keys are read here once and never go back to the page.
-  assistant_ask: async (args = {}) => {
+  assistant_ask: async (args = {}) => require("./assistant").ask(assistantOptions(args)),
+};
+
+// The page's question, cleaned and capped, plus the main-process tools and keys (which never go back to the page).
+// Shared by invoke("assistant_ask") and the streaming MessagePort path (electron/assistant-port.js).
+function assistantOptions(args = {}) {
     const assistant = require("./assistant");
     if (!assistantKeys) {
       const found = require("../scripts/resolve-key.cjs").readSecrets(assistant.KEY_NAMES);
@@ -117,7 +122,7 @@ const handlers = {
       age: String(s.age || "").slice(0, 30), desc: String(s.desc || "").slice(0, 400), url: String(s.url || "").slice(0, 600),
       coverage: Math.min(Math.max(Number(s.coverage) || 1, 1), 100000), ts: Number(s.ts) || 0,
     }));
-    return assistant.ask({
+    return {
       question: String(args.question || ""),
       wire,
       current: args.current && typeof args.current === "object" ? { title: String(args.current.title || "").slice(0, 300), source: String(args.current.source || "").slice(0, 80), text: String(args.current.text || "").slice(0, 3000) } : null,
@@ -138,8 +143,10 @@ const handlers = {
       },
       // The reader's home place (sent by the page) unless the model names another city.
       weather: (place) => require("./weather").weatherReport(place ? { city: place, region: "" } : { city: String((args.home && args.home.city) || "").slice(0, 80), region: String((args.home && args.home.region) || "").slice(0, 80) }),
-    });
-  },
+    };
+}
+
+const moreHandlers = {
   // The whole story behind a headline, with the videos the page carries (electron/article.js).
   article_fetch: (args = {}) => require("./article").articleFetch(args.url || ""),
   // Feeds are fetched here because a page cannot read another site's feed (CORS). Public https only.
@@ -154,4 +161,6 @@ const handlers = {
   },
 };
 
-module.exports = { handlers };
+Object.assign(handlers, moreHandlers);
+
+module.exports = { handlers, assistantOptions };

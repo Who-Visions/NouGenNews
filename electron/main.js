@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
 const path = require("node:path");
-const { handlers } = require("./handlers");
+const { handlers, assistantOptions } = require("./handlers");
+const { serveAssistantPort } = require("./assistant-port");
 
 const DEV_URL = process.env.NOUGENNEWS_DEV_URL;
 
@@ -63,6 +64,14 @@ app.whenReady().then(() => {
     ipcMain,
     isAppFrame,
     synth: (args) => require("./kokoro").kokoroSynthFast(args),
+  });
+  // Streaming assistant: the page sends one end of a MessageChannel with its question, and the answer streams back
+  // over it step by step (electron/assistant-port.js). Only the app's own page may open one.
+  ipcMain.on("assistant_port", (e, args) => {
+    const [port] = e.ports || [];
+    if (!port) return;
+    if (!isAppFrame(e.senderFrame)) { port.close(); return; }
+    serveAssistantPort(port, assistantOptions(args && typeof args === "object" ? args : {}), { ask: require("./assistant").ask });
   });
   createWindow();
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });

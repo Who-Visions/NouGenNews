@@ -142,3 +142,27 @@ test("press-release wires never lead the 'biggest stories' list, however many no
   assert.equal(lines.length, 1);
   assert.match(lines[0], /^\[r1\]/);
 });
+
+test("ask reports each round and tool as it goes, so a port can stream progress", async () => {
+  const steps = [];
+  let n = 0;
+  const http = async () => {
+    n += 1;
+    return n === 1
+      ? reply({ role: "assistant", content: "", tool_calls: [{ function: { name: "search_wire", arguments: { query: "gunsmoke" } } }] })
+      : reply({ role: "assistant", content: "Kelley guest-starred on Gunsmoke (TVLine, 21h)." });
+  };
+  const r = await ask({ question: "Kelley?", wire, keys: ["k1"], http, onStep: (s) => steps.push(s) });
+  assert.match(r.answer, /Gunsmoke/);
+  assert.deepEqual(steps.map((s) => s.type), ["thinking", "tool", "tool_done", "thinking"]);
+  assert.equal(steps[1].tool, "search_wire");
+  assert.equal(steps[1].detail, "gunsmoke");
+  assert.equal(typeof steps[2].ms, "number");
+  assert.equal(steps[2].error, false);
+});
+
+test("a throwing onStep never breaks the answer", async () => {
+  const http = async () => reply({ role: "assistant", content: "ok" });
+  const r = await ask({ question: "q", wire, keys: ["k1"], http, onStep: () => { throw new Error("listener gone"); } });
+  assert.equal(r.answer, "ok");
+});

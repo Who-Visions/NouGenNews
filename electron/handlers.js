@@ -17,12 +17,20 @@ const handlers = {
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
   // A desktop notification for a red alert. Skipped when the window is already in front (the banner is visible).
-  notify: (args = {}) => {
-    const { Notification, BrowserWindow } = require("electron");
+  // A breaking-news notification, with the story's picture when the page sends one (electron/osui.js, nativeImage).
+  notify: async (args = {}) => {
+    const { Notification, BrowserWindow, nativeImage } = require("electron");
     const w = BrowserWindow.getAllWindows()[0];
     if (!Notification.isSupported() || (w && w.isFocused())) return false;
-    new Notification({ title: String(args.title || "").slice(0, 80), body: String(args.body || "").slice(0, 200), urgency: "critical" }).show();
+    const icon = await require("./osui").notificationIcon(args.image, { http: fetchSafe, nativeImage });
+    new Notification({ title: String(args.title || "").slice(0, 80), body: String(args.body || "").slice(0, 200), urgency: "critical", ...(icon ? { icon } : {}) }).show();
     return true;
+  },
+  // The Windows accent color as "#rrggbb", made readable on the dark UI; null where the system has none.
+  system_accent: () => {
+    const { systemPreferences } = require("electron");
+    const osui = require("./osui");
+    try { return osui.readableOnDark(osui.accentHex(systemPreferences.getAccentColor())); } catch (_) { return null; }
   },
   // Any registered API provider (electron/providers.js): cached on disk, capped, keyed from the environment.
   // YouTube channels (core/feeds.js "@youtube"): the latest videos of every channel in the list; no key needed.

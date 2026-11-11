@@ -57,6 +57,12 @@ function askStream(args, onEvent) {
 
 contextBridge.exposeInMainWorld("nougennews", {
   askStream,
+  // The Windows accent color changed; returns an unsubscribe function.
+  onOsAccent: (cb) => {
+    const f = (_e, hex) => { if (typeof hex === "string" && /^#[0-9a-f]{6}$/.test(hex)) cb(hex); };
+    ipcRenderer.on("os-accent", f);
+    return () => ipcRenderer.removeListener("os-accent", f);
+  },
   invoke: (cmd, args) => ipcRenderer.invoke("cmd", cmd, args || {}),
   ttsSynth: (text, voice) => new Promise((resolve, reject) => {
     const id = ++ttsSeq;

@@ -1013,7 +1013,7 @@ export function NewsView() {
     try { told = JSON.parse(localStorage.getItem("nn.alertsTold") || "[]"); } catch { /* none yet */ }
     if (told.includes(activeAlert.key)) return;
     try { localStorage.setItem("nn.alertsTold", JSON.stringify([activeAlert.key, ...told].slice(0, 60))); } catch { /* storage unavailable */ }
-    invoke("notify", { title: "RED ALERT \u2014 NouGenNews", body: activeAlert.headline }).catch(() => {});
+    invoke("notify", { title: "RED ALERT \u2014 NouGenNews", body: activeAlert.headline, image: activeAlert.story?.imageUrl || "" }).catch(() => {});
   }, [activeAlert?.key]);
   useEffect(() => { if (alertLead) setSelectedArticleId(alertLead.story.id); }, [alertLead?.key]);
   const dismissAlert = () => { if (activeAlert?.demo) setDemoAlert(null); else if (activeAlert) markSeen(activeAlert.key); };

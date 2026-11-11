@@ -18,15 +18,7 @@ const { showSplash, attachSplash } = require("./splash");
 const { initAutoUpdater } = require("./updater");
 const { systemPreferences } = require("electron");
 
-// Windows/macOS accent color for the renderer theme: window.<bridge>.cmd("system_accent").
-handlers.system_accent = () => {
-  try {
-    const hex = systemPreferences.getAccentColor(); // "RRGGBBAA"
-    return hex ? `#${hex.slice(0, 6)}` : null;
-  } catch {
-    return null; // not available on this platform
-  }
-};
+// system_accent lives in handlers.js (electron/osui.js): lightened for the dark UI, with live accent-color-changed.
 
 const DEV_URL = process.env.NOUGENNEWS_DEV_URL;
 
@@ -130,6 +122,14 @@ app.whenReady().then(() => {
     if (!isAppFrame(e.senderFrame)) { port.close(); return; }
     serveAssistantPort(port, assistantOptions(args && typeof args === "object" ? args : {}), { ask: require("./assistant").ask });
   });
+  // The reader changed the Windows accent color: pages that follow it repaint (Settings > Use the Windows accent color).
+  if (typeof systemPreferences.on === "function" && process.platform !== "linux") {
+    systemPreferences.on("accent-color-changed", (_e, color) => {
+      const osui = require("./osui");
+      const hex = osui.readableOnDark(osui.accentHex(color));
+      if (hex) for (const w of BrowserWindow.getAllWindows()) w.webContents.send("os-accent", hex);
+    });
+  }
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { NewsView } from "./components/NewsView.jsx";
 import { MenuBar } from "./components/MenuBar.jsx";
 import { BrowserSidebar } from "./components/BrowserSidebar.jsx";
+import { applyOsAccent } from "./lib/bridge.js";
 
 // The Weather tab loads on first use: the page, and the 3D globe behind it, cost nothing until it is opened.
 const WeatherPage = lazy(() => import("./components/WeatherPage.jsx").then((m) => ({ default: m.WeatherPage })));
@@ -28,6 +29,13 @@ export function App() {
     window.addEventListener("nn:view", on);
     window.addEventListener("nn:weather", on);
     return () => { window.removeEventListener("nn:view", on); window.removeEventListener("nn:weather", on); };
+  }, []);
+  // Settings > Use the Windows accent color.
+  useEffect(() => {
+    const read = () => { let on = false; try { on = localStorage.getItem("nn.osAccent") === "1"; } catch { /* storage unavailable */ } applyOsAccent(on); };
+    read();
+    window.addEventListener("nn:os-accent", read);
+    return () => { window.removeEventListener("nn:os-accent", read); applyOsAccent(false); };
   }, []);
   // The news view stays mounted (its feeds, archive and speech keep running) but ignores keys while another tab is in front.
   useEffect(() => {

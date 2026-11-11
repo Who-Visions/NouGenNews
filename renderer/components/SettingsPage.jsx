@@ -25,6 +25,23 @@ function KeyRow({ row, onRows }) {
   );
 }
 
+// Use the Windows accent color for the app's highlights (Electron systemPreferences); off by default.
+function AccentToggle() {
+  const [on, setOn] = useState(() => { try { return localStorage.getItem("nn.osAccent") === "1"; } catch { return false; } });
+  const flip = (e) => {
+    const next = e.target.checked;
+    setOn(next);
+    try { localStorage.setItem("nn.osAccent", next ? "1" : "0"); } catch { /* storage unavailable */ }
+    window.dispatchEvent(new CustomEvent("nn:os-accent"));
+  };
+  return (
+    <label className="settings__row settings__toggle">
+      <input type="checkbox" checked={on} onChange={flip} />
+      <span>Use the Windows accent color for highlights</span>
+    </label>
+  );
+}
+
 export function SettingsPage() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
@@ -33,6 +50,8 @@ export function SettingsPage() {
   return (
     <div className="settings">
       <h1>Settings</h1>
+      <h2>Appearance</h2>
+      <AccentToggle />
       <h2>API keys</h2>
       <p className="settings__note">Keys are encrypted on this computer and can't be read back here. A new key applies the next time that source refreshes.</p>
       {error ? <p className="settings__error" role="alert">{error}</p> : null}

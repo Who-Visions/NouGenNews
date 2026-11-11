@@ -1,43 +1,29 @@
-// open_external must only hand http(s) URLs of sane length to the OS shell.
 const test = require("node:test");
-const assert = require("node:assert");
-const Module = require("node:module");
+const assert = require("node:assert/strict");
+const { openExternalSafe } = require("../open-external");
 
-const opened = [];
-const fakeElectron = {
-  app: { getPath: () => require("node:os").tmpdir(), isPackaged: false },
-  shell: { openExternal: (u) => { opened.push(u); return Promise.resolve(); }, openPath: () => Promise.resolve("") },
-  safeStorage: {},
-};
-const realLoad = Module._load;
-Module._load = function (request, ...rest) {
-  if (request === "electron") return fakeElectron;
-  return realLoad.call(this, request, ...rest);
-};
-const { handlers } = require("../handlers");
-// handlers.js requires "electron" lazily inside each command, so the stub stays until the file ends.
-test.after(() => { Module._load = realLoad; });
+const shell = (fail) => ({ opened: [], openExternal(u) { this.opened.push(u); return fail ? Promise.reject(new Error("no browser")) : Promise.resolve(); } });
 
-test("open_external opens http and https URLs", () => {
-  opened.length = 0;
-  assert.strictEqual(handlers.open_external({ url: "https://example.com/a?b=1" }), true);
-  assert.strictEqual(handlers.open_external({ url: "http://example.com/" }), true);
-  assert.deepStrictEqual(opened, ["https://example.com/a?b=1", "http://example.com/"]);
+test("a successful launch answers true", async () => {
+  const s = shell(false);
+  assert.equal(await openExternalSafe("https://open-meteo.com/", s), true);
+  assert.deepEqual(s.opened, ["https://open-meteo.com/"]);
 });
 
-test("open_external rejects other schemes, junk and over-long URLs", () => {
-  opened.length = 0;
-  for (const url of [
-    "file:///C:/Windows/System32/calc.exe",
-    "javascript:alert(1)",
-    "ms-settings:",
-    "\\\\server\\share\\x.exe",
-    "",
-    undefined,
-    "https://example.com/" + "a".repeat(2100),
-  ]) {
-    assert.strictEqual(handlers.open_external({ url }), false, String(url).slice(0, 40));
-  }
-  assert.strictEqual(handlers.open_external(), false);
-  assert.deepStrictEqual(opened, []);
+test("a failed launch answers false instead of an unhandled rejection", async () => {
+  const s = shell(true);
+  assert.equal(await openExternalSafe("https://open-meteo.com/", s), false);
+});
+
+test("only https, never a page-shaped or oversized address", async () => {
+  const s = shell(false);
+  for (const u of ["http://x.com", "file:///C:/Windows/System32/calc.exe", "javascript:alert(1)", "ms-settings:", "https://a b.com", "", null,
+                   "https://x.com/" + "a".repeat(2100)])
+    assert.equal(await openExternalSafe(u, s), false, String(u).slice(0, 40));
+  assert.deepEqual(s.opened, []);
+});
+
+test("the weather credit command still only opens its fixed sites", async () => {
+  const { handlers } = require("../handlers");
+  assert.equal(await handlers.weather_open_credit({ which: "https://evil.example/" }), false);
 });

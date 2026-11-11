@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, screen } = require("electron");
+const { fitWindowSize } = require("./window-size");
 const path = require("node:path");
 const { handlers } = require("./handlers");
 const { showSplash, attachSplash } = require("./splash");
@@ -22,24 +23,20 @@ function isAppFrame(frame) {
   return DEV_URL ? frame.url.startsWith(DEV_URL) : frame.url.startsWith("file:");
 }
 
-// Preferred size, shrunk to fit the work area of the display under the cursor (small laptops, scaled screens).
-const PREFERRED = { width: 1440, height: 900 };
-function fitToDisplay() {
-  const { screen } = require("electron");
+// Size from fitWindowSize (window-size.js), placed centered on the display under the cursor.
+function boundsOnCursorDisplay() {
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const width = Math.min(PREFERRED.width, area.width);
-  const height = Math.min(PREFERRED.height, area.height);
+  const size = fitWindowSize(area);
   return {
-    width,
-    height,
-    x: Math.round(area.x + (area.width - width) / 2),
-    y: Math.round(area.y + (area.height - height) / 2),
+    ...size,
+    x: Math.round(area.x + Math.max(0, area.width - size.width) / 2),
+    y: Math.round(area.y + Math.max(0, area.height - size.height) / 2),
   };
 }
 
 function createWindow(splash) {
   const win = new BrowserWindow({
-    ...fitToDisplay(),
+    ...boundsOnCursorDisplay(),
     show: false,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
@@ -52,13 +49,12 @@ function createWindow(splash) {
     },
   });
   // If the window's display is unplugged or rescaled away, bring it back onto a visible display.
-  const { screen } = require("electron");
   const keepOnScreen = () => {
     if (win.isDestroyed()) return;
     const b = win.getBounds();
     const visible = screen.getAllDisplays().some(({ workArea: a }) =>
       b.x < a.x + a.width && b.x + b.width > a.x && b.y < a.y + a.height && b.y + b.height > a.y);
-    if (!visible) win.setBounds(fitToDisplay());
+    if (!visible) win.setBounds(boundsOnCursorDisplay());
   };
   screen.on("display-removed", keepOnScreen);
   screen.on("display-metrics-changed", keepOnScreen);
@@ -85,6 +81,11 @@ app.on("web-contents-created", (_e, contents) => {
     webPreferences.sandbox = true;
     if (!/^https?:\/\//i.test(String(params.src || ""))) event.preventDefault();
   });
+  // The attach check above runs once. Without this, a guest could navigate itself to file: or other non-web URLs
+  // after it attaches. Applies to guest pages only; the app's own page is not a webview.
+  contents.on("will-navigate", (event, url) => {
+    if (contents.getType() === "webview" && !/^https?:\/\//i.test(String(url || ""))) event.preventDefault();
+  });
   if (contents.getType() === "webview") {
     // A guest asking for a new window is denied; the link opens in place instead.
     contents.setWindowOpenHandler(({ url }) => {
@@ -107,6 +108,11 @@ app.whenReady().then(() => {
   });
   createWindow(splash);
   initAutoUpdater();
+  require("./ttsport").attachTtsPort({
+    ipcMain,
+    isAppFrame,
+    synth: (args) => require("./kokoro").kokoroSynthFast(args),
+  });
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

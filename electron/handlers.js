@@ -1,5 +1,6 @@
 // Commands the renderer can invoke (see preload.js). Each takes the args object and returns a value.
 const { fetchSafe } = require("./safe");
+const { openExternalSafe } = require("./open-external");
 const embed = require("./embed");
 const { app } = require("electron");
 const path = require("node:path");
@@ -30,6 +31,8 @@ const handlers = {
   tts_kokoro_synth: (args = {}) => require("./kokoro").kokoroSynthFast({ text: String(args.text || "").slice(0, 60000), voice: String(args.voice || "") }),
   // Loads the Kokoro model for the chosen voice so the first Listen starts fast.
   tts_kokoro_warm: (args = {}) => require("./kokoro").kokoroWarm(String(args.voice || "")),
+  // Read-aloud audio keeps the system awake while it plays (electron/keepawake.js).
+  keep_awake: (args = {}) => require("./keepawake").setKeepAwake(!!args.on),
   // A video written up as a news article by NouGen (transcript via nougentube, local Ollama writer, the video's source links).
   tube_article: (args = {}) => require("./tubenews").tubeArticle({
     id: String(args.id || ""), title: String(args.title || "").slice(0, 300), desc: String(args.desc || "").slice(0, 6000), channel: String(args.channel || "").slice(0, 100),
@@ -65,8 +68,7 @@ const handlers = {
   weather_open_credit: (args = {}) => {
     const url = { "open-meteo": "https://open-meteo.com/", weatherapi: "https://www.weatherapi.com/", rainviewer: "https://www.rainviewer.com/", cesium: "https://cesium.com/" }[String(args.which || "open-meteo")];
     if (!url) return false;
-    require("electron").shell.openExternal(url);
-    return true;
+    return openExternalSafe(url);
   },
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),
   // The reader's own place from Windows' location service, only when they ask (electron/geo.js).
@@ -103,22 +105,19 @@ const handlers = {
     return shell.openPath(dir).then((err) => !err);
   },
   // "Open in browser" for the article the reader is viewing. main.js only answers this for the app's own page
-  // (like keys_*); only http(s) URLs are accepted, and the length is capped.
+  // (like keys_*). The one page-supplied address the app opens, so it goes through openExternalSafe: https only,
+  // length-capped, normalised by URL, and a failed launch answers false.
   open_external: (args = {}) => {
-    const url = String(args.url || "");
-    if (url.length > 2048 || !/^https?:\/\//i.test(url)) return false;
-    let parsed;
-    try { parsed = new URL(url); } catch { return false; }
-    require("electron").shell.openExternal(parsed.href);
-    return true;
+    let href;
+    try { href = new URL(String(args.url || "")).href; } catch { return false; }
+    return require("./open-external").openExternalSafe(href);
   },
   // Opens the NouGen Shards page in the reader's browser: only the address upgradeInfo names, nothing the page supplies.
   archive_open_upgrade: () => {
     const { shell } = require("electron");
     const url = require("./archive").appArchive(app).upgradeInfo().url;
     if (!/^https:\/\//i.test(url)) return false;
-    shell.openExternal(url);
-    return true;
+    return openExternalSafe(url, shell);
   },
   // The assistant (electron/assistant.js): gemma4:31b on Ollama Cloud with the keymaker's keys, local model as fallback.
   // The renderer sends the wire it is showing; keys are read here once and never go back to the page.

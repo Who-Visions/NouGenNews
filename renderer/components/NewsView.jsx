@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "../lib/bridge.js";
+import { invoke, synthSpeech } from "../lib/bridge.js";
 import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, dropAdLabels, embedSocialPosts } from "../lib/articleHtml.js";
 import { TailCarousel } from "./TailCarousel.jsx";
 import { BreakingTicker } from "./BreakingTicker.jsx";
@@ -378,9 +378,8 @@ const inWire = (a) => !WIRE_OFF.has(a.feedId);
 
 // The WAV the Kokoro sidecar wrote for this text, as a playable object URL.
 async function kokoroSynth(text, voice) {
-  const b64 = await invoke("tts_kokoro_synth", { text, voice });
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+  const wav = await synthSpeech(text, voice);
+  return URL.createObjectURL(new Blob([wav], { type: "audio/wav" }));
 }
 
 // One copy of every story, however many sources carried it, then playable first and newest first.

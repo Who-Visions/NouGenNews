@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, screen } = require("electron");
+const { fitWindowSize } = require("./window-size");
 const path = require("node:path");
 const { handlers } = require("./handlers");
 const { showSplash, attachSplash } = require("./splash");
@@ -22,25 +23,11 @@ function isAppFrame(frame) {
   return DEV_URL ? frame.url.startsWith(DEV_URL) : frame.url.startsWith("file:");
 }
 
-// Preferred size, shrunk to fit the work area of the display under the cursor (small laptops, scaled screens).
-const PREFERRED = { width: 1440, height: 900 };
-function fitToDisplay() {
-  const { screen } = require("electron");
-  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const width = Math.min(PREFERRED.width, area.width);
-  const height = Math.min(PREFERRED.height, area.height);
-  return {
-    width,
-    height,
-    x: Math.round(area.x + (area.width - width) / 2),
-    y: Math.round(area.y + (area.height - height) / 2),
-  };
-}
-
 function createWindow(splash) {
+  const size = fitWindowSize(screen.getPrimaryDisplay().workAreaSize);
   const win = new BrowserWindow({
-    ...fitToDisplay(),
-    show: false,
+    width: size.width,
+    height: size.height,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
     webPreferences: {
@@ -70,6 +57,11 @@ app.on("web-contents-created", (_e, contents) => {
     webPreferences.sandbox = true;
     if (!/^https?:\/\//i.test(String(params.src || ""))) event.preventDefault();
   });
+  // The attach check above runs once. Without this, a guest could navigate itself to file: or other non-web URLs
+  // after it attaches. Applies to guest pages only; the app's own page is not a webview.
+  contents.on("will-navigate", (event, url) => {
+    if (contents.getType() === "webview" && !/^https?:\/\//i.test(String(url || ""))) event.preventDefault();
+  });
   if (contents.getType() === "webview") {
     // A guest asking for a new window is denied; the link opens in place instead.
     contents.setWindowOpenHandler(({ url }) => {
@@ -92,6 +84,11 @@ app.whenReady().then(() => {
   });
   createWindow(splash);
   initAutoUpdater();
+  require("./ttsport").attachTtsPort({
+    ipcMain,
+    isAppFrame,
+    synth: (args) => require("./kokoro").kokoroSynthFast(args),
+  });
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

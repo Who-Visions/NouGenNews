@@ -189,6 +189,23 @@
   .news-reader-bar { margin: 24px -16px -16px; padding: 10px 16px; }
 }
 
+/* Tablet and narrow windows: one pane at a time. The split's grid columns are inline, so these rules use !important.
+   The wire shows first; opening a story switches to the reader (mobileReading), and news-mobile-back returns. */
+@media (max-width: 900px) {
+  .news-split-pane { grid-template-columns: 1fr !important; gap: 0 !important; }
+  .news-view-container:not(.mobile-reading-active) .news-split-pane > :nth-child(2) { display: none !important; }
+  .news-view-container.mobile-reading-active .news-split-pane > :nth-child(1) { display: none !important; }
+  /* Keyboard shortcut hints do nothing for touch. */
+  .news-keys { display: none; }
+}
+
+/* Touch screens: targets at least 44px, the usual minimum for a finger. */
+@media (pointer: coarse) {
+  .news-view-container button,
+  .news-view-container [role="button"],
+  .news-view-container a.nh-btn { min-height: 44px; min-width: 44px; }
+}
+
 /* Hero headline: whole, wrapped, sized to its length (HeroTitle). */
 .nh-title--wrap { text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; font-family: var(--font-serif, "Newsreader Variable", Georgia, serif); line-height: 1.12; letter-spacing: -0.015em; }
 .nh-title--xl { font-size: clamp(28px, 3vw, 42px); }

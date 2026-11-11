@@ -1,7 +1,19 @@
-const { app, BrowserWindow, ipcMain, safeStorage, systemPreferences } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, screen, dialog, systemPreferences } = require("electron");
+const { setIdentity, singleInstance, guardRenderer, withTaskbarProgress } = require("./window-life");
+
+// Same identity as the installer (package.json build.appId) so Windows attributes notifications to the app.
+setIdentity(app, require("../package.json"));
+// One app: a second launch (shortcut, post-update relaunch) focuses the first window instead.
+let mainWindow = null;
+const primaryInstance = singleInstance(app, () => mainWindow);
+if (!primaryInstance) app.quit();
+const { fitWindowSize } = require("./window-size");
 const path = require("node:path");
 const { handlers, assistantOptions } = require("./handlers");
 const { serveAssistantPort } = require("./assistant-port");
+const { showSplash, attachSplash } = require("./splash");
+const { initAutoUpdater } = require("./updater");
+// system_accent lives in handlers.js (electron/osui.js): lightened for the dark UI, with live accent-color-changed.
 
 const DEV_URL = process.env.NOUGENNEWS_DEV_URL;
 
@@ -10,10 +22,11 @@ function isAppFrame(frame) {
   return DEV_URL ? frame.url.startsWith(DEV_URL) : frame.url.startsWith("file:");
 }
 
-function createWindow() {
+function createWindow(splash) {
+  const size = fitWindowSize(screen.getPrimaryDisplay().workAreaSize);
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: size.width,
+    height: size.height,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
     webPreferences: {
@@ -24,11 +37,15 @@ function createWindow() {
       webviewTag: true,
     },
   });
+  require("./zoom").attachZoom(win);
   // No pop-ups, ever: links open in the in-app sidebar.
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (e, url) => {
     if (!DEV_URL || !url.startsWith(DEV_URL)) e.preventDefault();
   });
+  mainWindow = win;
+  guardRenderer(win, { dialog, log: (m) => console.log(`[window] ${m}`) });
+  attachSplash(win, splash);
   if (DEV_URL) win.loadURL(DEV_URL);
   else win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
 }
@@ -42,6 +59,11 @@ app.on("web-contents-created", (_e, contents) => {
     webPreferences.sandbox = true;
     if (!/^https?:\/\//i.test(String(params.src || ""))) event.preventDefault();
   });
+  // The attach check above runs once. Without this, a guest could navigate itself to file: or other non-web URLs
+  // after it attaches. Applies to guest pages only; the app's own page is not a webview.
+  contents.on("will-navigate", (event, url) => {
+    if (contents.getType() === "webview" && !/^https?:\/\//i.test(String(url || ""))) event.preventDefault();
+  });
   if (contents.getType() === "webview") {
     // A guest asking for a new window is denied; the link opens in place instead.
     contents.setWindowOpenHandler(({ url }) => {
@@ -52,14 +74,24 @@ app.on("web-contents-created", (_e, contents) => {
 });
 
 app.whenReady().then(() => {
+  if (!primaryInstance) return;
+  // Long archive jobs show taskbar progress until they finish.
+  for (const cmd of ["archive_promote", "archive_export"]) {
+    const run = handlers[cmd];
+    if (typeof run === "function") handlers[cmd] = (args) => withTaskbarProgress(mainWindow, () => run(args));
+  }
+  const splash = showSplash();
   require("./keys").applySaved({ userDir: app.getPath("userData"), crypt: safeStorage });
   ipcMain.handle("cmd", (e, cmd, args) => {
     // Key commands answer only the app's own top-level page.
-    if (String(cmd).startsWith("keys_") && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
+    const appOnly = String(cmd).startsWith("keys_") || cmd === "open_external" || cmd === "archive_reveal";
+    if (appOnly && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
     const fn = Object.prototype.hasOwnProperty.call(handlers, cmd) ? handlers[cmd] : null;
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);
   });
+  createWindow(splash);
+  initAutoUpdater();
   require("./ttsport").attachTtsPort({
     ipcMain,
     isAppFrame,
@@ -81,7 +113,6 @@ app.whenReady().then(() => {
       if (hex) for (const w of BrowserWindow.getAllWindows()) w.webContents.send("os-accent", hex);
     });
   }
-  createWindow();
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

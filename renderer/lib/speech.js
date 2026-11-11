@@ -181,6 +181,12 @@ export async function summarizeWithOllama({ article, model, lang = "fr", host = 
 }
 
 const PREFS_KEY = "nougenflix.speech.v1";
+
+// Tell the main process whether read-aloud audio is playing, so the system stays awake during it. Never throws:
+// outside Electron there is no bridge and nothing to do.
+const keepAwake = (on) => {
+  try { window.nougennews?.invoke?.("keep_awake", { on }); } catch { /* not in Electron */ }
+};
 /** Kokoro voices offered in the News read-aloud picker (ids match bin/kokoro_sidecar.py). */
 export const KOKORO_VOICES = [
   { id: "af_heart", label: "American English · Heart (F)" },
@@ -280,6 +286,7 @@ export function createSpeechController({
     session += 1;
     abort?.abort();
     abort = null;
+    keepAwake(false);
     if (player) { try { player.pause(); } catch { /* ignore */ } }
     playerStop?.();
     try { synth?.cancel(); } catch { /* nothing playing */ }
@@ -288,12 +295,12 @@ export function createSpeechController({
 
   const pause = () => {
     if (state.status !== "speaking") return;
-    if (player) { try { player.pause(); emit({ status: "paused" }); } catch { /* ignore */ } return; }
+    if (player) { try { player.pause(); keepAwake(false); emit({ status: "paused" }); } catch { /* ignore */ } return; }
     try { synth.pause(); emit({ status: "paused" }); } catch { /* ignore */ }
   };
   const resume = () => {
     if (state.status !== "paused") return;
-    if (player) { player.play().then(() => emit({ status: "speaking" })).catch(() => { /* ignore */ }); return; }
+    if (player) { player.play().then(() => { keepAwake(true); emit({ status: "speaking" }); }).catch(() => { /* ignore */ }); return; }
     try { synth.resume(); emit({ status: "speaking" }); } catch { /* ignore */ }
   };
   const togglePause = () => (state.status === "paused" ? resume() : pause());
@@ -335,7 +342,7 @@ export function createSpeechController({
         const audio = new AudioCtor(url);
         audio.playbackRate = clampRate(prefs.rate);
         const finish = (r) => {
-          if (player === audio) { player = null; playerStop = null; }
+          if (player === audio) { player = null; playerStop = null; keepAwake(false); }
           try { URL.revokeObjectURL?.(url); } catch { /* ignore */ }
           resolve(r);
         };
@@ -343,7 +350,7 @@ export function createSpeechController({
         playerStop = () => finish("stopped");
         audio.onended = () => finish("done");
         audio.onerror = () => finish("failed");
-        audio.play().catch(() => finish("failed"));
+        audio.play().then(() => keepAwake(true)).catch(() => finish("failed"));
       });
       if (result === "stopped") return "stopped";
       if (result === "failed") return i === 0 ? "failed" : "done";
@@ -358,6 +365,7 @@ export function createSpeechController({
     if (!chunks.length || mine !== session) return resolve(false);
     const { voice, notice } = selectBestVoice(synth.getVoices?.() || [], lang, prefs.voices?.[lang]);
     emit({ status: "speaking", voiceName: voice?.name || "default voice", lang, notice });
+    keepAwake(true);
     let i = 0;
     const next = () => {
       if (mine !== session) return resolve(false);
@@ -379,7 +387,7 @@ export function createSpeechController({
       const result = await speakKokoro(text, opts);
       if (result !== "failed") return result === "done";
     }
-    return speakSystem(text, opts);
+    return speakSystem(text, opts).finally(() => keepAwake(false));
   };
 
   const speakArticle = async (article, prefs = DEFAULT_PREFS) => {

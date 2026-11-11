@@ -27,13 +27,34 @@ function zoomActionFor(input) {
   return null;
 }
 
-function attachZoom(win) {
-  win.webContents.on("before-input-event", (event, input) => {
+// `store` is optional: { load() -> level or null, save(level) }. With it the zoom survives a restart: the saved level
+// is applied when the page finishes loading, and every change is written back. A store that throws is ignored.
+function attachZoom(win, store = null) {
+  const wc = win.webContents;
+  if (store) {
+    wc.on("did-finish-load", () => {
+      try {
+        const saved = Number(store.load());
+        if (Number.isFinite(saved) && saved !== 0) wc.setZoomLevel(Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, saved)));
+      } catch { /* no saved zoom */ }
+    });
+  }
+  wc.on("before-input-event", (event, input) => {
     const action = zoomActionFor(input);
     if (!action) return;
     event.preventDefault();
-    win.webContents.setZoomLevel(zoomLevelFor(win.webContents.getZoomLevel(), action));
+    const level = zoomLevelFor(wc.getZoomLevel(), action);
+    wc.setZoomLevel(level);
+    if (store) { try { store.save(level); } catch { /* zoom still applies this session */ } }
   });
 }
 
-module.exports = { attachZoom, zoomLevelFor, zoomActionFor, MIN_LEVEL, MAX_LEVEL };
+// A zoom store backed by one small JSON file (the app passes a path under userData).
+function fileZoomStore(file, fs = require("node:fs")) {
+  return {
+    load() { try { return JSON.parse(fs.readFileSync(file, "utf8")).level; } catch { return null; } },
+    save(level) { fs.writeFileSync(file, JSON.stringify({ level })); },
+  };
+}
+
+module.exports = { attachZoom, fileZoomStore, zoomLevelFor, zoomActionFor, MIN_LEVEL, MAX_LEVEL };

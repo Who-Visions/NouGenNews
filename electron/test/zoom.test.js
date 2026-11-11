@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { attachZoom, zoomLevelFor, zoomActionFor, MIN_LEVEL, MAX_LEVEL } = require("../zoom");
+const { attachZoom, fileZoomStore, zoomLevelFor, zoomActionFor, MIN_LEVEL, MAX_LEVEL } = require("../zoom");
 
 test("zoom levels step by one and clamp to the range", () => {
   assert.equal(zoomLevelFor(0, "in"), 1);
@@ -49,4 +49,37 @@ test("attachZoom handles the key, prevents the default, and sets the clamped lev
   // A non-zoom key is left alone.
   listeners["before-input-event"](ev, { type: "keyDown", key: "a", control: true });
   assert.equal(prevented, 3);
+});
+
+test("with a store, the saved level is applied on load and each change is written back", () => {
+  const listeners = {};
+  let level = 0;
+  const saved = [];
+  const win = { webContents: { on: (n, fn) => { listeners[n] = fn; }, getZoomLevel: () => level, setZoomLevel: (l) => { level = l; } } };
+  attachZoom(win, { load: () => 2, save: (l) => saved.push(l) });
+  listeners["did-finish-load"]();
+  assert.equal(level, 2);
+  listeners["before-input-event"]({ preventDefault() {} }, { type: "keyDown", key: "=", control: true });
+  assert.equal(level, 3);
+  assert.deepEqual(saved, [3]);
+});
+
+test("a saved level outside the range is clamped, and a broken store never throws", () => {
+  const listeners = {};
+  let level = 0;
+  const win = { webContents: { on: (n, fn) => { listeners[n] = fn; }, getZoomLevel: () => level, setZoomLevel: (l) => { level = l; } } };
+  attachZoom(win, { load: () => 99, save: () => { throw new Error("disk full"); } });
+  listeners["did-finish-load"]();
+  assert.equal(level, MAX_LEVEL);
+  assert.doesNotThrow(() => listeners["before-input-event"]({ preventDefault() {} }, { type: "keyDown", key: "-", control: true }));
+  assert.equal(level, MAX_LEVEL - 1);
+});
+
+test("fileZoomStore round-trips a level and reads a missing file as null", () => {
+  const files = {};
+  const fs = { readFileSync: (f) => { if (!(f in files)) throw new Error("ENOENT"); return files[f]; }, writeFileSync: (f, d) => { files[f] = d; } };
+  const store = fileZoomStore("zoom.json", fs);
+  assert.equal(store.load(), null);
+  store.save(-2);
+  assert.equal(store.load(), -2);
 });

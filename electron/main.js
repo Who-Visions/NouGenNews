@@ -60,7 +60,10 @@ function createWindow(splash) {
   // would show it early on Windows, so a restored maximized state is applied once it is shown.
   if (place.maximized) win.once("show", () => win.maximize());
   trackWindow({ win, screen, userDir });
-  require("./zoom").attachZoom(win);
+  {
+    const zoom = require("./zoom");
+    zoom.attachZoom(win, zoom.fileZoomStore(path.join(app.getPath("userData"), "zoom.json")));
+  }
   // No pop-ups, ever: links open in the in-app sidebar.
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (e, url) => {

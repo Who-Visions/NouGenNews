@@ -23,6 +23,7 @@ function createWindow() {
       webviewTag: true,
     },
   });
+  require("./zoom").attachZoom(win);
   // No pop-ups, ever: links open in the in-app sidebar.
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (e, url) => {

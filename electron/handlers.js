@@ -1,5 +1,6 @@
 // Commands the renderer can invoke (see preload.js). Each takes the args object and returns a value.
 const { fetchSafe } = require("./safe");
+const { openExternalSafe } = require("./open-external");
 const embed = require("./embed");
 const { app } = require("electron");
 const path = require("node:path");
@@ -65,8 +66,7 @@ const handlers = {
   weather_open_credit: (args = {}) => {
     const url = { "open-meteo": "https://open-meteo.com/", weatherapi: "https://www.weatherapi.com/", rainviewer: "https://www.rainviewer.com/", cesium: "https://cesium.com/" }[String(args.which || "open-meteo")];
     if (!url) return false;
-    require("electron").shell.openExternal(url);
-    return true;
+    return openExternalSafe(url);
   },
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),
   // The reader's own place from Windows' location service, only when they ask (electron/geo.js).
@@ -101,8 +101,7 @@ const handlers = {
     const { shell } = require("electron");
     const url = require("./archive").appArchive(app).upgradeInfo().url;
     if (!/^https:\/\//i.test(url)) return false;
-    shell.openExternal(url);
-    return true;
+    return openExternalSafe(url, shell);
   },
   // The assistant (electron/assistant.js): gemma4:31b on Ollama Cloud with the keymaker's keys, local model as fallback.
   // The renderer sends the wire it is showing; keys are read here once and never go back to the page.

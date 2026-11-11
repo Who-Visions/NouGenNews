@@ -1,6 +1,19 @@
 const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
 const path = require("node:path");
 const { handlers } = require("./handlers");
+const { showSplash, attachSplash } = require("./splash");
+const { initAutoUpdater } = require("./updater");
+const { systemPreferences } = require("electron");
+
+// Windows/macOS accent color for the renderer theme: window.<bridge>.cmd("system_accent").
+handlers.system_accent = () => {
+  try {
+    const hex = systemPreferences.getAccentColor(); // "RRGGBBAA"
+    return hex ? `#${hex.slice(0, 6)}` : null;
+  } catch {
+    return null; // not available on this platform
+  }
+};
 
 const DEV_URL = process.env.NOUGENNEWS_DEV_URL;
 
@@ -9,10 +22,11 @@ function isAppFrame(frame) {
   return DEV_URL ? frame.url.startsWith(DEV_URL) : frame.url.startsWith("file:");
 }
 
-function createWindow() {
+function createWindow(splash) {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
+    show: false,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
     webPreferences: {
@@ -28,6 +42,7 @@ function createWindow() {
   win.webContents.on("will-navigate", (e, url) => {
     if (!DEV_URL || !url.startsWith(DEV_URL)) e.preventDefault();
   });
+  attachSplash(win, splash);
   if (DEV_URL) win.loadURL(DEV_URL);
   else win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
 }
@@ -51,6 +66,7 @@ app.on("web-contents-created", (_e, contents) => {
 });
 
 app.whenReady().then(() => {
+  const splash = showSplash();
   require("./keys").applySaved({ userDir: app.getPath("userData"), crypt: safeStorage });
   ipcMain.handle("cmd", (e, cmd, args) => {
     // Key commands answer only the app's own top-level page.
@@ -59,7 +75,8 @@ app.whenReady().then(() => {
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);
   });
-  createWindow();
+  createWindow(splash);
+  initAutoUpdater();
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

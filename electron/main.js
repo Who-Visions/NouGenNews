@@ -1,4 +1,12 @@
-const { app, BrowserWindow, ipcMain, safeStorage, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, screen, dialog } = require("electron");
+const { setIdentity, singleInstance, guardRenderer, withTaskbarProgress } = require("./window-life");
+
+// Same identity as the installer (package.json build.appId) so Windows attributes notifications to the app.
+setIdentity(app, require("../package.json"));
+// One app: a second launch (shortcut, post-update relaunch) focuses the first window instead.
+let mainWindow = null;
+const primaryInstance = singleInstance(app, () => mainWindow);
+if (!primaryInstance) app.quit();
 const { fitWindowSize } = require("./window-size");
 const path = require("node:path");
 const { handlers } = require("./handlers");
@@ -44,6 +52,8 @@ function createWindow(splash) {
   win.webContents.on("will-navigate", (e, url) => {
     if (!DEV_URL || !url.startsWith(DEV_URL)) e.preventDefault();
   });
+  mainWindow = win;
+  guardRenderer(win, { dialog, log: (m) => console.log(`[window] ${m}`) });
   attachSplash(win, splash);
   if (DEV_URL) win.loadURL(DEV_URL);
   else win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
@@ -73,6 +83,12 @@ app.on("web-contents-created", (_e, contents) => {
 });
 
 app.whenReady().then(() => {
+  if (!primaryInstance) return;
+  // Long archive jobs show taskbar progress until they finish.
+  for (const cmd of ["archive_promote", "archive_export"]) {
+    const run = handlers[cmd];
+    if (typeof run === "function") handlers[cmd] = (args) => withTaskbarProgress(mainWindow, () => run(args));
+  }
   const splash = showSplash();
   require("./keys").applySaved({ userDir: app.getPath("userData"), crypt: safeStorage });
   ipcMain.handle("cmd", (e, cmd, args) => {

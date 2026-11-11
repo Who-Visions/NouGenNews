@@ -41,6 +41,11 @@ app.on("web-contents-created", (_e, contents) => {
     webPreferences.sandbox = true;
     if (!/^https?:\/\//i.test(String(params.src || ""))) event.preventDefault();
   });
+  // The attach check above runs once. Without this, a guest could navigate itself to file: or other non-web URLs
+  // after it attaches. Applies to guest pages only; the app's own page is not a webview.
+  contents.on("will-navigate", (event, url) => {
+    if (contents.getType() === "webview" && !/^https?:\/\//i.test(String(url || ""))) event.preventDefault();
+  });
   if (contents.getType() === "webview") {
     // A guest asking for a new window is denied; the link opens in place instead.
     contents.setWindowOpenHandler(({ url }) => {

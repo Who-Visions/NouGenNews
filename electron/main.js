@@ -7,7 +7,7 @@ setIdentity(app, require("../package.json"));
 let mainWindow = null;
 const primaryInstance = singleInstance(app, () => mainWindow);
 if (!primaryInstance) app.quit();
-const { fitWindowSize } = require("./window-size");
+const { fitWindowSize, FLOOR } = require("./window-size");
 const path = require("node:path");
 const { handlers } = require("./handlers");
 const { showSplash, attachSplash } = require("./splash");
@@ -36,6 +36,9 @@ function createWindow(splash) {
   const win = new BrowserWindow({
     width: size.width,
     height: size.height,
+    // The same floor the fit uses, enforced by the window: a resize cannot shrink it below a usable layout.
+    minWidth: FLOOR.width,
+    minHeight: FLOOR.height,
     backgroundColor: "#000000",
     autoHideMenuBar: true,
     webPreferences: {

@@ -1,6 +1,13 @@
-const { app, BrowserWindow, ipcMain, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, safeStorage, autoUpdater, Notification } = require("electron");
 const path = require("node:path");
 const { handlers } = require("./handlers");
+const { handleSquirrelEvent, createUpdater } = require("./updater");
+
+// Squirrel.Windows install/update/uninstall runs: make or remove the shortcuts and quit before any window opens.
+const squirrelQuitting = handleSquirrelEvent({
+  argv: process.argv, platform: process.platform, execPath: process.execPath,
+  spawn: require("node:child_process").spawn, quit: () => app.quit(),
+});
 
 const DEV_URL = process.env.NOUGENNEWS_DEV_URL;
 
@@ -51,15 +58,32 @@ app.on("web-contents-created", (_e, contents) => {
 });
 
 app.whenReady().then(() => {
+  if (squirrelQuitting) return;
   require("./keys").applySaved({ userDir: app.getPath("userData"), crypt: safeStorage });
   ipcMain.handle("cmd", (e, cmd, args) => {
     // Key commands answer only the app's own top-level page.
-    if (String(cmd).startsWith("keys_") && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
+    if (/^(keys|update)_/.test(String(cmd)) && !isAppFrame(e.senderFrame)) throw new Error("Not allowed");
     const fn = Object.prototype.hasOwnProperty.call(handlers, cmd) ? handlers[cmd] : null;
     if (!fn) throw new Error(`Unknown command: ${cmd}`);
     return fn(args);
   });
   createWindow();
+  // Installed Windows builds update themselves from GitHub Releases (see updater.js); dev runs and other platforms skip.
+  const updater = createUpdater({
+    autoUpdater, app, platform: process.platform, argv: process.argv, env: process.env,
+    log: (m) => console.log(`[update] ${m}`),
+    onReady: (name) => {
+      if (!Notification.isSupported()) return;
+      const n = new Notification({ title: "NouGenNews update ready",
+        body: `${name || "A new version"} is downloaded. Click to restart now, or it installs the next time you open the app.` });
+      n.on("click", () => updater.restart());
+      n.show();
+    },
+  });
+  updater.start();
+  handlers.update_status = () => updater.status();
+  handlers.update_check = () => updater.check();
+  handlers.update_restart = () => updater.restart();
   app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

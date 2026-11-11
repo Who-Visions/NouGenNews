@@ -84,13 +84,14 @@ const handlers = {
   // Whether full NouGen Shards is on this machine (its vault folder, its local node on :4444).
   archive_detect_full: () => require("./archive").appArchive(app).detectFull(),
   // Copies the whole archive into the full NouGen Shards vault on this machine. Only when the reader presses Promote.
+  // The import can take minutes (Python importer, 10 min limit): keep the PC awake until it finishes, then release.
   archive_promote: () => {
     const archive = require("./archive");
     const { nougenDir, pickPython } = require("../scripts/resolve-key.cjs");
-    return archive.appArchive(app).promote({
+    return require("./keep-awake").whileAwake(require("electron").powerSaveBlocker, () => archive.appArchive(app).promote({
       dir: path.join(app.getPath("documents"), "NouGenNews Archive"),
       runImporter: archive.pythonImporter({ nougenDir: nougenDir(), pickPython }),
-    });
+    }));
   },
   archive_upgrade_info: () => require("./archive").appArchive(app).upgradeInfo(),
   // Writes the whole archive as a bundle full NouGen Shards imports, into Documents\NouGenNews Archive.

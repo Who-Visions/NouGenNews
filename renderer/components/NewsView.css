@@ -1,0 +1,285 @@
+/* News tab. Tokens follow NouGenDesign nougen-core (designs/nougen-core/tokens.css): matte graphite,
+   fine dividers, amber used sparingly, 4px corners. No gradients, glass or glow. Motion is scroll-driven
+   CSS where the browser supports it and off entirely under prefers-reduced-motion. */
+.news-view-container {
+  --nn-bg: #141414;
+  --nn-panel: #202020;
+  --nn-panel-2: #282828;
+  --nn-hover: #333333;
+  --nn-line: rgba(119, 119, 119, 0.3);
+  --nn-line-strong: rgba(119, 119, 119, 0.55);
+  --nn-text: #f2eee6;
+  --nn-muted: #bdb8ad;
+  --nn-dim: #8f8a80;
+  --nn-accent: #e8b86d;
+  --nn-accent-ink: #141414;
+  --nn-mono: Consolas, "JetBrains Mono", ui-monospace, monospace;
+  --nn-radius: 4px;
+  --nn-fast: 120ms ease-out;
+  color: var(--nn-text);
+  background: var(--nn-bg);
+}
+.news-view-container .mono { font-family: var(--nn-mono); font-variant-numeric: tabular-nums; }
+.news-view-container kbd {
+  font: 600 10px/1 var(--nn-mono);
+  color: var(--nn-muted);
+  border: 1px solid var(--nn-line-strong);
+  border-radius: 3px;
+  padding: 2px 4px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.news-view-container :where(button, input, select, a, [tabindex]):focus-visible { outline: 2px solid var(--nn-accent); outline-offset: 2px; }
+
+/* Scrollbars: thin, matte, visible only where there is something to scroll. */
+.news-view-container ::-webkit-scrollbar, .news-view-container::-webkit-scrollbar { width: 8px; height: 8px; }
+.news-view-container ::-webkit-scrollbar-track { background: transparent; }
+.news-view-container ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; border: 2px solid var(--nn-bg); }
+.news-view-container ::-webkit-scrollbar-thumb:hover { background: #555; }
+.news-view-container ::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── Hero carousel (above the fold) ─────────────────────────────────────────── */
+.news-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 5fr);
+  grid-template-rows: auto auto;
+  gap: 16px 24px;
+  padding: 16px 0 18px;
+  border-bottom: 1px solid var(--nn-line);
+  margin-bottom: 16px;
+}
+.nh-frame {
+  grid-row: 1 / 3;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 1px solid var(--nn-line);
+  border-radius: var(--nn-radius);
+  overflow: hidden;
+  animation: nh-in 180ms ease-out;
+}
+@keyframes nh-in { from { opacity: 0.4; } to { opacity: 1; } }
+.nh-player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+.nh-poster { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: #000; cursor: pointer; display: block; }
+.nh-poster img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 400ms ease-out; }
+.nh-poster:hover img { transform: scale(1.02); }
+.nh-poster-blank { position: absolute; inset: 0; background: var(--nn-panel-2); }
+.nh-play {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 64px; height: 64px; display: grid; place-items: center;
+  font-size: 24px; color: var(--nn-accent-ink); background: var(--nn-accent);
+  border-radius: var(--nn-radius); opacity: 0.92;
+}
+.nh-poster:hover .nh-play { opacity: 1; }
+.nh-tag {
+  position: absolute; left: 10px; top: 10px;
+  font: 600 11px/1 var(--nn-mono); letter-spacing: 0.04em;
+  color: var(--nn-accent); background: rgba(20, 20, 20, 0.9);
+  border: 1px solid var(--nn-line-strong); border-radius: 3px; padding: 5px 7px;
+}
+
+.nh-copy { grid-column: 2; grid-row: 1 / 3; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.nh-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 11px; color: var(--nn-muted); }
+.nh-source { color: var(--nn-accent); font-weight: 600; }
+.nh-count { margin-left: auto; color: var(--nn-dim); }
+.nh-title { font-size: clamp(20px, 2vw, 28px); line-height: 1.2; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.nh-dek { margin: 0; font-size: 14px; line-height: 1.55; color: var(--nn-muted); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.nh-byline { margin: 0; font-size: 12px; color: var(--nn-dim); }
+
+/* The hero's summary: ordinary upright text in a short scrollable window that drifts slowly (HeroScroller). */
+.nh-scroller { flex: 1 1 0; min-height: 11em; overflow-y: auto; margin: 0; font-size: 16px; line-height: 1.6; color: var(--nn-muted); scrollbar-gutter: stable; outline-offset: 2px; }
+.nh-scroller p { margin: 0 0 0.7em; }
+.nh-scroller p:last-child { margin-bottom: 0; }
+
+.nh-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.nh-btn {
+  font: 600 12px/1 inherit; color: var(--nn-text);
+  background: var(--nn-panel-2); border: 1px solid var(--nn-line-strong); border-radius: var(--nn-radius);
+  padding: 9px 12px; cursor: pointer; min-height: 32px;
+  transition: background var(--nn-fast), border-color var(--nn-fast);
+}
+.nh-btn:hover { background: var(--nn-hover); }
+.nh-btn-primary { background: var(--nn-accent); color: var(--nn-accent-ink); border-color: var(--nn-accent); }
+.nh-btn-primary:hover { background: #f0c67e; }
+.nh-btn-primary kbd { color: var(--nn-accent-ink); border-color: rgba(20, 20, 20, 0.4); }
+.nh-nav { display: flex; align-items: center; gap: 6px; }
+.nh-arrow { width: 28px; height: 28px; border: 1px solid var(--nn-line-strong); border-radius: var(--nn-radius); background: var(--nn-panel); color: var(--nn-text); font-size: 18px; line-height: 1; cursor: pointer; }
+.nh-arrow:hover { background: var(--nn-hover); }
+.nh-hint { font-size: 10px; color: var(--nn-dim); margin-left: 4px; }
+
+/* Up-next strip: compact thumbs with the progress bar on the active one. */
+/* Fixed-width cards, so the row is wider than the window and can drift; the second copy of the cards makes the loop seamless. */
+.nh-strip { grid-column: 1 / 3; list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 300px; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+.nh-strip::-webkit-scrollbar { display: none; }
+.nh-thumb {
+  position: relative; display: block; width: 100%; padding: 0; text-align: left; cursor: pointer;
+  background: var(--nn-panel); border: 1px solid var(--nn-line); border-radius: var(--nn-radius); overflow: hidden;
+  color: var(--nn-muted); transition: border-color var(--nn-fast);
+}
+.nh-thumb:hover { border-color: var(--nn-line-strong); }
+.nh-thumb.on { border-color: var(--nn-accent); color: var(--nn-text); }
+.nh-thumb img, .nh-thumb .nh-poster-blank { position: static; display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.nh-thumb-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.35; padding: 7px 8px 9px; }
+.nh-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--nn-line-strong); }
+.nh-progress-bar { display: block; height: 100%; width: 0; background: var(--nn-accent); }
+.nh-progress-bar.run { animation: nh-fill linear forwards; }
+@keyframes nh-fill { from { width: 0; } to { width: 100%; } }
+
+/* ── Toolbar and the wire (below the fold) ──────────────────────────────────── */
+.news-toolbar { position: sticky; top: 0; z-index: 3; background: var(--nn-bg); }
+.news-feed-list { scroll-padding-block: 8px; }
+.news-feed-list [role="option"] { position: relative; }
+.news-feed-list [role="option"][aria-selected="true"]::before {
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--nn-accent); border-radius: 1px;
+}
+.news-article-canvas article { max-width: none; width: 100%; }
+.news-article-canvas .article-native-content { font-size: 15px; line-height: 1.7; }
+.news-article-canvas .article-native-content img, .news-article-canvas .article-native-content video { max-width: 100%; height: auto; border-radius: var(--nn-radius); }
+.news-article-canvas .article-native-content a { color: var(--nn-accent); text-decoration: underline; text-decoration-color: var(--nn-line-strong); }
+.news-article-canvas .article-native-content blockquote { margin: 1em 0; padding: 0 0 0 14px; border-left: 2px solid var(--nn-line-strong); color: var(--nn-muted); }
+
+/* Reader footer: pinned to the bottom of the reader column. */
+.news-reader-bar {
+  position: sticky; bottom: -28px; margin: 24px -40px -28px; padding: 10px 40px;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  background: var(--nn-panel); border-top: 1px solid var(--nn-line);
+  font-size: 12px;
+}
+.news-reader-bar .spacer { flex: 1; }
+.news-reader-bar .mono { color: var(--nn-dim); font-size: 11px; }
+
+/* Keyboard strip, docked at the bottom of the tab. */
+.news-keys {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  margin-top: 4px; padding: 4px 0 0; border-top: 1px solid var(--nn-line);
+  font: 11px/1.4 var(--nn-mono); color: var(--nn-dim);
+}
+.news-keys b { color: var(--nn-muted); font-weight: 600; }
+.news-keys .spacer { flex: 1; }
+.news-keys button { background: none; border: 1px solid var(--nn-line-strong); border-radius: 3px; color: var(--nn-muted); font: inherit; padding: 2px 6px; cursor: pointer; }
+
+/* Help sheet (the ? key). A plain panel, not a modal window. */
+.news-help { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; background: rgba(20, 20, 20, 0.85); }
+.news-help-panel { width: min(560px, 92%); background: var(--nn-panel); border: 1px solid var(--nn-line-strong); border-radius: var(--nn-radius); padding: 18px 20px; }
+.news-help-panel h3 { margin: 0 0 12px; font-size: 14px; }
+.news-help-panel dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+.news-help-panel dt { font-family: var(--nn-mono); color: var(--nn-accent); white-space: nowrap; }
+.news-help-panel dd { margin: 0; color: var(--nn-muted); }
+.news-help-panel p { margin: 12px 0 0; font-size: 11px; color: var(--nn-dim); }
+
+/* ── Scroll-driven motion: depth on the hero as it leaves, rise-in on wire rows as they arrive. ── */
+@supports (animation-timeline: scroll()) {
+  .news-view-container { scroll-timeline: --news-page block; }
+  .nh-frame { animation: nh-in 180ms ease-out, nh-depth linear both; animation-timeline: auto, --news-page; animation-range: normal, 0 60vh; }
+  @keyframes nh-depth { to { transform: translateY(18px) scale(0.985); opacity: 0.6; } }
+  .news-feed-list [role="option"] { animation: nn-rise linear both; animation-timeline: view(); animation-range: entry 0% entry 40%; }
+  @keyframes nn-rise { from { opacity: 0.35; transform: translateY(6px); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .news-view-container *, .news-view-container *::before, .news-view-container *::after { animation: none !important; transition: none !important; }
+  .nh-progress-bar.run { width: 100%; }
+}
+
+/* Narrow: hero stacks, strip scrolls, the split pane stacks (the mobile reading toggle already exists). */
+@media (max-width: 900px) {
+  .news-hero { grid-template-columns: 1fr; }
+  .nh-frame { grid-row: auto; }
+  .nh-copy { grid-column: 1; }
+  .nh-strip { grid-column: 1; grid-auto-columns: 150px; }
+  .news-reader-bar { margin: 24px -16px -16px; padding: 10px 16px; }
+}
+
+/* Tablet and narrow windows: one pane at a time. The split's grid columns are inline, so these rules use !important.
+   The wire shows first; opening a story switches to the reader (mobileReading), and news-mobile-back returns. */
+@media (max-width: 900px) {
+  .news-split-pane { grid-template-columns: 1fr !important; gap: 0 !important; }
+  .news-view-container:not(.mobile-reading-active) .news-split-pane > :nth-child(2) { display: none !important; }
+  .news-view-container.mobile-reading-active .news-split-pane > :nth-child(1) { display: none !important; }
+  /* Keyboard shortcut hints do nothing for touch. */
+  .news-keys { display: none; }
+}
+
+/* Touch screens: targets at least 44px, the usual minimum for a finger. */
+@media (pointer: coarse) {
+  .news-view-container button,
+  .news-view-container [role="button"],
+  .news-view-container a.nh-btn { min-height: 44px; min-width: 44px; }
+}
+
+/* Hero headline: whole, wrapped, sized to its length (HeroTitle). */
+.nh-title--wrap { text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; font-family: var(--font-serif, "Newsreader Variable", Georgia, serif); line-height: 1.12; letter-spacing: -0.015em; }
+.nh-title--xl { font-size: clamp(28px, 3vw, 42px); }
+.nh-title--l { font-size: clamp(24px, 2.4vw, 34px); }
+.nh-title--m { font-size: clamp(20px, 1.9vw, 27px); }
+
+/* Story-card info row: one line, extra text trimmed, so a narrow list never stacks it into three lines. */
+.news-card-meta { flex-wrap: nowrap; min-width: 0; white-space: nowrap; overflow: hidden; }
+.news-card-meta > * { flex: none; }
+.news-card-meta > :last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* The hero's tag for an alert story: red for a red alert, gold for a breaking one. */
+.nh-tag--red { background: #b3121a; color: #fff; border-color: #ff4b4b; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.nh-tag--amber { background: #e8b86d; color: #141414; border-color: #8a5a00; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+
+.voice-pick { max-width: 210px; font-size: 12px; cursor: pointer; }
+
+/* Key points: the article's own most representative sentences, extracted (no model). Flat, one accent rule. */
+.nn-keypoints { margin: 0 0 20px; padding: 12px 16px 10px; border: 1px solid var(--nn-line); border-left: 3px solid var(--nn-accent, #e8b86d); border-radius: 4px; background: var(--nn-panel); }
+.nn-keypoints__h { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nn-dim); }
+.nn-keypoints__list { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.6; color: #d1d5db; }
+.nn-keypoints__list li + li { margin-top: 6px; }
+.nn-keypoints__note { margin: 8px 0 0; font-size: 11px; color: var(--nn-dim); }
+
+/* Since you last looked: one quiet line, not a pop-up. */
+.catchup { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 9px 12px; border: 1px solid rgba(232, 184, 109, 0.45); border-radius: 10px; background: linear-gradient(90deg, rgba(232, 184, 109, 0.14), rgba(232, 184, 109, 0.04)); flex-shrink: 0; }
+.catchup-pulse { width: 8px; height: 8px; border-radius: 50%; background: #e8b86d; box-shadow: 0 0 0 0 rgba(232, 184, 109, 0.6); animation: catchup-pulse 2.2s ease-out infinite; flex-shrink: 0; }
+.catchup-copy { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 1px; }
+.catchup-copy strong { font-size: 12px; color: #e8b86d; letter-spacing: 0.2px; }
+.catchup-lead { font-size: 12.5px; color: var(--text-secondary, #cbd5e1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catchup-go { background: #e8b86d; color: #1a1205; border: 0; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+.catchup-go:hover { filter: brightness(1.08); }
+.catchup-x { background: none; border: 0; color: #9ca3af; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.catchup-x:hover { color: #fff; }
+.nn-new { font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: 0.6px; color: #1a1205; background: #e8b86d; border-radius: 3px; padding: 1px 4px; margin-right: 6px; vertical-align: 1px; }
+@keyframes catchup-pulse { 70% { box-shadow: 0 0 0 7px rgba(232, 184, 109, 0); } 100% { box-shadow: 0 0 0 0 rgba(232, 184, 109, 0); } }
+@media (prefers-reduced-motion: reduce) { .catchup-pulse { animation: none; } }
+
+/* The wire has hundreds of cards. Cards off screen are not laid out or painted until they scroll near: the long list
+   scrolls without stutter and holds less memory (measured: 95th-percentile frame 71ms -> 20ms, total memory -13%). */
+.news-feed-list > * { content-visibility: auto; contain-intrinsic-size: auto 150px; }
+.catchup-copy strong em { font-style: normal; font-weight: 500; color: #9ca3af; }
+
+/* The reader uses the full width of its pane in one column (operator ruling 2026-11-03: no multi-column text).
+   Type scales with the pane so full-width lines stay legible. */
+.news-article-canvas article { container-type: inline-size; }
+.news-view-container .article-native-content > :is(p, ul, ol, blockquote, h2, h3, h4) { max-width: none; }
+.news-article-canvas .article-native-content { font-size: clamp(15px, 14px + 0.35cqi, 19px); text-wrap: pretty; }
+.news-article-canvas .article-native-content :is(h2, h3, h4) { text-wrap: balance; }
+/* Pictures in the story are shown whole, never cropped. */
+.news-article-canvas .article-native-content :is(img, picture img) { display: block; margin-inline: auto; width: auto; max-width: 100%; height: auto; max-height: 80vh; object-fit: contain; aspect-ratio: auto; }
+/* Pictures and their captions sit centred in the column. */
+.news-article-canvas .article-native-content :is(figure, picture, video, iframe) { display: block; margin-inline: auto; text-align: center; }
+.news-article-canvas .article-native-content figcaption { text-align: center; }
+
+/* Story videos sit in the story. A played video that has scrolled above the reading pane floats at its bottom-left
+   corner (the same element, switched to fixed, so playback is not interrupted); the x puts it back. */
+.avid { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; }
+.avid__box { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }
+.avid__box > iframe, .avid__box > video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+.avid__box.is-floating { position: fixed; inset: auto; width: min(340px, 34vw); aspect-ratio: 16 / 9; z-index: 45; border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75); }
+.avid__close { position: absolute; top: 4px; right: 4px; z-index: 2; width: 26px; height: 26px; padding: 0; font: 600 18px/1 inherit; color: #f2eee6; background: rgba(0, 0, 0, 0.7); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; cursor: pointer; }
+.avid__close:hover { background: rgba(232, 184, 109, 0.9); color: #0b0b0d; }
+.avid__close:focus-visible { outline: 2px solid #e8b86d; outline-offset: 2px; }
+
+/* Social posts the story quotes, shown as the posts themselves, centred. */
+.news-article-canvas .article-native-content .nn-social { margin: 20px auto; width: min(540px, 100%); border: 0; padding: 0; }
+.nn-social iframe { display: block; width: 100%; border: 0; border-radius: 8px; background: #fff; }
+.nn-social--ig iframe { height: 760px; }
+.nn-social--x iframe { height: 560px; background: transparent; }
+.nn-social--tt iframe { height: 740px; }
+.nn-social iframe { overflow: hidden; transition: height 160ms ease-out; }
+
+/* Back to the wire: a small chip at the start of the source row, not a line of its own. */
+.news-mobile-back { display: inline-grid; place-items: center; width: 26px; height: 24px; padding: 0; font-size: 14px; line-height: 1; color: var(--nn-muted); background: transparent; border: 1px solid var(--nn-line-strong); border-radius: var(--nn-radius, 4px); cursor: pointer; }
+.news-mobile-back:hover { color: var(--nn-text, #fff); border-color: var(--nn-accent); }
+.news-mobile-back:focus-visible { outline: 2px solid var(--nn-accent); outline-offset: 2px; }

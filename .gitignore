@@ -32,3 +32,5 @@ out/
 # Logs
 *.log
 npm-debug.log*
+!.env.example
+release/

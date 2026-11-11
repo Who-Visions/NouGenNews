@@ -1,0 +1,13 @@
+.settings { max-width: 860px; margin: 0 auto; padding: 28px 16px 60px; height: 100%; overflow-y: auto; box-sizing: border-box; }
+.settings h1 { font-size: 28px; margin: 0 0 18px; }
+.settings h2 { font-size: 18px; margin: 0 0 6px; }
+.settings h3 { font-size: 13px; margin: 24px 0 6px; opacity: 0.7; }
+.settings__note { margin: 0; opacity: 0.75; font-size: 13px; }
+.settings__row { display: grid; grid-template-columns: 180px 120px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--nn-line); font-size: 14px; }
+.settings__status { font-size: 12px; opacity: 0.65; }
+.settings__status.is-saved, .settings__status.is-environment { color: #6fdc8c; opacity: 1; }
+.settings__row input { min-width: 0; padding: 7px 10px; color: inherit; background: var(--nn-panel); border: 1px solid var(--nn-line-strong); border-radius: 6px; }
+.settings__row button { padding: 7px 12px; color: inherit; background: var(--nn-panel); border: 1px solid var(--nn-line); border-radius: 6px; cursor: pointer; }
+.settings__row button:disabled { opacity: 0.4; cursor: default; }
+.settings__error { grid-column: 1 / -1; margin: 0; color: #ff8a80; font-size: 13px; }
+@media (max-width: 760px) { .settings__row { grid-template-columns: 1fr auto; } .settings__row input { grid-column: 1 / -1; } }

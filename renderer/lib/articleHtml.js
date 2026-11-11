@@ -1,0 +1,313 @@
+// Feed article bodies are third-party HTML. They are cleaned here before the reader renders
+// them: an allowlist of text tags, http(s) links and images only, and no event handlers,
+// styles or script URLs. Used by NewsView.jsx for every article.
+import DOMPurify from "dompurify";
+
+const ALLOWED_TAGS = [
+  "p", "br", "a", "em", "strong", "b", "i", "u", "span",
+  "ul", "ol", "li", "blockquote", "h2", "h3", "h4",
+  "img", "figure", "figcaption", "video", "source",
+];
+const ALLOWED_ATTR = ["href", "src", "alt", "title", "target", "rel", "controls", "poster", "preload", "type"];
+
+// Only web links and images are allowed; anything else (javascript:, data:, file:) is dropped.
+const SAFE_URL = /^https?:\/\//i;
+
+export function optimizeLowCacheUrl(rawUrl, width = 760) {
+  if (!rawUrl) return "";
+  try {
+    const clean = String(rawUrl).replace(/&amp;/g, "&").trim();
+    const u = new URL(clean);
+    if (u.hostname.endsWith("wp.com") || u.pathname.includes("/wp-content/uploads/")) {
+      u.searchParams.set("w", String(width));
+      u.searchParams.set("strip", "all");
+      u.searchParams.set("quality", "75");
+      return u.toString();
+    }
+    return clean;
+  } catch {
+    return String(rawUrl);
+  }
+}
+
+// A picture for a spot that shows it at `width` CSS pixels. WordPress hosts hand out size variants
+// ("photo-150x150.jpg"); the suffix is dropped to get the full original, then the CDN is asked for twice the
+// width (a crisp image on a dense screen) instead of stretching a thumbnail. Other hosts are left as given.
+export function hiResUrl(rawUrl, width = 700) {
+  if (!rawUrl) return "";
+  try {
+    const u = new URL(String(rawUrl).replace(/&amp;/g, "&").trim());
+    if (!/^https?:$/.test(u.protocol)) return String(rawUrl);
+    const wp = u.hostname.endsWith("wp.com") || u.pathname.includes("/wp-content/uploads/");
+    if (!wp) return u.toString();
+    u.pathname = u.pathname.replace(/-\d{2,4}x\d{2,4}(\.[A-Za-z0-9]+)$/, "$1");
+    u.searchParams.delete("resize");
+    u.searchParams.delete("fit");
+    u.searchParams.set("w", String(Math.round(width * 2)));
+    u.searchParams.set("strip", "all");
+    u.searchParams.set("quality", "85");
+    return u.toString();
+  } catch {
+    return String(rawUrl);
+  }
+}
+
+export function makeSanitizer(win) {
+  const purify = DOMPurify(win);
+  purify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.hasAttribute("href") && !SAFE_URL.test(node.getAttribute("href"))) {
+      node.removeAttribute("href");
+    }
+    // An image without a safe http(s) source is removed entirely, not left as an empty tag.
+    if (node.tagName === "IMG") {
+      const src = node.getAttribute("src") || "";
+      if (!SAFE_URL.test(src)) {
+        node.remove();
+        return;
+      }
+      node.setAttribute("src", optimizeLowCacheUrl(src, 760));
+      node.setAttribute("loading", "lazy");
+      node.setAttribute("decoding", "async");
+      node.setAttribute("referrerpolicy", "no-referrer");
+    }
+    // A video plays in the reader itself; one without a safe https source is removed.
+    if (node.tagName === "VIDEO" || node.tagName === "SOURCE") {
+      const src = node.getAttribute("src") || "";
+      const hasSource = node.tagName === "VIDEO" && [...node.querySelectorAll("source")].some((c) => SAFE_URL.test(c.getAttribute("src") || ""));
+      if (!SAFE_URL.test(src) && !hasSource) { node.remove(); return; }
+      if (node.tagName === "VIDEO") {
+        node.setAttribute("controls", "");
+        node.setAttribute("preload", "metadata");
+        const poster = node.getAttribute("poster") || "";
+        if (poster && !SAFE_URL.test(poster)) node.removeAttribute("poster");
+      }
+    }
+    if (node.tagName === "A") {
+      node.setAttribute("target", "_blank");
+      node.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+  return (html) => {
+    const raw = String(html || "")
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1")
+      .replace(/<p[^>]*>\s*(The post|L’article|Cet article)[\s\S]*?(first appeared on|est apparu en premier sur)[\s\S]*?<\/p>/gi, "");
+    return purify.sanitize(raw, {
+      ALLOWED_TAGS,
+      ALLOWED_ATTR: [...ALLOWED_ATTR, "loading", "decoding", "referrerpolicy"],
+      ALLOW_DATA_ATTR: false,
+      FORBID_TAGS: ["style", "script", "iframe", "object", "embed", "form", "svg", "math"],
+      FORBID_ATTR: ["style"],
+    });
+  };
+}
+
+let cached = null;
+export function sanitizeArticleHtml(html) {
+  if (!cached) cached = makeSanitizer(window);
+  return cached(html);
+}
+
+// Scraped pages end with site furniture: "Next Article", "More Anime", "Related", "Trending", with
+// links, thumbnails and promos under each. None of it is the story. splitTail cuts the body at the first
+// such heading and returns what was after it as small items (link, title, picture) for the footer
+// carousel, so the story ends where the story ends and the promos still show without taking space.
+const TAIL_HEAD = /^\s*(next article|previous article|read next|up next|more\b.{0,40}|related\b.{0,40}|recommended\b.{0,40}|trending\b.{0,40}|you (?:may|might) also like|popular\b.{0,40}|latest\b.{0,40}|don'?t miss|more from\b.{0,40}|sponsored\b.{0,40})\s*:?\s*$/i;
+
+export function splitTail(html, doc = typeof document !== "undefined" ? document : null) {
+  const source = String(html || "");
+  if (!doc || !source) return { body: source, items: [] };
+  const host = doc.createElement("div");
+  host.innerHTML = source;
+  const kids = [...host.childNodes];
+  const at = kids.findIndex((n) => n.nodeType === 1 && /^(H[1-6]|P|STRONG|B)$/.test(n.tagName) && n.textContent.length < 60 && TAIL_HEAD.test(n.textContent));
+  // A heading with nothing before it is the story's own first line, not a tail.
+  if (at <= 0) return { body: source, items: [] };
+
+  const tail = kids.slice(at);
+  const items = [];
+  const seen = new Set();
+  const holder = doc.createElement("div");
+  tail.forEach((n) => holder.appendChild(n.cloneNode(true)));
+  for (const a of holder.querySelectorAll("a[href]")) {
+    const href = a.getAttribute("href") || "";
+    if (!/^https?:\/\//i.test(href) || seen.has(href)) continue;
+    const img = a.querySelector("img") || a.closest("figure")?.querySelector("img") || a.previousElementSibling?.querySelector?.("img") || null;
+    const title = (a.textContent || "").trim() || img?.getAttribute("alt") || a.getAttribute("title") || "";
+    if (!title) continue;
+    seen.add(href);
+    items.push({ href, title: title.slice(0, 140), img: img ? img.getAttribute("src") || "" : "" });
+  }
+  // Pictures that carry no link of their own are not promos we can open; they are dropped with the tail.
+  const body = kids.slice(0, at).map((n) => (n.nodeType === 1 ? n.outerHTML : n.textContent)).join("");
+  return { body, items };
+}
+
+// A picture's identity: host and path without CDN prefix, size suffix ("-150x150"), query or extension, so a
+// resized or re-encoded copy of the same file counts as the same picture.
+export function imageKey(src) {
+  try {
+    const u = new URL(String(src || "").replace(/&amp;/g, "&").trim());
+    // A WordPress CDN address carries the real host as its first path segment ("i0.wp.com/site.test/...").
+    const cdn = /^i\d\.wp\.com$/.test(u.hostname);
+    return ((cdn ? "" : u.hostname) + (cdn ? u.pathname.replace(/^\//, "") : u.pathname))
+      .replace(/-\d{2,4}x\d{2,4}(\.[A-Za-z0-9]+)$/, "$1")
+      .replace(/(?:\.(?:sm|md|lg|xs|xl))?\.(?:jpe?g|png|webp|avif|gif)$/i, "")
+      // A CMS that names each size ("l-intro-1793203098", "intro-1793203098.sm") still means one picture; the prefix is only
+      // dropped when the name carries a long numeric id, so ordinary names such as "s-curve" are left alone.
+      .replace(/([/])(?:xs|sm|md|lg|xl|[lmst])-([^/]*\d{6,}[^/]*)$/i, "$1$2")
+      .toLowerCase();
+  } catch {
+    return String(src || "");
+  }
+}
+
+// Removes from an article body any picture that is the lead picture or already appeared earlier in the body (and
+// a figure or link left empty by that). The first copy is kept.
+export function dropDuplicateImages(html, leadSrc = "", doc = typeof document !== "undefined" ? document : null) {
+  const source = String(html || "");
+  if (!doc || !source || !/<img/i.test(source)) return source;
+  const host = doc.createElement("div");
+  host.innerHTML = source;
+  const seen = new Set(leadSrc ? [imageKey(leadSrc)] : []);
+  let removed = 0;
+  for (const img of [...host.querySelectorAll("img")]) {
+    const k = imageKey(img.getAttribute("src"));
+    if (!k) continue;
+    if (seen.has(k)) {
+      let node = img;
+      // Climb out of wrappers that hold nothing but this picture.
+      while (node.parentElement && node.parentElement !== host && /^(A|FIGURE|P|SPAN|DIV)$/.test(node.parentElement.tagName) && !node.parentElement.textContent.trim() && node.parentElement.querySelectorAll("img").length === 1) node = node.parentElement;
+      // A caption on a figure is kept with the figure only if it says something: the figure goes with its picture.
+      node.remove();
+      removed += 1;
+    } else {
+      seen.add(k);
+    }
+  }
+  return removed ? host.innerHTML : source;
+}
+
+// Scraped pages often end the article block with a "related story" thumbnail: a picture (usually linked) with no
+// caption, after the last paragraph. Real story pictures come before the text ends or carry a caption. This drops
+// image-only blocks from the very end of the body, as long as real text precedes them.
+export function dropTrailingImages(html, doc = typeof document !== "undefined" ? document : null) {
+  const source = String(html || "");
+  if (!doc || !source || !/<img/i.test(source)) return source;
+  const host = doc.createElement("div");
+  host.innerHTML = source;
+  const nodes = () => [...host.childNodes].filter((n) => n.nodeType === 1 || (n.nodeType === 3 && n.textContent.trim()));
+  const textBefore = (node) => {
+    let n = 0;
+    for (const c of host.childNodes) {
+      if (c === node) break;
+      n += (c.textContent || "").trim().length;
+    }
+    return n;
+  };
+  let removed = 0;
+  for (;;) {
+    const list = nodes();
+    const last = list[list.length - 1];
+    if (!last || last.nodeType !== 1 || !last.querySelector("img") && last.tagName !== "IMG") break;
+    const caption = (last.textContent || "").trim();
+    if (caption.length > 25 || textBefore(last) < 80) break;
+    last.remove();
+    removed += 1;
+  }
+  return removed ? host.innerHTML : source;
+}
+
+// Every distinct picture of a story, lead first, for the photo carousel: the lead picture, then the pictures in the
+// body in order. Duplicates (by imageKey) and icon-sized images (declared under 120px) are skipped.
+export function collectPhotos(html, leadSrc = "", doc = typeof document !== "undefined" ? document : null, max = 12) {
+  const out = [];
+  const seen = new Set();
+  const add = (src, alt) => {
+    const s = String(src || "").trim();
+    if (!/^https?:\/\//i.test(s)) return;
+    const k = imageKey(s);
+    if (!k || seen.has(k) || out.length >= max) return;
+    seen.add(k);
+    out.push({ src: s, alt: String(alt || "").trim() });
+  };
+  add(leadSrc, "");
+  if (!doc || !html) return out;
+  const host = doc.createElement("div");
+  host.innerHTML = String(html);
+  for (const img of host.querySelectorAll("img")) {
+    const w = Number(img.getAttribute("width")) || 0;
+    const h = Number(img.getAttribute("height")) || 0;
+    if ((w && w < 120) || (h && h < 120)) continue;
+    add(img.getAttribute("src"), img.getAttribute("alt") || img.closest("figure")?.querySelector("figcaption")?.textContent);
+  }
+  return out;
+}
+
+// Removes every picture from a body (and the figure or link left holding only that picture), for the case where the
+// pictures are shown in the photo carousel instead.
+export function stripImages(html, doc = typeof document !== "undefined" ? document : null) {
+  const source = String(html || "");
+  if (!doc || !source || !/<img/i.test(source)) return source;
+  const host = doc.createElement("div");
+  host.innerHTML = source;
+  for (const img of [...host.querySelectorAll("img")]) {
+    let node = img;
+    while (node.parentElement && node.parentElement !== host && /^(A|FIGURE|P|SPAN|DIV)$/.test(node.parentElement.tagName) && !node.parentElement.textContent.replace(node.textContent, "").trim() && node.parentElement.querySelectorAll("img").length === 1) node = node.parentElement;
+    node.remove();
+  }
+  return host.innerHTML;
+}
+
+// Ad slots leave their label behind ("Advertisement", repeated once per slot) when the ad itself does not load. A
+// block whose only text is such labels is not story, so it is removed; blocks that carry a picture are left alone.
+const AD_LABELS = /^(?:(?:advertisement|advertising|sponsored(?: content)?|story continues(?: below)?|scroll to continue(?: reading)?|continue reading below)[\s:.—-]*)+$/i;
+// Short blocks that are the page's own controls, not the story: a comment count, a copy-link confirmation, a share or
+// follow prompt.
+const PAGE_CHROME = /\bcomments?\s*\(\d+\)|\bcopied!|\bleave a comment\b|\bshare (?:this|on|via)\b|\bfollow us on\b/i;
+export function dropAdLabels(html, doc = typeof document !== "undefined" ? document : null) {
+  const source = String(html || "");
+  if (!doc || !source || !(/advertis|sponsored|continues|scroll to continue|continue reading/i.test(source) || PAGE_CHROME.test(source))) return source;
+  const host = doc.createElement("div");
+  host.innerHTML = source;
+  let removed = 0;
+  for (const el of [...host.querySelectorAll("p, div, span, aside, li, h2, h3, h4, section")]) {
+    if (!host.contains(el) || el.querySelector("video")) continue;
+    const text = (el.textContent || "").trim();
+    const media = !!el.querySelector("img");
+    // A byline block keeps its small avatar in the same element; only an ad label must be free of pictures.
+    if ((!media && AD_LABELS.test(text)) || (text.length < 160 && PAGE_CHROME.test(text))) { el.remove(); removed += 1; }
+  }
+  return removed ? host.innerHTML : source;
+}
+
+// Social posts a story quotes arrive as placeholders: a quote box holding only a "View this post on Instagram" link
+// (the publisher's embed script is stripped). Each placeholder names its post, so it becomes the post itself, framed
+// from the platform's own embed page. Runs after sanitizing, on links the sanitizer already let through.
+const SOCIAL = [
+  { re: /https?:\/\/(?:www\.)?instagram\.com\/(?:[\w.]+\/)?(p|reel|tv)\/([\w-]+)/i, src: (m) => `https://www.instagram.com/${m[1]}/${m[2]}/embed/captioned/`, cls: "ig" },
+  { re: /https?:\/\/(?:www\.)?(?:twitter|x)\.com\/\w+\/status\/(\d+)/i, src: (m) => `https://platform.twitter.com/embed/Tweet.html?id=${m[1]}&theme=dark&dnt=true`, cls: "x" },
+  { re: /https?:\/\/(?:www\.)?tiktok\.com\/@[\w.]+\/video\/(\d+)/i, src: (m) => `https://www.tiktok.com/embed/v2/${m[1]}`, cls: "tt" },
+];
+function socialFrame(href) {
+  for (const s of SOCIAL) {
+    const m = href.match(s.re);
+    if (m) return `<figure class="nn-social nn-social--${s.cls}"><iframe src="${s.src(m)}" scrolling="no" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups" title="Embedded post"></iframe></figure>`;
+  }
+  return null;
+}
+export function embedSocialPosts(html) {
+  if (!html) return html;
+  // A quote box that is only a post placeholder: replace the whole box.
+  return html.replace(/<blockquote\b[^>]*>([\s\S]*?)<\/blockquote>/gi, (whole, inner) => {
+    const text = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    // Only embed boxes (short text); a real pull quote that merely links a post keeps its words.
+    if (text.length > 600) return whole;
+    // Any link in the box may be the post: a tweet box leads with t.co and pic.twitter.com links and names its own
+    // status link last, on the "— Name (@handle) date" line.
+    for (const [, href] of inner.matchAll(/href="([^"]+)"/gi)) {
+      const frame = socialFrame(href.replace(/&amp;/g, "&"));
+      if (frame) return frame;
+    }
+    return whole;
+  });
+}

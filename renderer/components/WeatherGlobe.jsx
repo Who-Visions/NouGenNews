@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
 import { invoke } from "../lib/bridge.js";
 
 const clockOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -10,12 +11,20 @@ const clockOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", m
 // imagery from Cesium ion, rain from RainViewer, a marker at the place's coordinates. Nothing on it is drawn from a model.
 export function WeatherGlobe({ lat, lon, place }) {
   const frameEl = useRef(null);
+  const videoEl = useRef(null);
   const [phase, setPhase] = useState("loading"); // loading | ready | error
   const [error, setError] = useState("");
   const [radarOn, setRadarOn] = useState(true);
   const [playing, setPlaying] = useState(true);
   const [frame, setFrame] = useState(0);
   const [radar, setRadar] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [camerasOn, setCamerasOn] = useState(true);
+  const [shapes, setShapes] = useState([]);
+  const [warningsOn, setWarningsOn] = useState(true);
+  const [buildingsOn, setBuildingsOn] = useState(false);
+  const [cam, setCam] = useState(null); // { id, name }
+  const [camFrame, setCamFrame] = useState("");
 
   const post = useCallback((m) => {
     const w = frameEl.current && frameEl.current.contentWindow;
@@ -48,6 +57,17 @@ export function WeatherGlobe({ lat, lon, place }) {
         });
       } else if (m.type === "started") {
         setPhase("ready");
+        const list = await invoke("map_cameras", { lat, lon }).catch(() => []);
+        if (dead || !Array.isArray(list) || !list.length) return;
+        setCameras(list);
+        post({ type: "cameras", cameras: list });
+        post({ type: "focus", lat, lon });
+      } else if (m.type === "buildings-error") {
+        setBuildingsOn(false);
+        setError(String(m.message || "3D buildings unavailable"));
+      } else if (m.type === "camera") {
+        setCamFrame("");
+        setCam({ id: String(m.id), name: String(m.name || "") });
       } else if (m.type === "error") {
         setError(String(m.message || "The globe stopped"));
         setPhase((p) => (p === "ready" ? p : "error"));
@@ -65,6 +85,57 @@ export function WeatherGlobe({ lat, lon, place }) {
     if (phase === "ready") post({ type: "frame", index: frame, on: radarOn });
   }, [frame, radarOn, phase, post]);
 
+  // Warning outlines, renewed while the map is open.
+  useEffect(() => {
+    if (phase !== "ready") return undefined;
+    let live = true;
+    const pull = () => invoke("map_warnings", { lat, lon }).then((s) => {
+      if (!live || !Array.isArray(s)) return;
+      setShapes(s);
+      post({ type: "warnings", shapes: s });
+    }).catch(() => {});
+    pull();
+    const t = setInterval(pull, 120000);
+    return () => { live = false; clearInterval(t); };
+  }, [phase, lat, lon, post]);
+
+  const toggleCameras = () => {
+    const on = !camerasOn;
+    setCamerasOn(on);
+    post({ type: "layer", name: "cameras", on });
+    if (on) post({ type: "focus", lat, lon });
+    else setCam(null);
+  };
+  const toggleBuildings = () => {
+    const on = !buildingsOn;
+    setBuildingsOn(on);
+    post({ type: "buildings", on, lat, lon });
+  };
+  const toggleWarnings = () => {
+    const on = !warningsOn;
+    setWarningsOn(on);
+    post({ type: "layer", name: "warnings", on });
+  };
+
+  // The open camera: its still at once, then the live stream, kept as close to the live edge as the stream allows.
+  // If the stream fails the still keeps renewing.
+  useEffect(() => {
+    if (!cam) return undefined;
+    let live = true;
+    let timer = null;
+    const pull = () => invoke("camera_frame", { id: cam.id }).then((src) => { if (live) setCamFrame(src); }).catch(() => {});
+    pull();
+    const hls = new Hls({ enableWorker: false, lowLatencyMode: true, liveSyncDurationCount: 1, liveMaxLatencyDurationCount: 3, maxLiveSyncPlaybackRate: 1.5, backBufferLength: 0 });
+    hls.on(Hls.Events.ERROR, (_e, d) => { if (d.fatal && !timer) { hls.destroy(); timer = setInterval(pull, 5000); } });
+    invoke("camera_stream", { id: cam.id }).then((url) => {
+      if (!live || !videoEl.current) return;
+      hls.loadSource(url);
+      hls.attachMedia(videoEl.current);
+      hls.on(Hls.Events.FRAG_BUFFERED, () => { if (videoEl.current?.paused) videoEl.current.play().catch(() => {}); });
+    }).catch(() => {});
+    return () => { live = false; clearInterval(timer); hls.destroy(); };
+  }, [cam]);
+
   const count = radar ? radar.frames.length : 0;
   useEffect(() => {
     if (!playing || !radarOn || count < 2 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
@@ -79,6 +150,13 @@ export function WeatherGlobe({ lat, lon, place }) {
   return (
     <div className="wg" aria-label={`3D Weather Globe for ${place}`}>
       <iframe ref={frameEl} className="wg__map" src="./globe.html" title={`Globe centred on ${place}`} />
+
+      {cam ? (
+        <figure className="wg__cam">
+          <video key={cam.id} ref={videoEl} className="wg__cam-video" poster={camFrame || undefined} autoPlay muted playsInline aria-label={cam.name} />
+          <figcaption><span className="wg__cam-live mono">Live</span><span className="wg__cam-name">{cam.name}</span><button type="button" className="wg__cam-x" aria-label="Close camera" onClick={() => setCam(null)}>&times;</button></figcaption>
+        </figure>
+      ) : null}
 
       {phase === "loading" ? (
         <div className="wg__note mono">Loading instrument map…</div>
@@ -97,6 +175,7 @@ export function WeatherGlobe({ lat, lon, place }) {
             <button type="button" className="wg__btn" onClick={() => post({ type: "home" })}>
               Home
             </button>
+            <div className="wg__layers" role="group" aria-label="Map layers">
             <button
               type="button"
               className={`wg__btn ${radarOn ? "on" : ""}`}
@@ -106,6 +185,18 @@ export function WeatherGlobe({ lat, lon, place }) {
             >
               Radar
             </button>
+            {cameras.length ? (
+              <button type="button" className={`wg__btn ${camerasOn ? "on" : ""}`} onClick={toggleCameras} aria-pressed={camerasOn}>
+                Cameras <span className="wg__count">{cameras.length}</span>
+              </button>
+            ) : null}
+            <button type="button" className={`wg__btn ${buildingsOn ? "on" : ""}`} onClick={toggleBuildings} aria-pressed={buildingsOn}>
+              Buildings
+            </button>
+            <button type="button" className={`wg__btn ${warningsOn ? "on" : ""}`} onClick={toggleWarnings} aria-pressed={warningsOn}>
+              Warnings{shapes.length ? <span className="wg__count">{shapes.length}</span> : null}
+            </button>
+            </div>
             {count > 1 ? (
               <button
                 type="button"

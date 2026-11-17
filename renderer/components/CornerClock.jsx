@@ -105,6 +105,7 @@ export function CornerClock() {
       <span>{wx?.place || city}</span>
       {!chosen ? <button type="button" className="cc__locate" onClick={useMyLocation} disabled={locating} title="The city above is a guess from your time zone. Ask Windows for your actual location (sent once to a place-name lookup).">{locating ? "Locating\u2026" : "Use my location"}</button> : null}
       {wx ? <button type="button" className={`cc__wx${alerts.length ? " cc__wx--alert" : ""}`} title={alerts.length ? `${alerts.length} weather alert${alerts.length === 1 ? "" : "s"}: ${alerts[0].event}. Open the Weather tab (W)` : "Open the Weather tab (W)"} onClick={() => window.dispatchEvent(new CustomEvent("nn:weather"))}><i aria-hidden="true">{ICON[wx.label] || "☁"}</i>{Math.round(wx.temp_f)}°F{alerts.length ? <b className="cc__warn" aria-label={`${alerts.length} weather alerts`}>{" ⚠ "}{alerts.length}</b> : null}</button> : null}
+      {!wx?.region || /florida/i.test(wx.region) ? <button type="button" className="cc__locate" onClick={() => window.dispatchEvent(new CustomEvent("nn:weather"))} title="Palm Beach County traffic cameras on the weather map">Live cameras</button> : null}
     </div>
   );
 }

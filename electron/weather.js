@@ -222,6 +222,24 @@ async function fetchNws(lat, lon, http = require("./safe").fetchSafe) {
   } catch { return []; }
 }
 
+// The outlines of warnings in force at a point, for the map. County-wide alerts carry no outline and are left out.
+function parseNwsShapes(json) {
+  const out = [];
+  for (const f of (json && Array.isArray(json.features)) ? json.features : []) {
+    const g = f.geometry;
+    const polys = g?.type === "Polygon" ? [g.coordinates] : g?.type === "MultiPolygon" ? g.coordinates : [];
+    for (const p of polys) if (Array.isArray(p[0]) && p[0].length > 2) out.push({ event: clip(f.properties?.event, 120), ring: p[0] });
+  }
+  return out;
+}
+
+async function warningShapes(lat, lon, http = require("./safe").fetchSafe) {
+  try {
+    const res = await http(`https://api.weather.gov/alerts/active?point=${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}`, { headers: { Accept: "application/geo+json", "User-Agent": "NouGenNews" } });
+    return res.ok ? parseNwsShapes(await res.json()) : [];
+  } catch { return []; }
+}
+
 // Alerts for a point, or [] on any failure (no key, no alerts on the plan, network down). Never throws.
 async function fetchAlerts(lat, lon, { key = process.env.WEATHERAPI_KEY, get = getJson } = {}) {
   if (!key) return [];
@@ -318,4 +336,4 @@ async function weatherReport({ city, region = "" }, { get, key, now = Date.now }
   return report;
 }
 
-module.exports = { parseOpenWeather, fetchOpenWeather, parseNws, homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };
+module.exports = { parseNwsShapes, warningShapes, parseOpenWeather, fetchOpenWeather, parseNws, homeWeather, labelFor, parseForecast, locate, parseReport, aqiCategory, weatherReport, parseAlerts, fetchAlerts, weatherAlerts, parseMarine, compass, radarFrames };

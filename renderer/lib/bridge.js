@@ -19,3 +19,16 @@ export function askAssistant(args, onEvent) {
     .catch((err) => { if (!stopped) onEvent({ type: "error", message: String((err && err.message) || err) }); });
   return () => { stopped = true; onEvent({ type: "cancelled" }); };
 }
+
+// The Windows accent color as the app accent (--nn-accent), when the reader turns it on in Settings
+// (localStorage "nn.osAccent" = "1"). Follows live changes; turning it off restores the theme's own accent.
+let accentOff = null;
+export async function applyOsAccent(enabled) {
+  const root = document.documentElement;
+  if (accentOff) { accentOff(); accentOff = null; }
+  if (!enabled) { root.style.removeProperty("--nn-accent"); return null; }
+  const hex = await invoke("system_accent").catch(() => null);
+  if (hex) root.style.setProperty("--nn-accent", hex);
+  if (typeof window.nougennews?.onOsAccent === "function") accentOff = window.nougennews.onOsAccent((h) => root.style.setProperty("--nn-accent", h));
+  return hex;
+}

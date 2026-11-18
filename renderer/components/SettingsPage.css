@@ -11,3 +11,7 @@
 .settings__row button:disabled { opacity: 0.4; cursor: default; }
 .settings__error { grid-column: 1 / -1; margin: 0; color: #ff8a80; font-size: 13px; }
 @media (max-width: 760px) { .settings__row { grid-template-columns: 1fr auto; } .settings__row input { grid-column: 1 / -1; } }
+
+/* Appearance: Use the Windows accent color */
+.settings__toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.settings__toggle input { width: 16px; height: 16px; accent-color: var(--nn-accent); }

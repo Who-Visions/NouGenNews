@@ -6,7 +6,7 @@
   },
   "sections": [
     {
-      "title": "📋 Table of Contents",
+      "title": "Table of Contents",
       "content": "A high-level overview of the operational doctrine for this pipeline.",
       "emoji": "📋",
       "keywords": [
@@ -16,7 +16,7 @@
       ]
     },
     {
-      "title": "⚙️ Installation and Deployment Doctrine",
+      "title": "Installation and Deployment Doctrine",
       "content": "Establish the operational baseline by cloning the repository and provisioning the necessary runtime environment. This sequence ensures all dependencies are correctly mapped before initiating the feed ingestion phase.",
       "emoji": "⚙️",
       "keywords": [
@@ -26,7 +26,7 @@
       ]
     },
     {
-      "title": "🏗️ Core Architecture: The Throughput Engine",
+      "title": "Core Architecture: The Throughput Engine",
       "content": "The system operates on a parallel, staged execution model designed for maximum leverage. We utilize parallel XML fetching, an 8-lane scrape pool employing head-only streaming (16KB reads) to minimize bandwidth expenditure, and a 6-lane Drive pool for concurrent storage. All persistent writes are consolidated into a single batched SQLite transaction, maximizing I/O efficiency.",
       "emoji": "🏗️",
       "keywords": [
@@ -36,7 +36,7 @@
       ]
     },
     {
-      "title": "⚡ Performance Metrics: Quantifying Leverage",
+      "title": "Performance Metrics: Quantifying Leverage",
       "content": "The pipeline demonstrates significant operational gains. Key metrics include an 8x speedup in scrape concurrency, a ~50x acceleration in DB writes via batched transactions, and reduced bandwidth usage by ~12x through early-abort streaming. This architecture prioritizes speed and resource efficiency over brute-force processing.",
       "emoji": "⚡",
       "keywords": [
@@ -46,7 +46,7 @@
       ]
     },
     {
-      "title": "🔑 Key Operational Techniques (Doctrine)",
+      "title": "Key Operational Techniques (Doctrine)",
       "content": "The system relies on several core techniques that define its operational advantage: Zero-Dep Concurrency Semaphores to manage resource contention, Early-Abort Streaming Scrapers to terminate connections immediately upon finding necessary data, and DNS Pre-Warming to eliminate cold lookups from the critical path. These techniques ensure predictable, high-velocity execution.",
       "emoji": "🔑",
       "keywords": [
@@ -56,7 +56,7 @@
       ]
     },
     {
-      "title": "🔗 Integration Points and Data Persistence",
+      "title": "Integration Points and Data Persistence",
       "content": "Data persistence leverages a single batched SQLite transaction for atomic writes, ensuring data integrity without the overhead of numerous individual fsync operations. Image assets are managed via Domain-Wide Delegation with Google Drive, utilizing a proxy endpoint (`/api/media/[fileId]`) for zero API cost storage.",
       "emoji": "🔗",
       "keywords": [
@@ -64,6 +64,26 @@
         "database",
         "integration"
       ]
+    },
+    {
+      "title": "Configuration",
+      "content": "```sh\ncp .env.example .env.local\n# Add your service-account.json for Google Drive access\n\n# Run pipeline\nnpx tsx scripts/enrich_articles_with_real_images.ts\n\n# Start server\nnpm run dev\n```",
+      "emoji": "⚙️"
+    },
+    {
+      "title": "Google Drive Integration",
+      "content": "Uses Domain-Wide Delegation with a service account to store article images in `dave@whovisions.com`'s Google Drive at zero API cost.\n\n- **Folder**: `NouGenAi-site/news/`\n- **Proxy**: `/api/media/[fileId]` returns raw image bytes\n- **Auth**: JWT with `subject` delegation",
+      "emoji": "🗄️"
+    },
+    {
+      "title": "License",
+      "content": "© 2026 Who Visions LLC. All rights reserved.",
+      "emoji": "📄"
+    },
+    {
+      "title": "Fleet role",
+      "content": "| | |\n|---|---|\n| Role | news intelligence pipeline |\n| Kind | satellite |\n| Status | canonical |\n| Canonical for | news |\n| Visibility | public |\n\nThis role table is generated from the NouGenRelay fleet manifest; the fleet manifest stays the source of truth for it.",
+      "emoji": "none"
     }
   ],
   "links": [

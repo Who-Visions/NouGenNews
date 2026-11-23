@@ -39,6 +39,7 @@ function titleCaseIfShouting(s) {
  * Raw bylines -> clean, deduped names. Splits "A, B and C", strips "By"/"Written by", drops emails, links, handles,
  * desks and anything that equals a brand in `brands` (the outlet's own name is not an author).
  */
+/** @param {unknown} list @param {{ brands?: string[] }} [opts] @returns {string[]} */
 export function cleanAuthors(list, { brands = [] } = {}) {
   const brandSet = new Set([].concat(brands || []).map((b) => String(b || "").toLowerCase().replace(/^@/, "").trim()).filter(Boolean));
   const seen = new Set();
@@ -65,6 +66,7 @@ export function cleanAuthors(list, { brands = [] } = {}) {
  * Authors an RSS/Atom item names, as [{name, url?}]. Reads every dc:creator, RSS <author> (email form or plain),
  * Atom <author><name>/<uri>, itunes:author and media:credit with role author. `brands` keeps the outlet's own name out.
  */
+/** @param {string} xml @param {{ brands?: string[] }} [opts] @returns {{ name: string, url?: string }[]} */
 export function authorsFromXmlItem(xml, { brands = [] } = {}) {
   const s = String(xml || "");
   const found = []; // {name, url}
@@ -137,6 +139,7 @@ const isArticle = (o) => [].concat((o && o["@type"]) || []).some((t) => /Article
  * What an article page says about its credit: {authors:[{name,url?}], siteName, publishedAt, modifiedAt, canonical,
  * imageCredit}. JSON-LD first (it names people and their pages), then meta tags, then rel/itemprop author links.
  */
+/** @param {string} html @param {{ brands?: string[] }} [opts] */
 export function creditsFromHtml(html, { brands = [] } = {}) {
   const s = String(html || "");
   const ld = jsonLd(s).find(isArticle) || {};

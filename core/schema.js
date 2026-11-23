@@ -62,6 +62,11 @@ function normImage(img, fallbackCredit) {
  * outlet the story's own address belongs to unless the source names it; an aggregator that only led us to the story
  * goes in `via`. v1 fields stay filled: source_name = publisher.name, creator = author names.
  */
+/**
+ * @param {Record<string, any> | null | undefined} raw
+ * @param {{ feedName?: string, via?: { name: string, url?: string } | null, now?: number }} [opts]
+ * @returns {Record<string, any> | null}
+ */
 export function toNewsItem(raw, { feedName = "", via = null, now = Date.now() } = {}) {
   if (!raw || typeof raw !== "object") return null;
   const title = str(raw.title || raw.headline);

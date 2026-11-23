@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Who-Visions/NouGenNews/schema/news-item.v2.json",
+  "title": "NouGen news item, version 2",
+  "description": "One story from any wire, feed, API or page. v1 fields stay filled so older readers keep working. See docs/SCHEMA.md.",
+  "type": "object",
+  "required": ["article_id", "title", "link", "source_name", "creator", "schema_version", "publisher", "authors", "images", "fetched_at", "rights"],
+  "properties": {
+    "article_id": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "content": { "type": "string" },
+    "link": { "type": "string", "format": "uri" },
+    "pubDate": { "type": "string", "description": "v1 alias of published_at. Source time, never fetch time." },
+    "source_id": { "type": "string" },
+    "source_name": { "type": "string", "description": "v1 alias of publisher.name." },
+    "source_url": { "type": "string" },
+    "source_icon": { "type": "string" },
+    "creator": { "type": "array", "items": { "type": "string" }, "description": "v1 alias of authors[].name. Empty when the source names nobody." },
+    "image_url": { "type": ["string", "null"], "description": "v1 alias of images[0].url." },
+    "category": { "type": "array", "items": { "type": "string" } },
+    "language": { "type": "string" },
+
+    "schema_version": { "const": 2 },
+    "canonical_url": { "type": "string", "format": "uri" },
+    "publisher": {
+      "type": "object",
+      "required": ["name", "domain"],
+      "properties": {
+        "name": { "type": "string" },
+        "id": { "type": "string" },
+        "domain": { "type": "string" },
+        "url": { "type": "string" },
+        "logo": { "type": "string" }
+      }
+    },
+    "authors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string" }, "url": { "type": "string" }, "role": { "type": "string" } }
+      }
+    },
+    "via": {
+      "type": ["object", "null"],
+      "description": "An aggregator that led to the story (Hacker News, GDELT, a news API). Never the publisher.",
+      "properties": { "name": { "type": "string" }, "url": { "type": "string" } }
+    },
+    "credit_line": { "type": "string" },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["url", "origin_url", "kind"],
+        "properties": {
+          "url": { "type": "string", "description": "Where to load it (may be a mirror)." },
+          "origin_url": { "type": "string", "description": "Where the source published it. Always kept." },
+          "kind": { "enum": ["source", "mirror", "generated"] },
+          "width": { "type": "integer" },
+          "height": { "type": "integer" },
+          "credit": { "type": "string" },
+          "caption": { "type": "string" },
+          "alt": { "type": "string" },
+          "generator": { "type": "string" }
+        }
+      }
+    },
+    "image_credit": { "type": "string" },
+    "image_origin_url": { "type": "string" },
+    "published_at": { "type": "string" },
+    "fetched_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "rights": {
+      "type": "object",
+      "required": ["attribution_required"],
+      "properties": { "attribution_required": { "type": "boolean" }, "license": { "type": "string" } }
+    }
+  },
+  "additionalProperties": true
+}

@@ -144,8 +144,11 @@ export function creditsFromHtml(html, { brands = [] } = {}) {
   const s = String(html || "");
   const ld = jsonLd(s).find(isArticle) || {};
   const ldPeople = [].concat(ld.author || []).flatMap((p) => (typeof p === "string" ? [{ name: p }] : p && p.name ? [{ name: p.name, url: typeof p.url === "string" ? p.url : "" }] : []));
-  const metaNames = [...s.matchAll(/<meta\b[^>]*\b(?:property|name)=["'](?:article:author|author|parsely-author|sailthru\.author|dc\.creator|byl)["'][^>]*\bcontent=["']([^"']*)["']/gi)]
-    .map((m) => ({ name: m[1] })).filter((x) => !/^https?:/i.test(x.name));
+  // Each <meta> tag read whole, so content="..." before name="..." counts too.
+  const AUTHOR_META = /^(?:article:author|author|parsely-author|sailthru\.author|dc\.creator|byl)$/i;
+  const metaNames = [...s.matchAll(/<meta\b[^>]*>/gi)]
+    .filter((m) => AUTHOR_META.test(attr(m[0], "property") || attr(m[0], "name")))
+    .map((m) => ({ name: attr(m[0], "content") })).filter((x) => x.name && !/^https?:/i.test(x.name));
   const relNames = [...s.matchAll(/<a\b[^>]*\brel=["']author["'][^>]*>([\s\S]{0,200}?)<\/a>/gi)].map((m) => ({ name: squash(m[1]), url: attr(m[0], "href") }));
   const siteName = meta(s, "og:site_name", "application-name") || (ld.publisher && typeof ld.publisher === "object" ? squash(ld.publisher.name || "") : "");
   const people = [...ldPeople, ...metaNames, ...relNames];

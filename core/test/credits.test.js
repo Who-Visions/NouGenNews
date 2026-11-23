@@ -107,3 +107,8 @@ test("no title or no link is no item", () => {
   assert.equal(toNewsItem({ title: "T" }), null);
   assert.equal(toNewsItem({ link: "https://x.com" }), null);
 });
+
+test("author meta tags count whichever attribute comes first", () => {
+  const html = `<meta content="Jane Doe" name="author"><meta property="article:author" content="Sam Lee"><meta name="author" content="https://x.com/jane">`;
+  assert.deepEqual(creditsFromHtml(html).authors.map((a) => a.name), ["Jane Doe", "Sam Lee"]);
+});

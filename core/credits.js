@@ -143,7 +143,9 @@ const isArticle = (o) => [].concat((o && o["@type"]) || []).some((t) => /Article
 export function creditsFromHtml(html, { brands = [] } = {}) {
   const s = String(html || "");
   const ld = jsonLd(s).find(isArticle) || {};
-  const ldPeople = [].concat(ld.author || []).flatMap((p) => (typeof p === "string" ? [{ name: p }] : p && p.name ? [{ name: p.name, url: typeof p.url === "string" ? p.url : "" }] : []));
+  // An author typed as an Organization (the outlet, a wire, a desk) is not a person, whatever its name.
+  const isOrg = (p) => [].concat(p["@type"] || []).some((t) => /Organization|Corporation|NewsMediaOrganization/i.test(String(t)));
+  const ldPeople = [].concat(ld.author || []).flatMap((p) => (typeof p === "string" ? [{ name: p }] : p && p.name && !isOrg(p) ? [{ name: p.name, url: typeof p.url === "string" ? p.url : "" }] : []));
   // Each <meta> tag read whole, so content="..." before name="..." counts too.
   const AUTHOR_META = /^(?:article:author|author|parsely-author|sailthru\.author|dc\.creator|byl)$/i;
   const metaNames = [...s.matchAll(/<meta\b[^>]*>/gi)]

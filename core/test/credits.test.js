@@ -112,3 +112,8 @@ test("author meta tags count whichever attribute comes first", () => {
   const html = `<meta content="Jane Doe" name="author"><meta property="article:author" content="Sam Lee"><meta name="author" content="https://x.com/jane">`;
   assert.deepEqual(creditsFromHtml(html).authors.map((a) => a.name), ["Jane Doe", "Sam Lee"]);
 });
+
+test("a JSON-LD Organization author is never a person, even when its name differs from the site", () => {
+  const html = `<meta property="og:site_name" content="The Verge"><script type="application/ld+json">{"@type":"NewsArticle","author":[{"@type":"Person","name":"Jane Doe"},{"@type":"Organization","name":"Associated Press"},{"@type":"NewsMediaOrganization","name":"Vox Media"}]}</script>`;
+  assert.deepEqual(creditsFromHtml(html).authors.map((a) => a.name), ["Jane Doe"]);
+});

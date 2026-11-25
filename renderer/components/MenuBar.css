@@ -31,3 +31,11 @@
 /* Click targets are at least 24px tall (WCAG 2.2 target size); the bar is 28px, so the buttons sit 2px inside it. */
 .menubar__tab { min-height: 24px; align-self: center; display: inline-flex; align-items: center; }
 .menubar__restart, .menubar__refresh { margin-top: 2px; margin-bottom: 2px; min-height: 24px; }
+
+/* Tablet and narrow windows: the bar wraps onto a second row instead of running off the right edge. It must not
+   scroll sideways, because the open menus are absolutely positioned children and a scroll container would clip them. */
+@media (max-width: 900px) {
+  .menubar { height: auto; flex: 0 0 auto; flex-wrap: wrap; row-gap: 2px; }
+  .menubar > * { min-height: 28px; }
+  .menubar__menu > button { height: 28px; }
+}

@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { NewsView } from "./components/NewsView.jsx";
 import { MenuBar } from "./components/MenuBar.jsx";
+import { Splash } from "./components/Splash.jsx";
 import { BrowserSidebar } from "./components/BrowserSidebar.jsx";
 import { applyOsAccent } from "./lib/bridge.js";
 
@@ -44,6 +45,7 @@ export function App() {
   }, [view]);
   return (
     <div className="app-frame">
+      <Splash />
       <LiquidDefs />
       <MenuBar />
       <div className="app-shell">

@@ -132,7 +132,7 @@
 .news-feed-list [role="option"][aria-selected="true"]::before {
   content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--nn-accent); border-radius: 1px;
 }
-.news-article-canvas article { max-width: 68ch; }
+.news-article-canvas article { max-width: none; width: 100%; }
 .news-article-canvas .article-native-content { font-size: 15px; line-height: 1.7; }
 .news-article-canvas .article-native-content img, .news-article-canvas .article-native-content video { max-width: 100%; height: auto; border-radius: var(--nn-radius); }
 .news-article-canvas .article-native-content a { color: var(--nn-accent); text-decoration: underline; text-decoration-color: var(--nn-line-strong); }
@@ -189,17 +189,28 @@
   .news-reader-bar { margin: 24px -16px -16px; padding: 10px 16px; }
 }
 
-/* Hero headline on one line; it loops right to left only when it is wider than its box (HeroTitle). */
-.nh-title--line { overflow: hidden; white-space: nowrap; margin: 0; }
-.nh-title__track { display: inline-flex; will-change: transform; }
-.nh-title__text { flex: none; padding-right: 4rem; }
-.nh-title--line.is-running .nh-title__track { animation: nh-title var(--title-s, 14s) linear infinite; }
-.nh-title--line.is-running:hover .nh-title__track, .nh-title--line.is-running:focus-within .nh-title__track { animation-play-state: paused; }
-@keyframes nh-title { to { transform: translateX(-50%); } }
-@media (prefers-reduced-motion: reduce) {
-  .nh-title--line { white-space: normal; }
-  .nh-title__text { padding-right: 0; }
+/* Tablet and narrow windows: one pane at a time. The split's grid columns are inline, so these rules use !important.
+   The wire shows first; opening a story switches to the reader (mobileReading), and news-mobile-back returns. */
+@media (max-width: 900px) {
+  .news-split-pane { grid-template-columns: 1fr !important; gap: 0 !important; }
+  .news-view-container:not(.mobile-reading-active) .news-split-pane > :nth-child(2) { display: none !important; }
+  .news-view-container.mobile-reading-active .news-split-pane > :nth-child(1) { display: none !important; }
+  /* Keyboard shortcut hints do nothing for touch. */
+  .news-keys { display: none; }
 }
+
+/* Touch screens: targets at least 44px, the usual minimum for a finger. */
+@media (pointer: coarse) {
+  .news-view-container button,
+  .news-view-container [role="button"],
+  .news-view-container a.nh-btn { min-height: 44px; min-width: 44px; }
+}
+
+/* Hero headline: whole, wrapped, sized to its length (HeroTitle). */
+.nh-title--wrap { text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; font-family: var(--font-serif, "Newsreader Variable", Georgia, serif); line-height: 1.12; letter-spacing: -0.015em; }
+.nh-title--xl { font-size: clamp(28px, 3vw, 42px); }
+.nh-title--l { font-size: clamp(24px, 2.4vw, 34px); }
+.nh-title--m { font-size: clamp(20px, 1.9vw, 27px); }
 
 /* Story-card info row: one line, extra text trimmed, so a narrow list never stacks it into three lines. */
 .news-card-meta { flex-wrap: nowrap; min-width: 0; white-space: nowrap; overflow: hidden; }
@@ -218,3 +229,57 @@
 .nn-keypoints__list { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.6; color: #d1d5db; }
 .nn-keypoints__list li + li { margin-top: 6px; }
 .nn-keypoints__note { margin: 8px 0 0; font-size: 11px; color: var(--nn-dim); }
+
+/* Since you last looked: one quiet line, not a pop-up. */
+.catchup { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 9px 12px; border: 1px solid rgba(232, 184, 109, 0.45); border-radius: 10px; background: linear-gradient(90deg, rgba(232, 184, 109, 0.14), rgba(232, 184, 109, 0.04)); flex-shrink: 0; }
+.catchup-pulse { width: 8px; height: 8px; border-radius: 50%; background: #e8b86d; box-shadow: 0 0 0 0 rgba(232, 184, 109, 0.6); animation: catchup-pulse 2.2s ease-out infinite; flex-shrink: 0; }
+.catchup-copy { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 1px; }
+.catchup-copy strong { font-size: 12px; color: #e8b86d; letter-spacing: 0.2px; }
+.catchup-lead { font-size: 12.5px; color: var(--text-secondary, #cbd5e1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catchup-go { background: #e8b86d; color: #1a1205; border: 0; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+.catchup-go:hover { filter: brightness(1.08); }
+.catchup-x { background: none; border: 0; color: #9ca3af; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.catchup-x:hover { color: #fff; }
+.nn-new { font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: 0.6px; color: #1a1205; background: #e8b86d; border-radius: 3px; padding: 1px 4px; margin-right: 6px; vertical-align: 1px; }
+@keyframes catchup-pulse { 70% { box-shadow: 0 0 0 7px rgba(232, 184, 109, 0); } 100% { box-shadow: 0 0 0 0 rgba(232, 184, 109, 0); } }
+@media (prefers-reduced-motion: reduce) { .catchup-pulse { animation: none; } }
+
+/* The wire has hundreds of cards. Cards off screen are not laid out or painted until they scroll near: the long list
+   scrolls without stutter and holds less memory (measured: 95th-percentile frame 71ms -> 20ms, total memory -13%). */
+.news-feed-list > * { content-visibility: auto; contain-intrinsic-size: auto 150px; }
+.catchup-copy strong em { font-style: normal; font-weight: 500; color: #9ca3af; }
+
+/* The reader uses the full width of its pane in one column (operator ruling 2026-11-03: no multi-column text).
+   Type scales with the pane so full-width lines stay legible. */
+.news-article-canvas article { container-type: inline-size; }
+.news-view-container .article-native-content > :is(p, ul, ol, blockquote, h2, h3, h4) { max-width: none; }
+.news-article-canvas .article-native-content { font-size: clamp(15px, 14px + 0.35cqi, 19px); text-wrap: pretty; }
+.news-article-canvas .article-native-content :is(h2, h3, h4) { text-wrap: balance; }
+/* Pictures in the story are shown whole, never cropped. */
+.news-article-canvas .article-native-content :is(img, picture img) { display: block; margin-inline: auto; width: auto; max-width: 100%; height: auto; max-height: 80vh; object-fit: contain; aspect-ratio: auto; }
+/* Pictures and their captions sit centred in the column. */
+.news-article-canvas .article-native-content :is(figure, picture, video, iframe) { display: block; margin-inline: auto; text-align: center; }
+.news-article-canvas .article-native-content figcaption { text-align: center; }
+
+/* Story videos sit in the story. A played video that has scrolled above the reading pane floats at its bottom-left
+   corner (the same element, switched to fixed, so playback is not interrupted); the x puts it back. */
+.avid { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; }
+.avid__box { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }
+.avid__box > iframe, .avid__box > video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+.avid__box.is-floating { position: fixed; inset: auto; width: min(340px, 34vw); aspect-ratio: 16 / 9; z-index: 45; border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75); }
+.avid__close { position: absolute; top: 4px; right: 4px; z-index: 2; width: 26px; height: 26px; padding: 0; font: 600 18px/1 inherit; color: #f2eee6; background: rgba(0, 0, 0, 0.7); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; cursor: pointer; }
+.avid__close:hover { background: rgba(232, 184, 109, 0.9); color: #0b0b0d; }
+.avid__close:focus-visible { outline: 2px solid #e8b86d; outline-offset: 2px; }
+
+/* Social posts the story quotes, shown as the posts themselves, centred. */
+.news-article-canvas .article-native-content .nn-social { margin: 20px auto; width: min(540px, 100%); border: 0; padding: 0; }
+.nn-social iframe { display: block; width: 100%; border: 0; border-radius: 8px; background: #fff; }
+.nn-social--ig iframe { height: 760px; }
+.nn-social--x iframe { height: 560px; background: transparent; }
+.nn-social--tt iframe { height: 740px; }
+.nn-social iframe { overflow: hidden; transition: height 160ms ease-out; }
+
+/* Back to the wire: a small chip at the start of the source row, not a line of its own. */
+.news-mobile-back { display: inline-grid; place-items: center; width: 26px; height: 24px; padding: 0; font-size: 14px; line-height: 1; color: var(--nn-muted); background: transparent; border: 1px solid var(--nn-line-strong); border-radius: var(--nn-radius, 4px); cursor: pointer; }
+.news-mobile-back:hover { color: var(--nn-text, #fff); border-color: var(--nn-accent); }
+.news-mobile-back:focus-visible { outline: 2px solid var(--nn-accent); outline-offset: 2px; }

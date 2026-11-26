@@ -80,3 +80,13 @@ test("the summary is built from sentences only: subheadings inside the body are 
   assert.equal(out.summary.length, 3); // fewer sentences than the summary size: every one comes back, so a leaked heading would show
   assert.ok(!out.summary.some((s) => /rarest project/.test(s)));
 });
+
+test("a video page falls back to the transcript in its JSON-LD", async () => {
+  const { bodyFromJsonLd } = require("../article");
+  const words = "A jet crashed on Sunday. All nine people died. <b>Crews</b> searched the road. Officials spoke. The inquiry began. ".repeat(4);
+  const page = `<script type="application/ld+json">${JSON.stringify({ "@type": "VideoObject", description: "Nine dead.", transcript: words })}</script>`;
+  const out = bodyFromJsonLd(page);
+  assert.match(out, /^<p>Nine dead\.<\/p><p>A jet crashed/);
+  assert.ok(!out.includes("<b>"));
+  assert.equal(bodyFromJsonLd("<script type='application/ld+json'>{bad</script>"), "");
+});

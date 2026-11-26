@@ -1,5 +1,6 @@
 // Commands the renderer can invoke (see preload.js). Each takes the args object and returns a value.
 const { fetchSafe } = require("./safe");
+const { openExternalSafe } = require("./open-external");
 const embed = require("./embed");
 const { app } = require("electron");
 const path = require("node:path");
@@ -8,22 +9,38 @@ const path = require("node:path");
 let assistantKeys = null;
 
 const handlers = {
+  // API keys on the Settings page (electron/keys.js): status only goes back, never a value.
+  keys_list: () => require("./keys").listKeys({ userDir: app.getPath("userData") }),
+  keys_save: (args = {}) => require("./keys").saveKey({ userDir: app.getPath("userData"), crypt: require("electron").safeStorage, name: String(args.name || ""), value: args.value }),
+  keys_clear: (args = {}) => require("./keys").clearKey({ userDir: app.getPath("userData"), name: String(args.name || "") }),
   // The loopback page that carries the YouTube player (electron/embed.js).
   embed_port: () => embed.start(),
   quit: () => { app.quit(); },
   // A desktop notification for a red alert. Skipped when the window is already in front (the banner is visible).
-  notify: (args = {}) => {
-    const { Notification, BrowserWindow } = require("electron");
+  // A breaking-news notification, with the story's picture when the page sends one (electron/osui.js, nativeImage).
+  notify: async (args = {}) => {
+    const { Notification, BrowserWindow, nativeImage } = require("electron");
     const w = BrowserWindow.getAllWindows()[0];
     if (!Notification.isSupported() || (w && w.isFocused())) return false;
-    new Notification({ title: String(args.title || "").slice(0, 80), body: String(args.body || "").slice(0, 200), urgency: "critical" }).show();
+    const icon = await require("./osui").notificationIcon(args.image, { http: fetchSafe, nativeImage });
+    new Notification({ title: String(args.title || "").slice(0, 80), body: String(args.body || "").slice(0, 200), urgency: "critical", ...(icon ? { icon } : {}) }).show();
     return true;
+  },
+  // The Windows accent color as "#rrggbb", made readable on the dark UI; null where the system has none.
+  system_accent: () => {
+    const { systemPreferences } = require("electron");
+    const osui = require("./osui");
+    try { return osui.readableOnDark(osui.accentHex(systemPreferences.getAccentColor())); } catch (_) { return null; }
   },
   // Any registered API provider (electron/providers.js): cached on disk, capped, keyed from the environment.
   // YouTube channels (core/feeds.js "@youtube"): the latest videos of every channel in the list; no key needed.
   youtube_feed: () => require("./youtube").fetchYoutube({ userDir: app.getPath("userData") }).then((r) => ({ items: r.items, channels: r.channels })),
   // Read-aloud with a Kokoro neural voice (scripts/kokoro_sidecar.py); the WAV comes back as base64.
   tts_kokoro_synth: (args = {}) => require("./kokoro").kokoroSynthFast({ text: String(args.text || "").slice(0, 60000), voice: String(args.voice || "") }),
+  // Loads the Kokoro model for the chosen voice so the first Listen starts fast.
+  tts_kokoro_warm: (args = {}) => require("./kokoro").kokoroWarm(String(args.voice || "")),
+  // Read-aloud audio keeps the system awake while it plays (electron/keepawake.js).
+  keep_awake: (args = {}) => require("./keepawake").setKeepAwake(!!args.on),
   // A video written up as a news article by NouGen (transcript via nougentube, local Ollama writer, the video's source links).
   tube_article: (args = {}) => require("./tubenews").tubeArticle({
     id: String(args.id || ""), title: String(args.title || "").slice(0, 300), desc: String(args.desc || "").slice(0, 6000), channel: String(args.channel || "").slice(0, 100),
@@ -55,12 +72,11 @@ const handlers = {
   weather_radar: () => require("./weather").radarFrames(),
   // What the 3D globe needs: a Cesium ion token (assets:read, geocode) from the keymaker via the launcher. Cesium ion tokens
   // are made for client-side use; this one reaches the page only when the Weather tab opens, and is never written to disk here.
-  weather_globe_config: () => ({ token: process.env.CESIUM_ION_TOKEN_20261030 || process.env.CESIUM_ION_TOKEN || "" }),
+  weather_globe_config: () => ({ token: process.env.CESIUM_ION_TOKEN || process.env.CESIUM_ION_TOKEN_20261030 || "" }),
   weather_open_credit: (args = {}) => {
     const url = { "open-meteo": "https://open-meteo.com/", weatherapi: "https://www.weatherapi.com/", rainviewer: "https://www.rainviewer.com/", cesium: "https://cesium.com/" }[String(args.which || "open-meteo")];
     if (!url) return false;
-    require("electron").shell.openExternal(url);
-    return true;
+    return openExternalSafe(url);
   },
   weather: (args = {}) => require("./weather").homeWeather({ city: String(args.city || "").slice(0, 80), region: String(args.region || "").slice(0, 80) }),
   // The reader's own place from Windows' location service, only when they ask (electron/geo.js).
@@ -76,13 +92,14 @@ const handlers = {
   // Whether full NouGen Shards is on this machine (its vault folder, its local node on :4444).
   archive_detect_full: () => require("./archive").appArchive(app).detectFull(),
   // Copies the whole archive into the full NouGen Shards vault on this machine. Only when the reader presses Promote.
+  // The import can take minutes (Python importer, 10 min limit): keep the PC awake until it finishes, then release.
   archive_promote: () => {
     const archive = require("./archive");
     const { nougenDir, pickPython } = require("../scripts/resolve-key.cjs");
-    return archive.appArchive(app).promote({
+    return require("./keep-awake").whileAwake(require("electron").powerSaveBlocker, () => archive.appArchive(app).promote({
       dir: path.join(app.getPath("documents"), "NouGenNews Archive"),
       runImporter: archive.pythonImporter({ nougenDir: nougenDir(), pickPython }),
-    });
+    }));
   },
   archive_upgrade_info: () => require("./archive").appArchive(app).upgradeInfo(),
   // Writes the whole archive as a bundle full NouGen Shards imports, into Documents\NouGenNews Archive.
@@ -90,17 +107,37 @@ const handlers = {
     const out = require("./archive").appArchive(app).exportTo(path.join(app.getPath("documents"), "NouGenNews Archive"));
     return { file: out.file, count: out.count };
   },
+  // Shows the archive export folder in Explorer. The path is the app's own, never one the page supplies.
+  archive_reveal: () => {
+    const { shell } = require("electron");
+    const dir = path.join(app.getPath("documents"), "NouGenNews Archive");
+    return shell.openPath(dir).then((err) => !err);
+  },
+  // "Open in browser" for the article the reader is viewing. main.js only answers this for the app's own page
+  // (like keys_*); only http(s) URLs are accepted, and the length is capped.
+  open_external: (args = {}) => {
+    const url = String(args.url || "");
+    if (url.length > 2048 || !/^https?:\/\//i.test(url)) return false;
+    let parsed;
+    try { parsed = new URL(url); } catch { return false; }
+    require("electron").shell.openExternal(parsed.href);
+    return true;
+  },
   // Opens the NouGen Shards page in the reader's browser: only the address upgradeInfo names, nothing the page supplies.
   archive_open_upgrade: () => {
     const { shell } = require("electron");
     const url = require("./archive").appArchive(app).upgradeInfo().url;
     if (!/^https:\/\//i.test(url)) return false;
-    shell.openExternal(url);
-    return true;
+    return openExternalSafe(url, shell);
   },
-  // The assistant (electron/assistant.js): gemma4:31b on Ollama Cloud with the keymaker's keys, local model as fallback.
+  // The assistant (electron/assistant.js): NVIDIA-hosted Nemotron with the keymaker's NVIDIA_API_KEY, local model as fallback.
   // The renderer sends the wire it is showing; keys are read here once and never go back to the page.
-  assistant_ask: async (args = {}) => {
+  assistant_ask: async (args = {}) => require("./assistant").ask(assistantOptions(args)),
+};
+
+// The page's question, cleaned and capped, plus the main-process tools and keys (which never go back to the page).
+// Shared by invoke("assistant_ask") and the streaming MessagePort path (electron/assistant-port.js).
+function assistantOptions(args = {}) {
     const assistant = require("./assistant");
     if (!assistantKeys) {
       const found = require("../scripts/resolve-key.cjs").readSecrets(assistant.KEY_NAMES);
@@ -111,7 +148,7 @@ const handlers = {
       age: String(s.age || "").slice(0, 30), desc: String(s.desc || "").slice(0, 400), url: String(s.url || "").slice(0, 600),
       coverage: Math.min(Math.max(Number(s.coverage) || 1, 1), 100000), ts: Number(s.ts) || 0,
     }));
-    return assistant.ask({
+    return {
       question: String(args.question || ""),
       wire,
       current: args.current && typeof args.current === "object" ? { title: String(args.current.title || "").slice(0, 300), source: String(args.current.source || "").slice(0, 80), text: String(args.current.text || "").slice(0, 3000) } : null,
@@ -132,8 +169,10 @@ const handlers = {
       },
       // The reader's home place (sent by the page) unless the model names another city.
       weather: (place) => require("./weather").weatherReport(place ? { city: place, region: "" } : { city: String((args.home && args.home.city) || "").slice(0, 80), region: String((args.home && args.home.region) || "").slice(0, 80) }),
-    });
-  },
+    };
+}
+
+const moreHandlers = {
   // The whole story behind a headline, with the videos the page carries (electron/article.js).
   article_fetch: (args = {}) => require("./article").articleFetch(args.url || ""),
   // Feeds are fetched here because a page cannot read another site's feed (CORS). Public https only.
@@ -148,4 +187,6 @@ const handlers = {
   },
 };
 
-module.exports = { handlers };
+Object.assign(handlers, moreHandlers);
+
+module.exports = { handlers, assistantOptions };

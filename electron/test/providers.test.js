@@ -236,3 +236,13 @@ test("force (the Refresh button) skips a fresh cached copy, still counts against
   assert.equal(calls, before);
   assert.equal(atCap.stale, true);
 });
+
+test("providers fetched at the same time keep each other's cache entries and usage", async () => {
+  const file = tmp();
+  const registry = Object.fromEntries(["a", "b"].map((id) => [id, { env: "K", ttlMs: 1000, cap: { period: "day", max: 5 }, run: async ({ get }) => { await get("https://example.test"); return [{ title: id }]; } }]));
+  const http = async () => reply({});
+  await Promise.all(["a", "b"].map((id) => fetchProvider({ id, file, env: { K: "dummy" }, registry, http, now: () => NOW })));
+  const saved = JSON.parse(fs.readFileSync(file, "utf8"));
+  assert.deepEqual(Object.keys(saved.entries).sort(), ["a", "b"]);
+  assert.deepEqual(Object.keys(saved.usage).sort(), ["a", "b"]);
+});

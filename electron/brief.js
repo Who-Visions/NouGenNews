@@ -186,7 +186,8 @@ async function survey({ topic, wire, archive, readArticle, maxSteps = 4 }) {
     const newOutlets = [...map.outlets].filter((x) => !prevOutlets.has(x)).length; // state novelty
     trace.push({ step: steps[i].name, sources: sources.length, outlets: map.outlets.size, newNames: gained, newOutlets });
     // Both signals must have settled, and at least one widening step must have been tried.
-    if (!sources.length || (i >= 1 && gained <= 1 && newOutlets === 0)) break;
+    // An empty first step is not a reason to stop: the archive steps may still find the topic.
+    if (i >= 1 && gained <= 1 && newOutlets === 0) break;
     prevNames = map.names;
     prevOutlets = map.outlets;
   }

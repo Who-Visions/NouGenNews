@@ -1,11 +1,15 @@
-// The in-app assistant: answers from the wire and the open story through Ollama's native /api/chat with tools.
-// Model order: gemma4:31b on Ollama Cloud (one key per NouGen account, rotated when one is rate-limited or refused),
-// then the resident local model. Keys come from the keymaker and stay in this process.
+// The in-app assistant: answers from the wire and the open story with tools.
+// Model order: NVIDIA's hosted models (OpenAI-compatible /v1/chat/completions, the keymaker's NVIDIA_API_KEY), the
+// strongest first and a fast one behind it, then the resident local model through Ollama's native /api/chat.
+// Ollama Cloud was dropped on 2026-11-11: every account key answered HTTP 402. Keys stay in this process.
 const { fetchSafe } = require("./safe");
 
-const CLOUD = "https://ollama.com";
+const CLOUD = "https://integrate.api.nvidia.com/v1";
 const LOCAL = "http://localhost:11434";
-const CLOUD_MODEL = "gemma4:31b";
+// Probed live with this key on 2026-11-11 (tool call to search_wire, with ids): Ultra 2.7 s, Lightning 0.8 s.
+// Other listed models answered 404 "not found for account" or timed out at 40 s.
+const CLOUD_MODELS = ["nvidia/nemotron-3-ultra-550b-a55b", "nvidia/nemotron-3.5-lightning-30b-a3b"];
+const CLOUD_MODEL = CLOUD_MODELS[0];
 const LOCAL_MODEL = "gemma4:e2b-qat";
 const MAX_ROUNDS = 4;
 // The E-series spends its budget on a reasoning channel first; too small a value returns empty content.
@@ -73,15 +77,8 @@ const TOOLS = [
   },
 ];
 
-// Every NouGen Ollama Cloud key name the keymaker holds; the generic one first.
-const KEY_NAMES = [
-  "OLLAMACLOUD_API_KEY",
-  ...[
-    "AIWITHDAV3_GMAIL_COM", "CONTACT_WHOVISIONS_COM", "DAVEMERALUS_GMAIL_COM", "DAVE_WHOVISIONS_COM", "EATSRUGER_GMAIL_COM",
-    "EDIEBRIKELL12_GMAIL_COM", "KUSHBOYGROUP_GMAIL_COM", "LEARNWITHMRSBTUTORING_GMAIL_COM", "NOUGENAI_GMAIL_COM",
-    "SUPERDAVEWHO_GMAIL_COM", "THESEXYSLUMBERPARTY_GMAIL_COM", "WHOENTERTAINS_GMAIL_COM", "WHOVISIONSLLC_GMAIL_COM", "WHOVISIONSTEAM_GMAIL_COM",
-  ].map((x) => `OLLAMA_KEY_${x}`),
-];
+// The keymaker names holding NVIDIA API keys, tried in order.
+const KEY_NAMES = ["NVIDIA_API_KEY"];
 
 // Words that ask about the wire itself rather than a topic in it.
 const GENERIC = new Set(["biggest", "top", "latest", "news", "story", "stories", "headline", "headlines", "right", "now", "today", "tonight", "wire", "what", "whats", "going", "main", "important", "major", "current", "recent", "happening", "new", "name", "three", "most", "the", "are", "and", "was", "for", "you", "any", "has", "have", "does", "did", "about", "with", "from", "that", "this", "tell", "give", "show", "list", "can", "please", "which", "who", "how", "why", "when", "there", "been", "being", "some", "all", "out", "get"]);
@@ -165,12 +162,57 @@ function makeTools({ wire, readArticle, recall = () => [], archive = () => [], w
   };
 }
 
-// One /api/chat round on one host. Returns { message } or throws an Error with .status.
+// The loop keeps messages in one shape: assistant tool_calls carry { id, function: { name, arguments: object } }, and
+// tool results carry tool_call_id. These convert that shape for each API and back.
+function toOpenAI(messages) {
+  return messages.map((m) => {
+    if (m.role === "assistant" && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+      return { role: "assistant", content: m.content || "", tool_calls: m.tool_calls.map((c, i) => ({
+        id: c.id || `call_${i}`, type: "function",
+        function: { name: c.function.name, arguments: typeof c.function.arguments === "string" ? c.function.arguments : JSON.stringify(c.function.arguments || {}) },
+      })) };
+    }
+    if (m.role === "tool") return { role: "tool", tool_call_id: m.tool_call_id || "", content: String(m.content || "") };
+    return { role: m.role, content: String(m.content || "") };
+  });
+}
+
+function fromOpenAI(msg = {}) {
+  const calls = (Array.isArray(msg.tool_calls) ? msg.tool_calls : []).map((c) => {
+    let args = c.function && c.function.arguments;
+    if (typeof args === "string") { try { args = JSON.parse(args || "{}"); } catch (_) { args = {}; } }
+    return { id: c.id, function: { name: c.function && c.function.name, arguments: args || {} } };
+  });
+  return { role: "assistant", content: msg.content || "", ...(calls.length ? { tool_calls: calls } : {}) };
+}
+
+// One OpenAI-compatible round on NVIDIA. Returns { message } in the loop's shape, or throws an Error with .status.
+async function chatCloud({ key, model, messages, http = fetchSafe, signal, tools = TOOLS }) {
+  const res = await http(`${CLOUD}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ model, messages: toOpenAI(messages), ...(tools.length ? { tools } : {}), max_tokens: NUM_PREDICT, temperature: 0.3 }),
+    signal,
+  });
+  if (!res.ok) {
+    const e = new Error(`NVIDIA HTTP ${res.status}`);
+    e.status = res.status;
+    throw e;
+  }
+  const data = await res.json();
+  const choice = data && Array.isArray(data.choices) ? data.choices[0] : null;
+  if (!choice || !choice.message) throw new Error("NVIDIA returned no message");
+  // A reply cut off by the token limit may carry half a tool call: never run it.
+  if (choice.finish_reason === "length" && choice.message.tool_calls) throw new Error("NVIDIA reply was cut off mid tool call");
+  return { message: fromOpenAI(choice.message) };
+}
+
+// One native /api/chat round on the local Ollama. Returns { message } or throws an Error with .status.
 async function chatOnce({ base, key, model, messages, http = fetchSafe, signal, tools = TOOLS }) {
   const res = await http(`${base}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
-    body: JSON.stringify({ model, messages, ...(tools.length ? { tools } : {}), stream: false, options: { num_predict: NUM_PREDICT, temperature: 0.3 } }),
+    body: JSON.stringify({ model, messages: messages.map(({ tool_call_id, ...m }) => m), ...(tools.length ? { tools } : {}), stream: false, options: { num_predict: NUM_PREDICT, temperature: 0.3 } }),
     signal,
   });
   if (!res.ok) {
@@ -183,19 +225,23 @@ async function chatOnce({ base, key, model, messages, http = fetchSafe, signal, 
   return data;
 }
 
-// Cloud with key rotation, then local. A refused or rate-limited key moves on to the next; the first success wins.
+// NVIDIA first: each key, each model. A model this account cannot use (404) or one whose pool is busy (429, 5xx)
+// moves to the next model; a refused key (401/403) moves to the next key; a malformed request (other 4xx) fails the
+// same everywhere, so it goes straight to the local model.
 async function chatRound(opts) {
   const { keys, http, signal } = opts;
   let lastError = null;
-  for (const key of keys.slice(opts.start || 0)) {
-    try {
-      const data = await chatOnce({ base: CLOUD, key, model: CLOUD_MODEL, messages: opts.messages, http, signal, tools: opts.tools });
-      return { data, model: CLOUD_MODEL, keyIndex: keys.indexOf(key) };
-    } catch (e) {
-      lastError = e;
-      if (signal && signal.aborted) throw e;
-      // Only keys and capacity are worth rotating on; a malformed request fails the same on every key.
-      if (e.status && ![401, 402, 403, 429, 500, 502, 503, 504].includes(e.status)) break;
+  cloud: for (const key of keys.slice(opts.start || 0)) {
+    for (const model of CLOUD_MODELS) {
+      try {
+        const data = await chatCloud({ key, model, messages: opts.messages, http, signal, tools: opts.tools });
+        return { data, model, keyIndex: keys.indexOf(key) };
+      } catch (e) {
+        lastError = e;
+        if (signal && signal.aborted) throw e;
+        if (e.status === 401 || e.status === 403) continue cloud;
+        if (e.status && ![402, 404, 408, 429, 500, 502, 503, 504].includes(e.status)) break cloud;
+      }
     }
   }
   const data = await chatOnce({ base: LOCAL, key: "", model: LOCAL_MODEL, messages: opts.messages, http, signal, tools: opts.tools }).catch((e) => {
@@ -205,7 +251,11 @@ async function chatRound(opts) {
 }
 
 // The assistant loop: the model asks for tools, we run them, until it answers in text.
-async function ask({ question, wire = [], current = null, history = [], keys = [], http, readArticle = async () => ({}), recall, archive, weather, brief, signal }) {
+// onStep (optional) hears progress as it happens, for a streaming reply over a MessagePort (electron/assistant-port.js):
+// { type: "thinking", round } before each model round, { type: "tool", tool, detail } before each tool and
+// { type: "tool_done", tool, ms, error } after it. A listener that throws is ignored; it can never break the answer.
+async function ask({ question, wire = [], current = null, history = [], keys = [], http, readArticle = async () => ({}), recall, archive, weather, brief, signal, onStep }) {
+  const step = (s) => { try { if (onStep) onStep(s); } catch (_) { /* a closed port must not cost the answer */ } };
   const tools = makeTools({ wire, readArticle, recall, archive, weather, brief });
   const open = current && current.title ? `The reader has this story open: "${current.title}" (${current.source || "unknown"}).\n${String(current.text || "").slice(0, 3000)}` : "";
   const messages = [
@@ -215,10 +265,13 @@ async function ask({ question, wire = [], current = null, history = [], keys = [
   ];
   let usedModel = "";
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
+    step({ type: "thinking", round: round + 1 });
     const { data, model } = await chatRound({ keys, http, signal, messages });
     usedModel = model;
     const msg = data.message;
     const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
+    // Every call gets an id before it is echoed, so its result can be tied to it on any API (Ollama sends none).
+    calls.forEach((c, i) => { if (!c.id) c.id = `call_${round}_${i}`; });
     if (!calls.length) return { answer: String(msg.content || "").trim(), model: usedModel };
     // The assistant's own tool-call message is echoed back, then each result follows it.
     messages.push(msg);
@@ -226,11 +279,16 @@ async function ask({ question, wire = [], current = null, history = [], keys = [
       const name = c.function && c.function.name;
       const args = (c.function && c.function.arguments) || {};
       const fn = Object.prototype.hasOwnProperty.call(tools, name) ? tools[name] : null;
-      const out = fn ? await Promise.resolve(fn(args)).catch((e) => `Tool error: ${e.message}`) : `Unknown tool: ${name}`;
-      messages.push({ role: "tool", tool_name: name, content: String(out) });
+      const detail = String(args.query || args.topic || args.id || args.place || args.city || "").slice(0, 120);
+      step({ type: "tool", tool: name, detail });
+      const t0 = Date.now();
+      let failed = !fn;
+      const out = fn ? await Promise.resolve(fn(args)).catch((e) => { failed = true; return `Tool error: ${e.message}`; }) : `Unknown tool: ${name}`;
+      step({ type: "tool_done", tool: name, ms: Date.now() - t0, error: failed });
+      messages.push({ role: "tool", tool_name: name, tool_call_id: c.id || "", content: String(out) });
     }
   }
   return { answer: "I could not settle on an answer from the wire in time.", model: usedModel };
 }
 
-module.exports = { weatherText, ask, chatOnce, chatRound, makeTools, KEY_NAMES, CLOUD_MODEL, LOCAL_MODEL, TOOLS };
+module.exports = { weatherText, ask, chatOnce, chatCloud, chatRound, toOpenAI, fromOpenAI, makeTools, KEY_NAMES, CLOUD_MODEL, CLOUD_MODELS, LOCAL_MODEL, TOOLS };

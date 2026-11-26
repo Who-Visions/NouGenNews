@@ -35,3 +35,4 @@
 .sm__btn:hover, .sm__main:hover, .sm__caret:hover { background: rgba(232, 184, 109, 0.16); }
 .sm__btn.is-active, .sm__split.is-active { border-color: var(--nn-accent, #e8b86d); background: rgba(232, 184, 109, 0.2); box-shadow: inset 0 -2px 0 var(--nn-accent, #e8b86d); }
 .sm__n { color: var(--nn-accent, #e8b86d); background: rgba(232, 184, 109, 0.14); }
+.sm__caret { min-width: 24px; }

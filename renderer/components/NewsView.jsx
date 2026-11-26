@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "../lib/bridge.js";
-import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, dropAdLabels } from "../lib/articleHtml.js";
+import { invoke, synthSpeech } from "../lib/bridge.js";
+import { optimizeLowCacheUrl, sanitizeArticleHtml, splitTail, dropDuplicateImages, dropTrailingImages, collectPhotos, dropAdLabels, embedSocialPosts } from "../lib/articleHtml.js";
 import { TailCarousel } from "./TailCarousel.jsx";
 import { BreakingTicker } from "./BreakingTicker.jsx";
 import { FrontSections } from "./FrontSections.jsx";
@@ -10,18 +10,22 @@ import { LangMenu } from "./LangMenu.jsx";
 import { NewsHero } from "./NewsHero.jsx";
 import { Ago } from "./Ago.jsx";
 import { imagesFromXmlItem, imagesFromHtml, bestImage } from "../../core/images.js";
-import { VideoDock, useWide } from "./VideoDock.jsx";
 import { Lightbox, photoIndex } from "./Lightbox.jsx";
 import { AssistantPanel } from "./AssistantPanel.jsx";
 import { ShardsLitePanel } from "./ShardsLitePanel.jsx";
 import { clampTs } from "../lib/age.js";
+import { loadRead, markRead } from "../lib/readstate.js";
+import { loadSince, stampVisit, newSince, catchupLabel, topNew } from "../lib/catchup.js";
 import { NewsTree, loadAutoplay } from "./NewsTree.jsx";
 import { FEEDS } from "../../core/feeds.js";
 import { extractTerms, matchStory, pruneTerms } from "../../core/library.js";
-import { scoreStory } from "../../core/edition.js";
+import { scoreStory, topicHeat, heroScore, capTopics } from "../../core/edition.js";
 import { findAlerts } from "../../core/alerts.js";
+import { officialAlert } from "../../core/weatheralert.js";
 import { dedupeStories } from "../../core/dedupe.js";
 import { clusterStories } from "../../core/cluster.js";
+import { isOpinion, capSources } from "../../core/voices.js";
+import { healImage } from "../lib/imageHeal.js";
 import { feedItems } from "../../core/atom.js";
 import { BreakingAlert } from "./BreakingAlert.jsx";
 import { LOCAL_ID, localFeedUrl, localQuery, stripPublisher } from "../../core/local.js";
@@ -94,6 +98,8 @@ function findVideos(text) {
 }
 
 // The story's videos, played in the app: YouTube through the loopback embed page (electron/embed.js), files directly.
+// They sit in the story, under the headline. A video that has been played and then scrolled out of view floats at the
+// bottom-left of the reading pane so the story can be read while it plays (see VideoSlot).
 function ArticleVideos({ videos, embedPort, autoplay = false, fallback = null }) {
   const [failed, setFailed] = useState(() => new Set());
   if (!videos || !videos.length) return fallback;
@@ -103,20 +109,65 @@ function ArticleVideos({ videos, embedPort, autoplay = false, fallback = null })
   return (
     <div className="article-videos" style={{ display: "grid", gap: 12, marginBottom: 18 }}>
       {shown.filter((v) => !failed.has(v.id || v.url)).map((v) => (
-        <div key={v.id || v.url} style={{ position: "relative", aspectRatio: "16 / 9", background: "#000", borderRadius: TOKENS.radiusLg, overflow: "hidden" }}>
-          {v.kind === "youtube" ? (
-            <iframe
-              title="Video"
-              src={embedPort && embedPort !== "web" ? `http://localhost:${embedPort}/embed?id=${v.id}${autoplay ? "&autoplay=1" : ""}` : `https://www.youtube.com/embed/${v.id}?playsinline=1${autoplay ? "&autoplay=1" : ""}`}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          ) : (
-            <video src={v.url} controls preload="metadata" playsInline onError={() => setFailed((p) => new Set(p).add(v.id || v.url))} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-          )}
-        </div>
+        <VideoSlot key={v.id || v.url} v={v} embedPort={embedPort} autoplay={autoplay} onFail={() => setFailed((p) => new Set(p).add(v.id || v.url))} />
       ))}
+    </div>
+  );
+}
+
+// One video. The slot keeps its place in the story; the player inside it switches to a fixed position when the video
+// has been played and the slot has scrolled above the reading pane. The same element is moved by CSS (never remounted),
+// so playback carries on without a break. A cross-origin YouTube player cannot report "playing", so a click on it
+// (the window loses focus to the iframe) counts as played; a file video reports play itself.
+function VideoSlot({ v, embedPort, autoplay, onFail }) {
+  const slot = useRef(null);
+  const [played, setPlayed] = useState(!!autoplay);
+  const [away, setAway] = useState(false);
+  const [closed, setClosed] = useState(false);
+  const [spot, setSpot] = useState({ right: 16, bottom: 80 });
+
+  useEffect(() => {
+    if (v.kind !== "youtube") return undefined;
+    const onBlur = () => setTimeout(() => { if (document.activeElement && document.activeElement === slot.current?.querySelector("iframe")) setPlayed(true); }, 0);
+    window.addEventListener("blur", onBlur);
+    return () => window.removeEventListener("blur", onBlur);
+  }, [v]);
+
+  useEffect(() => {
+    const el = slot.current;
+    const pane = el && el.closest(".news-article-canvas");
+    if (!el || !pane) return undefined;
+    const place = () => {
+      const r = pane.getBoundingClientRect();
+      setSpot({ right: Math.round(window.innerWidth - r.right + 14), bottom: Math.round(window.innerHeight - r.bottom + 76) });
+    };
+    place();
+    const io = new IntersectionObserver(([e]) => {
+      const above = !e.isIntersecting && e.boundingClientRect.bottom <= (e.rootBounds ? e.rootBounds.top + 1 : 1);
+      setAway(above);
+      if (!above) setClosed(false);
+    }, { root: pane, threshold: 0 });
+    io.observe(el);
+    const ro = new ResizeObserver(place);
+    ro.observe(pane);
+    window.addEventListener("resize", place);
+    return () => { io.disconnect(); ro.disconnect(); window.removeEventListener("resize", place); };
+  }, []);
+
+  const floating = played && away && !closed;
+  const src = v.kind === "youtube"
+    ? (embedPort && embedPort !== "web" ? `http://localhost:${embedPort}/embed?id=${v.id}${autoplay ? "&autoplay=1" : ""}` : `https://www.youtube.com/embed/${v.id}?playsinline=1${autoplay ? "&autoplay=1" : ""}`)
+    : "";
+  return (
+    <div className="avid" ref={slot}>
+      <div className={`avid__box${floating ? " is-floating" : ""}`} style={floating ? { right: spot.right, bottom: spot.bottom } : undefined}>
+        {v.kind === "youtube" ? (
+          <iframe title="Video" src={src} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+        ) : (
+          <video src={v.url} controls preload="metadata" playsInline onPlay={() => setPlayed(true)} onError={onFail} />
+        )}
+        {floating ? <button type="button" className="avid__close" onClick={() => setClosed(true)} aria-label="Put the video back in the story" title="Put the video back in the story">{"\u00d7"}</button> : null}
+      </div>
     </div>
   );
 }
@@ -327,15 +378,53 @@ const inWire = (a) => !WIRE_OFF.has(a.feedId);
 
 // The WAV the Kokoro sidecar wrote for this text, as a playable object URL.
 async function kokoroSynth(text, voice) {
-  const b64 = await invoke("tts_kokoro_synth", { text, voice });
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+  const wav = await synthSpeech(text, voice);
+  return URL.createObjectURL(new Blob([wav], { type: "audio/wav" }));
 }
 
 // One copy of every story, however many sources carried it, then playable first and newest first.
 // How many stories the hero carousel and its drifting "Up next" row hold.
 const HERO_COUNT = 18;
 const mergeWire = (list) => clusterStories(dedupeStories(list)).sort(byPlayableThenNew);
+
+// A feed refresh brings bare copies of every story. What the reader already fetched stays, so an open story keeps
+// its body and pictures instead of dropping to the summary and loading again each minute.
+const keepFetched = (prev, next) => {
+  const fetched = new Map(prev.filter((a) => a.full && a.link).map((a) => [a.link, a]));
+  return next.map((s) => {
+    const p = fetched.get(s.link);
+    if (!p || s.full) return s;
+    return { ...s, full: true, contentHtml: p.contentHtml, keyPoints: p.keyPoints, videos: p.videos, readMins: p.readMins, written: p.written, imageUrl: s.imageUrl || p.imageUrl, creator: s.creator || p.creator };
+  });
+};
+
+// The wire snapshot: the last few days of stories, kept between launches so a restart shows them, not just the feeds'
+// current items. Bodies and pictures are not kept; a story's picture is found again when it is shown.
+const WIRE_KEEP_MS = 3 * 86400000;
+const WIRE_KEEP_MAX = 500;
+function loadWireSnapshot() {
+  try {
+    const list = JSON.parse(localStorage.getItem("nn.wireSnapshot") || "[]");
+    const cutoff = Date.now() - WIRE_KEEP_MS;
+    return Array.isArray(list) ? list.filter((s) => s && s.link && clampTs(s.timestamp) >= cutoff) : [];
+  } catch { return []; }
+}
+function saveWireSnapshot(stories) {
+  try {
+    const cutoff = Date.now() - WIRE_KEEP_MS;
+    const keep = stories
+      .filter((s) => s.link && s.title && clampTs(s.timestamp) >= cutoff)
+      .sort((a, b) => clampTs(b.timestamp) - clampTs(a.timestamp))
+      .slice(0, WIRE_KEEP_MAX)
+      .map(({ id, feedId, title, link, source, badge, lang, categories, desc, timestamp, imageUrl, creator, videos }) => ({
+        id, feedId, title, link, source, badge, lang, categories, timestamp, creator,
+        desc: String(desc || "").slice(0, 400), imageUrl: imageUrl || "",
+        // The hero plays stories with a video: a restored story keeps its videos so it stays eligible.
+        videos: Array.isArray(videos) ? videos.slice(0, 3).map(({ kind, id: vid, url }) => ({ kind, id: vid, url })) : [],
+      }));
+    localStorage.setItem("nn.wireSnapshot", JSON.stringify(keep));
+  } catch { /* storage full or unavailable: the snapshot is only a convenience */ }
+}
 
 const byPlayableThenNew = (a, b) => clampTs(b.timestamp) - clampTs(a.timestamp) || String(a.id).localeCompare(String(b.id));
 
@@ -494,7 +583,8 @@ function LowCacheThumb({ article, size = "sm", priority = false }) {
         isBanner
           ? {
               width: "100%",
-              maxHeight: 360,
+              display: "flex",
+              justifyContent: "center",
               borderRadius: TOKENS.radiusMd,
               overflow: "hidden",
               marginBottom: 22,
@@ -513,18 +603,18 @@ function LowCacheThumb({ article, size = "sm", priority = false }) {
       }
     >
       <img
-        src={optimizeLowCacheUrl(imgUrl, isBanner ? 920 : 160)}
+        src={optimizeLowCacheUrl(imgUrl, isBanner ? 1800 : 160)}
         alt=""
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          display: "block",
-        }}
+        onError={(e) => healImage(e, { raw: imgUrl, link: article.link, onGiveUp: () => setFailed(true) })}
+        // The lead picture is shown whole (never cropped): full width, natural height, letterboxed past 75% of the window.
+        style={
+          isBanner
+            ? { width: "100%", height: "auto", maxHeight: "75vh", objectFit: "contain", display: "block" }
+            : { width: "100%", height: "100%", objectFit: "cover", display: "block" }
+        }
       />
     </div>
   );
@@ -583,6 +673,11 @@ export function NewsView() {
   }
 
   useEffect(() => () => speechRef.current?.stop(), []);
+
+  // Load the Kokoro model in the background for the chosen voice, so the first Listen does not wait for it.
+  useEffect(() => {
+    if (prefs.ttsEngine === "kokoro" && prefs.kokoroVoice) invoke("tts_kokoro_warm", { voice: prefs.kokoroVoice }).catch(() => {});
+  }, [prefs.ttsEngine, prefs.kokoroVoice]);
 
   useEffect(() => {
     let active = true;
@@ -652,7 +747,7 @@ export function NewsView() {
     }));
     providerRef.current = Object.fromEntries(results);
     const ids = new Set(feeds.map((f) => f.id));
-    setArticles((prev) => mergeWire(prev.filter((a) => !ids.has(a.feedId)).concat(results.flatMap(([, s]) => s))));
+    setArticles((prev) => keepFetched(prev, mergeWire(prev.filter((a) => !ids.has(a.feedId)).concat(results.flatMap(([, s]) => s)))));
   }, []);
   useEffect(() => { loadProviders(); }, [loadProviders]);
 
@@ -672,7 +767,7 @@ export function NewsView() {
       }
       setLocalVia(via);
       localRef.current = items;
-      setArticles((prev) => mergeWire(prev.filter((a) => a.feedId !== LOCAL_ID).concat(items)));
+      setArticles((prev) => keepFetched(prev, mergeWire(prev.filter((a) => a.feedId !== LOCAL_ID).concat(items))));
       setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: true, count: items.length } }));
     } catch (e) {
       setFeedHealth((h) => ({ ...h, [LOCAL_ID]: { ok: false, error: e?.message || "Failed" } }));
@@ -742,10 +837,15 @@ export function NewsView() {
         }
       });
 
+      // Feeds only carry their latest items, so yesterday's stories would vanish on restart. The snapshot brings back
+      // what the app saw in the last few days; fresh copies win where a link appears in both.
+      const seen = new Set(aggregated.concat(localRef.current, Object.values(providerRef.current).flat()).map((s) => s.link));
+      const kept = loadWireSnapshot().filter((s) => !seen.has(s.link));
       // Stories the app can play come first, then newest first.
-      aggregated = mergeWire(aggregated.concat(localRef.current, Object.values(providerRef.current).flat()));
+      aggregated = mergeWire(aggregated.concat(localRef.current, Object.values(providerRef.current).flat(), kept));
+      saveWireSnapshot(aggregated);
       setFeedHealth(healthMap);
-      setArticles(aggregated);
+      setArticles((prev) => keepFetched(prev, aggregated));
       if (placeRef.current) loadLocal(placeRef.current);
       // Only the Refresh button asks the API providers to skip their cache; the automatic pull never does.
       const forced = forceRef.current === true;
@@ -797,7 +897,18 @@ export function NewsView() {
     [articles, libraryTerms]
   );
   const alerts = useMemo(() => findAlerts(withLibrary, { now: clock }), [withLibrary, clock]);
-  const activeAlert = demoAlert || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
+  // Official warnings for the reader's place, checked every two minutes, outrank anything the outlets are saying.
+  const [warnings, setWarnings] = useState([]);
+  useEffect(() => {
+    if (!city) return undefined;
+    let live = true;
+    const check = () => invoke("weather_alerts", { city, region: loadRegion() }).then((w) => { if (live) setWarnings(Array.isArray(w) ? w : w?.alerts || []); }).catch(() => {});
+    check();
+    const t = setInterval(check, 120000);
+    return () => { live = false; clearInterval(t); };
+  }, [city]);
+  const weatherAlert = useMemo(() => officialAlert(warnings, withLibrary, { now: clock, city }), [warnings, withLibrary, clock, city]);
+  const activeAlert = demoAlert || (weatherAlert && !alertsSeen.includes(weatherAlert.key) ? weatherAlert : null) || alerts.find((a) => !alertsSeen.includes(a.key)) || null;
   // A real alert's story leads everything: the hero, the top of the list, and the story that opens in the reader.
   const alertLead = activeAlert && !activeAlert.demo && activeAlert.story ? activeAlert : null;
   const [knowhow, setKnowhow] = useState(loadKnowhow);
@@ -826,7 +937,8 @@ export function NewsView() {
     // The reader's Know-how shapes the wire, but a search finds everything and a breaking alert is never hidden.
     const taste = knowhow.on && !q ? applyKnowhow(base, tasteRules, knowhow.learned, new Set(alertLead ? alertLead.stories.map((s) => s.id) : [])) : null;
     tasteStats.current = taste ? taste.stats : { muted: 0, raised: 0, lowered: 0, flagged: 0, capped: 0 };
-    const ranked = taste ? taste.stories : base;
+    // The outlet limit runs last, because scoring reorders the wire; a search still shows matches in rank order.
+    const ranked = q ? (taste ? taste.stories : base) : capSources(taste ? taste.stories : base);
     if (!alertLead || activeFeed !== "all" || q) return ranked;
     const ids = new Set(alertLead.stories.map((s) => s.id));
     const first = ranked.find((a) => a.id === alertLead.story.id);
@@ -858,6 +970,22 @@ export function NewsView() {
     return () => ctrl.abort();
   }, [wireLang, searchFiltered, prefs.ollamaModel, ollamaInfo.best]);
 
+  // Since you last looked: fixed at launch, so the count means "new to you", not "new this minute".
+  const sinceRef = useRef(loadSince());
+  const [catchupHidden, setCatchupHidden] = useState(false);
+  const [readIds, setReadIds] = useState(loadRead);
+  useEffect(() => {
+    stampVisit();
+    const t = setInterval(() => stampVisit(), 60000);
+    const bye = () => stampVisit();
+    window.addEventListener("pagehide", bye);
+    return () => { clearInterval(t); window.removeEventListener("pagehide", bye); bye(); };
+  }, []);
+  const fresh = useMemo(() => newSince(withLibrary.filter(inWire), sinceRef.current).filter((a) => !readIds.has(a.id)), [withLibrary, readIds]);
+  // What the banner leads with and the brief plays: the new stories that matter most, not the newest dozen.
+  const freshTop = useMemo(() => topNew(fresh, (a) => scoreStory(a, { now: Date.now(), terms: libraryTerms }), 8), [fresh, libraryTerms]);
+  const freshIds = useMemo(() => new Set(fresh.map((a) => a.id)), [fresh]);
+
   const filtered = useMemo(() => {
     if (wireLang === "orig") return searchFiltered;
     return searchFiltered.map((a) => wireTranslatedMap[`${a.id}::${wireLang}`] || a);
@@ -885,15 +1013,17 @@ export function NewsView() {
     try { told = JSON.parse(localStorage.getItem("nn.alertsTold") || "[]"); } catch { /* none yet */ }
     if (told.includes(activeAlert.key)) return;
     try { localStorage.setItem("nn.alertsTold", JSON.stringify([activeAlert.key, ...told].slice(0, 60))); } catch { /* storage unavailable */ }
-    invoke("notify", { title: "RED ALERT \u2014 NouGenNews", body: activeAlert.headline }).catch(() => {});
+    invoke("notify", { title: "RED ALERT \u2014 NouGenNews", body: activeAlert.headline, image: activeAlert.story?.imageUrl || "" }).catch(() => {});
   }, [activeAlert?.key]);
   useEffect(() => { if (alertLead) setSelectedArticleId(alertLead.story.id); }, [alertLead?.key]);
   const dismissAlert = () => { if (activeAlert?.demo) setDemoAlert(null); else if (activeAlert) markSeen(activeAlert.key); };
   const readAlert = () => {
     if (!activeAlert) return;
     if (activeAlert.demo) { setDemoAlert(null); return; }
-    markSeen(activeAlert.key);
-    readStory(activeAlert.story);
+    // A warning in force stays up after it is read; only the reader dismisses it.
+    if (activeAlert.kind !== "weather") markSeen(activeAlert.key);
+    if (activeAlert.story) readStory(activeAlert.story);
+    else window.dispatchEvent(new CustomEvent("nn:view", { detail: { view: "weather" } }));
   };
 
   const feedCounts = useMemo(() => {
@@ -1032,6 +1162,14 @@ export function NewsView() {
     return () => clearTimeout(t);
   }, [articles]);
 
+  // A story that has been in front of the reader for a moment counts as seen: it dims in the wire and leaves the catch-up count.
+  useEffect(() => {
+    const id = currentArticle && currentArticle.id;
+    if (!id || document.body.dataset.view !== "news") return undefined;
+    const t = setTimeout(() => setReadIds((r) => markRead(r, id)), 2500);
+    return () => clearTimeout(t);
+  }, [currentArticle?.id]);
+
   // A story the reader opens is kept with its whole text, so the archive holds more than the headline and summary.
   useEffect(() => {
     const a = currentArticle;
@@ -1046,20 +1184,30 @@ export function NewsView() {
   const tail = useMemo(() => splitTail(currentArticle?.contentHtml || ""), [currentArticle?.contentHtml]);
   // Each picture once: the lead picture and repeats inside the body are dropped from the body.
   const articleBody = useMemo(() => dropDuplicateImages(dropTrailingImages(dropAdLabels(tail.body)), currentArticle?.imageUrl), [tail.body, currentArticle?.imageUrl]);
-  // With room beside the article, its videos dock to the right instead of sitting in the text.
-  const wideEnough = useWide(1500);
-  // Two ways to read: "view" docks the videos and a large photo carousel beside the story; "read" is the plain magazine column.
-  const [readerMode, setReaderModeState] = useState(() => { try { return localStorage.getItem("nn.readerMode") === "read" ? "read" : "view"; } catch { return "view"; } });
-  const setReaderMode = useCallback((m) => { setReaderModeState(m); try { localStorage.setItem("nn.readerMode", m); } catch { /* storage unavailable */ } }, []);
-  // Every picture of the story goes to the carousel (the lead first) and also stays where it is: under the headline and in the text.
+  // Every picture of the story, the lead first: the lightbox steps through them. They stay where they are in the story.
   const photos = useMemo(() => collectPhotos(articleBody, currentArticle?.imageUrl), [articleBody, currentArticle?.imageUrl]);
-  const docked = wideEnough && readerMode === "view" && (!!currentArticle?.videos?.length || photos.length > 1);
-  const shownBody = articleBody;
+  const shownBody = useMemo(() => embedSocialPosts(articleBody), [articleBody]);
+  // Embedded posts report their own height (Instagram: {type:"MEASURE"}; X: twttr.embed resize). Each frame takes that
+  // height, so a post shows whole with no scroll bar of its own.
+  useEffect(() => {
+    const onMsg = (e) => {
+      if (!/^https:\/\/(www\.instagram\.com|platform\.twitter\.com|www\.tiktok\.com)$/.test(e.origin)) return;
+      let d = e.data;
+      if (typeof d === "string") { try { d = JSON.parse(d); } catch { return; } }
+      const h = d?.details?.height ?? d?.["twttr.embed"]?.params?.[0]?.height ?? d?.height;
+      if (!Number.isFinite(+h) || +h < 80) return;
+      for (const f of document.querySelectorAll(".nn-social iframe")) {
+        if (f.contentWindow === e.source) { f.style.height = `${Math.ceil(+h)}px`; break; }
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
   // A picture clicked anywhere in the story opens large, growing out of where it was.
   const [lightbox, setLightbox] = useState(null);
   const openPicture = useCallback((e) => {
     const img = e.target && e.target.closest ? e.target.closest("img") : null;
-    if (!img || img.closest(".vdock__thumb, .tail, .news-mobile-back")) return;
+    if (!img || img.closest(".tail, .news-mobile-back")) return;
     const r = img.getBoundingClientRect();
     if (r.width < 80 || r.height < 60) return;
     const src = img.currentSrc || img.src;
@@ -1132,7 +1280,6 @@ export function NewsView() {
       if (!filtered.length) return;
       const idx = filtered.findIndex((a) => a.id === currentArticle?.id);
       if (e.key === "Enter") { e.preventDefault(); readStory(currentArticle || filtered[0]); return; }
-      if (e.key === "v" || e.key === "V") { e.preventDefault(); setReaderMode(readerMode === "view" ? "read" : "view"); return; }
       if (e.key === "l" || e.key === "L") { e.preventDefault(); listenTo(currentArticle || filtered[0]); return; }
       if (e.key === "ArrowDown" || e.key === "j" || e.key === "J") {
         e.preventDefault();
@@ -1146,15 +1293,29 @@ export function NewsView() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtered, currentArticle?.id, helpOpen, mobileReading, wireLang, fetchAllFeeds, readStory, listenTo, readerMode, setReaderMode]);
+  }, [filtered, currentArticle?.id, helpOpen, mobileReading, wireLang, fetchAllFeeds, readStory, listenTo, ]);
 
   // The stories the hero can play: the ones with a video, newest first.
   const playable = useMemo(() => {
-    const withVideo = filtered.filter((a) => a.videos && a.videos.length);
+    // The hero carries the biggest stories, not only the ones with a clip: anything with a picture or a video, ranked
+    // as the front page ranks them (freshness, library, a video bonus, opinion last) plus how many outlets carry it,
+    // at most two per outlet. Only video stories once filled it, so the sites that attach a clip to everything took
+    // every slot and the night's real news never led.
+    // Importance is how many outlets are on the story (topicHeat, over the whole wire), then freshness; the library lifts.
+    const now = Date.now();
+    const heat = topicHeat(articles, { now });
+    const score = (a) => heroScore(a, { now, terms: libraryTerms, heat: heat.get(a.id) || 1 });
+    // At most two per outlet and six per topic, so the night's big story leads without taking every slot.
+    const withVideo = capTopics(capSources(
+      filtered.filter((a) => (a.videos && a.videos.length) || a.imageUrl).map((a) => [a, score(a)]).sort((x, y) => y[1] - x[1]).map((x) => x[0]),
+      2,
+    ), 6);
     if (!alertLead || activeFeed !== "all" || search.trim()) return withVideo.slice(0, HERO_COUNT);
     const lead = filtered.find((a) => a.id === alertLead.story.id) || alertLead.story;
-    return [{ ...lead, alertLevel: alertLead.level }, ...withVideo.filter((a) => a.id !== lead.id)].slice(0, HERO_COUNT);
-  }, [filtered, alertLead, activeFeed, search]);
+    const coverage = alertLead.kind === "weather" ? alertLead.stories.filter((a) => a.id !== lead.id) : [];
+    const ahead = new Set([lead.id, ...coverage.map((a) => a.id)]);
+    return [{ ...lead, alertLevel: alertLead.level }, ...coverage, ...withVideo.filter((a) => !ahead.has(a.id))].slice(0, HERO_COUNT);
+  }, [filtered, articles, alertLead, activeFeed, search, libraryTerms]);
 
   return (
     <div
@@ -1443,6 +1604,23 @@ export function NewsView() {
         </div>
       </div>
 
+      {fresh.length > 0 && !catchupHidden && !mobileReading && !search.trim() && (
+        <div className="catchup" role="status" data-testid="catchup-banner">
+          <span className="catchup-pulse" aria-hidden="true" />
+          <span className="catchup-copy">
+            <strong>{catchupLabel(fresh.length, sinceRef.current)} <em>· top {freshTop.length} in the brief</em></strong>
+            <span className="catchup-lead">{freshTop[0].title}</span>
+          </span>
+          <button type="button" className="catchup-go" data-testid="catchup-go" onClick={() => {
+            setSelectedArticleId(freshTop[0].id);
+            speechRef.current?.startBriefing(freshTop, prefs, (a) => setSelectedArticleId(a.id));
+          }}>
+            <span aria-hidden="true">▶</span> Catch me up
+          </button>
+          <button type="button" className="catchup-x" aria-label="Dismiss" onClick={() => setCatchupHidden(true)}>×</button>
+        </div>
+      )}
+
       {playable.length > 0 && !mobileReading && (
         <NewsHero
           key={alertLead ? alertLead.key : "hero"}
@@ -1553,7 +1731,7 @@ export function NewsView() {
                           textOverflow: "ellipsis",
                         }}
                       >
-                        {item.source}
+                        {freshIds.has(item.id) && <i className="nn-new" title="New since you last looked">NEW</i>}{item.source}
                       </span>
                       <span
                         style={{
@@ -1574,6 +1752,7 @@ export function NewsView() {
                         margin: "0 0 4px",
                         lineHeight: 1.32,
                         color: isSelected ? "#ffffff" : TOKENS.textPrimary,
+                        opacity: readIds.has(item.id) && !isSelected ? 0.55 : 1,
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",
@@ -1588,7 +1767,8 @@ export function NewsView() {
                       {item.libraryHits?.length ? <span title={item.libraryHits.join(", ")} style={{ color: TOKENS.accentPrimary, fontWeight: 700 }}>♥ In your library</span> : null}
                       {flagsFor(item, tasteRules).length ? <span className="nn-flag" title={flagsFor(item, tasteRules).join(", ")}>⚑ Flagged</span> : null}
                       <span>{item.readMins} min read</span>
-                      {item.alsoFrom && item.alsoFrom.length ? <span title={item.alsoFrom.map((a) => `${a.source}: ${a.title}`).join("\n")}>+{item.alsoFrom.length} {item.alsoFrom.length === 1 ? "source" : "sources"}</span> : null}
+                      {isOpinion(item) ? <span>Opinion</span> : null}
+                      {item.alsoFrom && item.alsoFrom.length ? <span title={item.alsoFrom.map((a) => `${a.opinion ? "[Opinion] " : ""}${a.source}: ${a.title}`).join("\n")}>+{item.alsoFrom.length} {item.alsoFrom.length === 1 ? "source" : "sources"}</span> : null}
                       {item.categories[0] && (
                         <>
                           <span>•</span>
@@ -1618,15 +1798,8 @@ export function NewsView() {
           }}
         >
           {currentArticle ? (
-            <div className={docked ? "reader-with-dock" : undefined}>
-            <article style={{ maxWidth: 740, margin: "0 auto" }}>
-              <button
-                type="button"
-                className="news-mobile-back"
-                onClick={() => setMobileReading(false)}
-              >
-                ← Back to Wire
-              </button>
+            <>
+            <article style={{ width: "100%" }}>
               {/* Article Metadata Header */}
               <div
                 style={{
@@ -1639,6 +1812,9 @@ export function NewsView() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" className="news-mobile-back" aria-label="Back to the wire" title="Back to the wire" onClick={() => setMobileReading(false)}>
+                    ←
+                  </button>
                   <span
                     style={{
                       background: `${currentArticle.accent}22`,
@@ -1787,6 +1963,14 @@ export function NewsView() {
                 {currentArticle.title}
               </h1>
 
+              {/* The story's main picture stays directly under the headline, above the fold. */}
+              {currentArticle.videos?.length ? (
+                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />
+              ) : (
+                /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
+                <LowCacheThumb article={currentArticle} size="lg" priority={true} />
+              )}
+
               {/* Author & Tags */}
               {(currentArticle.creator || currentArticle.categories.length > 0) && (
                 <div
@@ -1838,12 +2022,6 @@ export function NewsView() {
                 </aside>
               ) : null}
 
-              {currentArticle.videos?.length && !docked ? (
-                <ArticleVideos videos={currentArticle.videos} embedPort={embedPort} autoplay={loadAutoplay()} fallback={<LowCacheThumb article={currentArticle} size="lg" priority={true} />} />
-              ) : (
-                /* Priority Hero Image (Low-Cache Edge Resized or Head-Range Scraped) */
-                <LowCacheThumb article={currentArticle} size="lg" priority={true} />
-              )}
               {writing && !currentArticle.written ? (
                 <p style={{ fontSize: 12, color: TOKENS.textMuted, margin: "0 0 10px" }}>NouGen is writing this story from the video…</p>
               ) : null}
@@ -1855,8 +2033,8 @@ export function NewsView() {
               <div
                 className="article-native-content"
                 style={{
-                  fontSize: 15.5,
-                  lineHeight: 1.78,
+                  fontSize: 17,
+                  lineHeight: 1.72,
                   color: "#d1d5db",
                 }}
                 onClick={(e) => {
@@ -1868,9 +2046,7 @@ export function NewsView() {
                 dangerouslySetInnerHTML={{ __html: shownBody }}
               />
               <div className="news-reader-bar">
-                <button type="button" className="nh-btn" aria-pressed={readerMode === "view"} title="Switch between the magazine column and the photo gallery view" onClick={() => setReaderMode(readerMode === "view" ? "read" : "view")}>
-                  {readerMode === "view" ? "Magazine" : "Gallery"} <kbd>V</kbd>
-                </button>
+                
                 <select className="nh-btn voice-pick" aria-label="Read-aloud voice" title="Voice for Listen" value={prefs.ttsEngine === "kokoro" ? prefs.kokoroVoice : "system"} onChange={(e) => (e.target.value === "system" ? updatePrefs({ ttsEngine: "system", ttsChosen: true }) : updatePrefs({ ttsEngine: "kokoro", kokoroVoice: e.target.value, ttsChosen: true }))}>
                   {KOKORO_VOICES.map((v) => <option key={v.id} value={v.id}>Kokoro · {v.label}</option>)}
                   <option value="system">System voice</option>
@@ -1887,8 +2063,7 @@ export function NewsView() {
                 {tail.items.length ? <TailCarousel items={tail.items} onOpen={openInApp} /> : <span className="mono">J next · K prev · Esc back</span>}
               </div>
             </article>
-            {docked ? <VideoDock large videos={currentArticle.videos} photos={photos} embedPort={embedPort} autoplay={loadAutoplay()} label={currentArticle.title} /> : null}
-            </div>
+            </>
           ) : (
             <div
               style={{

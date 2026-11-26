@@ -6,6 +6,8 @@
 // come from an inverted index on words, so a thousand-story wire is not compared pairwise. The thresholds err on
 // keeping stories apart: "Apple unveils iPhone" and "Apple unveils MacBook" must stay two stories.
 
+import { isOpinion } from "./voices.js";
+
 const STOP = new Set((
   "a an and are as at be but by for from has have he her his how in into is it its of on or our over she that the their " +
   "them they this to up was we were what when where which who why will with you your after before about says said say " +
@@ -69,8 +71,9 @@ export function sameEvent(a, b, wa = titleWords(a.title), wb = titleWords(b.titl
   return true;
 }
 
-// The story that leads its cluster: a picture, then the longer summary, then the newer.
+// The story that leads its cluster: reporting over opinion, then a picture, then the longer summary, then the newer.
 const better = (a, b) => {
+  if (isOpinion(a) !== isOpinion(b)) return isOpinion(a) ? b : a;
   if (!!a.imageUrl !== !!b.imageUrl) return a.imageUrl ? a : b;
   const da = (a.desc || "").length;
   const db = (b.desc || "").length;
@@ -133,7 +136,7 @@ export function clusterStories(stories) {
       ...s,
       reportCount: Math.max(s.reportCount || 0, outlets.size),
       clusterSize: others.length + 1,
-      alsoFrom: others.map((m) => ({ id: m.id, source: m.source || "", title: m.title, link: m.link || "", timestamp: m.timestamp || 0 })),
+      alsoFrom: others.map((m) => ({ id: m.id, source: m.source || "", title: m.title, link: m.link || "", timestamp: m.timestamp || 0, opinion: isOpinion(m) })),
     });
   }
   return out;

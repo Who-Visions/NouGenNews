@@ -49,7 +49,10 @@ function entryToItem(entry) {
   const when = inner(entry, "published").trim() || inner(entry, "updated").trim();
   const summary = textOf(entry, "summary");
   const content = textOf(entry, "content");
-  const author = inner(inner(entry, "author"), "name").trim();
+  // Every author the entry names, each with its page when it gives one, so credit is never cut to the first name.
+  const authors = [...entry.matchAll(/<author\b[^>]*>([\s\S]*?)<\/author>/gi)]
+    .map((m) => ({ name: inner(m[1], "name").trim(), uri: inner(m[1], "uri").trim() }))
+    .filter((a) => a.name);
   const out = ["<item>"];
   out.push(`<title>${cdata(title)}</title>`);
   out.push(`<link>${link}</link>`);
@@ -57,7 +60,8 @@ function entryToItem(entry) {
   if (when) out.push(`<pubDate>${when}</pubDate>`);
   if (summary || content) out.push(`<description>${cdata(summary || content)}</description>`);
   if (content) out.push(`<content:encoded>${cdata(content)}</content:encoded>`);
-  if (author) out.push(`<dc:creator>${author}</dc:creator>`);
+  for (const a of authors) out.push(`<dc:creator>${a.name}</dc:creator>`);
+  for (const a of authors) if (a.uri) out.push(`<author><name>${a.name}</name><uri>${a.uri}</uri></author>`);
   for (const m of entry.matchAll(/<category\b[^>]*>/gi)) {
     const term = attr(m[0], "label") || attr(m[0], "term");
     if (term) out.push(`<category>${term}</category>`);

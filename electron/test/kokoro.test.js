@@ -138,3 +138,9 @@ test("the idle stop never fires while a request is still waiting for its answer"
   await new Promise((r) => setTimeout(r, 60)); // now it is idle and stops
   assert.equal(spawnFn.last.killed, true);
 });
+
+test("kokoroWarm resolves true when the server warms and false, never a throw, when it cannot", async () => {
+  const { kokoroWarm } = require("../kokoro");
+  assert.equal(await kokoroWarm("af_heart", { server: { warm: async () => {} } }), true);
+  assert.equal(await kokoroWarm("af_heart", { server: { warm: async () => { throw new Error("no kokoro"); } } }), false);
+});

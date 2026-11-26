@@ -20,3 +20,6 @@
 /* A story without a picture is a text card: an accent rule on top and a larger headline, no empty image box. */
 .fs__card--text { border-top: 2px solid var(--nn-accent, #e8b86d); }
 .fs__card--text .fs__title { font-size: 22px; line-height: 1.25; }
+
+/* Section cards below the fold are skipped until they are near the viewport (same reason as the wire list). */
+.fs__card { content-visibility: auto; contain-intrinsic-size: auto 340px; }

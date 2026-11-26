@@ -3,13 +3,17 @@
 // a canonical address or an identical normalised headline; near-matches are left alone, a missed duplicate costing
 // less than a lost story.
 
+const TRACKING = /^(utm_.*|fbclid|gclid|dclid|msclkid|mc_[a-z]+|ref|ref_src|referrer|cmp|cid|ocid|taid|igshid|_ga|_gl|oly_.*|s_cid|smid|soc_src|soc_trk)$/i;
+
 export function canonicalUrl(u) {
   try {
     const x = new URL(String(u || ""));
     if (!/^https?:$/.test(x.protocol)) return "";
     // A bare site, or a search page (where the query IS the identity), says nothing about which article it is.
     if (!x.pathname || x.pathname === "/" || /^[/]search[/]?$/.test(x.pathname)) return "";
-    return (x.hostname.replace(/^www\./, "") + x.pathname.replace(/\/+$/, "")).toLowerCase();
+    // Tracking parameters say nothing about the article; any other parameter may be its identity (watch?v=...).
+    const keep = [...x.searchParams].filter(([k]) => !TRACKING.test(k)).map(([k, v]) => k + "=" + v).sort().join("&");
+    return (x.hostname.replace(/^www\./, "") + x.pathname.replace(/\/+$/, "") + (keep ? "?" + keep : "")).toLowerCase();
   } catch {
     return "";
   }
@@ -38,17 +42,17 @@ export function dedupeStories(stories) {
   for (const s of stories || []) {
     const uk = canonicalUrl(s.link);
     const tk = titleKey(s.title);
-    const hit = (uk && byUrl.get(uk)) || (tk.length > 12 && byTitle.get(tk)) || null;
-    if (hit) {
-      const keep = better(hit, s);
-      if (keep !== hit) out[out.indexOf(hit)] = keep;
-      if (uk) byUrl.set(uk, keep);
-      if (tk.length > 12) byTitle.set(tk, keep);
+    // The maps hold positions in out, not the stories, so a replacement can never leave an older alias pointing at a story that is gone.
+    const at = (uk ? byUrl.get(uk) : undefined) ?? (tk.length > 12 ? byTitle.get(tk) : undefined);
+    if (at !== undefined) {
+      out[at] = better(out[at], s);
+      if (uk) byUrl.set(uk, at);
+      if (tk.length > 12) byTitle.set(tk, at);
       continue;
     }
     out.push(s);
-    if (uk) byUrl.set(uk, s);
-    if (tk.length > 12) byTitle.set(tk, s);
+    if (uk) byUrl.set(uk, out.length - 1);
+    if (tk.length > 12) byTitle.set(tk, out.length - 1);
   }
   return out;
 }

@@ -184,3 +184,11 @@ test("the writer is given the map, and the output states how far the survey went
   assert.ok(Array.isArray(r.survey) && r.survey.length >= 2);
   assert.match(briefText(r), /surveyed \d outlet\(s\) in \d step\(s\)/);
 });
+
+test("a topic with an empty wire still searches the archive", async () => {
+  let calls = 0;
+  const archive = async () => { calls += 1; return [{ id: 1, title: "Harbor opens", snippet: "The harbor opens.", tags: ["Outlet"] }]; };
+  const r = await survey({ topic: "harbor", wire: [], archive, readArticle: async () => ({}) });
+  assert.ok(calls >= 1);
+  assert.ok(r.sources.length >= 1);
+});

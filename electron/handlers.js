@@ -169,7 +169,11 @@ function assistantOptions(args = {}) {
           archive: (query, days) => require("./archive").appArchive(app).search({ query, limit: 10, days }),
           readArticle: (url) => require("./article").articleFetch(url),
         });
-        return b.briefText(r);
+        const text = b.briefText(r);
+        require("./muse-bridge").publishSnapshot({
+          briefs: [{ id: String(topic || "brief"), title: String(topic || "Briefing"), body: text, updatedAt: Date.now() }],
+        }).catch(() => {});
+        return text;
       },
       // The reader's home place (sent by the page) unless the model names another city.
       weather: (place) => require("./weather").weatherReport(place ? { city: place, region: "" } : { city: String((args.home && args.home.city) || "").slice(0, 80), region: String((args.home && args.home.region) || "").slice(0, 80) }),

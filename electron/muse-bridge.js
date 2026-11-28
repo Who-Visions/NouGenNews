@@ -88,10 +88,13 @@ function writeAtomic(file, payload) {
 async function notifyBridge(payload, opts = {}) {
   const url = opts.bridgeUrl || process.env.NOUGEN_MUSE_BRIDGE_URL || "";
   if (!url) return { notified: false, reason: "no_bridge_url" };
+  const token = opts.bridgeToken || process.env.APP_BRIDGE_TOKEN || process.env.NOUGEN_MUSE_BRIDGE_TOKEN || "";
+  const headers = { "content-type": "application/json" };
+  if (token) headers["x-ngs-token"] = token;
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers,
       body: JSON.stringify({ event: "nougennews_sync", payload }),
       signal: AbortSignal.timeout(2000),
     });

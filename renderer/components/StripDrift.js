@@ -27,10 +27,14 @@ export function useStripDrift(enabled, { pxPerSec = DRIFT_PX_PER_SEC } = {}) {
     el.addEventListener("pointerdown", onDown);
     window.addEventListener("pointerup", onUp);
     const tick = (now) => {
-      // Follow the clock, not the frame rate: a window that is covered or minimized gets few animation frames, and the
-      // drift should still cover the same distance per second. The cap only stops a long stall from jumping the row.
-      const dt = Math.min(0.5, (now - last) / 1000);
+      // Follow the clock, not the frame rate; clamp dt <= 50ms per canvas-anim-ts law
+      // so a backgrounded tab never teleports the strip.
+      const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
       last = now;
+      if (document.hidden) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
       // One copy's width: from the first card to the first card of the second copy.
       const cards = el.querySelectorAll("[data-copy]");
       const half = cards.length ? [...cards].findIndex((c) => c.dataset.copy === "1") : -1;

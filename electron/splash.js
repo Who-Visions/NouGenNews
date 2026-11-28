@@ -5,6 +5,32 @@ const { BaseWindow, ImageView, nativeImage } = require("electron");
 const path = require("node:path");
 
 const SIZE = 256;
+const SPLASH_BG = "#141414"; // NouGenAI obsidian token (matches renderer/styles/tokens.css)
+
+function animateOpacity(win, from, to, durationMs, onDone) {
+  if (!win || win.isDestroyed() || typeof win.setOpacity !== "function") {
+    if (onDone) onDone();
+    return;
+  }
+  const steps = Math.max(1, Math.round(durationMs / 16));
+  let step = 0;
+  win.setOpacity(from);
+  const timer = setInterval(() => {
+    if (win.isDestroyed()) {
+      clearInterval(timer);
+      return;
+    }
+    step += 1;
+    const t = Math.min(1, step / steps);
+    // Ease-out cubic for restrained, physical fade (matches canvas-anim-ts easeOutCubic).
+    const eased = 1 - Math.pow(1 - t, 3);
+    win.setOpacity(from + (to - from) * eased);
+    if (t >= 1) {
+      clearInterval(timer);
+      if (onDone) onDone();
+    }
+  }, 16);
+}
 
 function showSplash() {
   if (typeof ImageView !== "function") return null;
@@ -23,12 +49,13 @@ function showSplash() {
     movable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    backgroundColor: "#000000",
+    backgroundColor: SPLASH_BG,
   });
   const view = new ImageView();
   view.setImage(image);
   view.setBounds({ x: 0, y: 0, width: SIZE, height: SIZE });
   win.contentView.addChildView(view);
+  animateOpacity(win, 0, 1, 180);
   return win;
 }
 
@@ -38,9 +65,16 @@ function attachSplash(mainWin, splash) {
     mainWin.show();
     return;
   }
+  let closed = false;
   const close = () => {
-    if (!splash.isDestroyed()) splash.close();
+    if (closed) return;
+    closed = true;
     if (!mainWin.isDestroyed() && !mainWin.isVisible()) mainWin.show();
+    if (!splash.isDestroyed()) {
+      animateOpacity(splash, 1, 0, 140, () => {
+        if (!splash.isDestroyed()) splash.close();
+      });
+    }
   };
   mainWin.once("ready-to-show", close);
   setTimeout(close, Number(process.env.NOUGENNEWS_SPLASH_MAX_MS) || 15000);

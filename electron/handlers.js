@@ -83,6 +83,10 @@ const handlers = {
   locate_me: () => require("./geo").locateMe(),
   // Titles the reader owns (NouGenFlix library), for lifting related stories. Read-only.
   library_titles: () => require("./library").libraryTitles(app),
+  // Shared Muse bridge & state sync (electron/muse-bridge.js): live stories, briefs, and saved stories.
+  muse_sync_publish: (args = {}) => require("./muse-bridge").publishSnapshot(args),
+  muse_sync_read: () => require("./muse-bridge").readSnapshot(),
+  muse_sync_saved: (args = {}) => require("./muse-bridge").mergeSavedStories(args),
   restart: () => { app.relaunch(); app.exit(0); },
   // The archive (electron/archive.js): NouGen Shards Light, one local SQLite file. Every story the app sees is kept once.
   archive_ingest: (args = {}) => require("./archive").appArchive(app).ingest(args.stories),

@@ -1158,6 +1158,17 @@ export function NewsView() {
       invoke("archive_ingest", { stories: fresh.map((a) => ({ id: a.id, feedId: a.feedId, title: a.title, link: a.link, source: a.source, badge: a.badge, lang: a.lang, categories: a.categories, desc: a.desc, timestamp: a.timestamp })) }).catch(() => {
         fresh.forEach((a) => archivedRef.current.delete(a.id)); // try again with the next refresh
       });
+      // Sync top live wire stories to NouGenMuse shared bridge (electron/muse-bridge.js).
+      invoke("muse_sync_publish", {
+        stories: articles.slice(0, 100).map((a) => ({
+          id: a.id,
+          title: a.title,
+          link: a.link,
+          source: a.source,
+          timestamp: a.timestamp,
+          alertLevel: a.alertLevel || "",
+        })),
+      }).catch(() => {});
     }, 4000);
     return () => clearTimeout(t);
   }, [articles]);

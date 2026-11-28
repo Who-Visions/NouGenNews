@@ -40,6 +40,7 @@
 
 /* ── Hero carousel (above the fold) ─────────────────────────────────────────── */
 .news-hero {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(280px, 5fr);
   grid-template-rows: auto auto;
@@ -47,6 +48,10 @@
   padding: 16px 0 18px;
   border-bottom: 1px solid var(--nn-line);
   margin-bottom: 16px;
+}
+.news-hero > :not(.nn-constellation) {
+  position: relative;
+  z-index: 1;
 }
 .nh-frame {
   grid-row: 1 / 3;

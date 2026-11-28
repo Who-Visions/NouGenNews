@@ -8,6 +8,8 @@ import { healImage, pagePicture } from "../lib/imageHeal.js";
 import { HeroScroller } from "./HeroScroller.jsx";
 import { HeroTitle } from "./HeroTitle.jsx";
 import { useStripDrift } from "./StripDrift.js";
+import { ConstellationBackdrop } from "./ConstellationBackdrop.jsx";
+import { Spring } from "../lib/canvas-anim/index.ts";
 
 // A story's picture for the hero. A story whose feed carried none borrows the best picture from its article page.
 function HeroPic({ story, loading }) {
@@ -56,7 +58,37 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
   const safe = count ? Math.min(index, count - 1) : 0;
   // The "Up next" row drifts slowly right to left and loops (two copies of the cards, the second one hidden from assistive tech).
   const drift = useStripDrift(count > 1);
+  const frameRef = useRef(null);
   const item = items[safe];
+
+  // Spring-driven frame entrance on story change (canvas-anim-ts): imperative rAF outside React render.
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el || !item) return undefined;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      el.style.opacity = "1";
+      el.style.transform = "";
+      return undefined;
+    }
+    const spring = new Spring(0, { stiffness: 180, damping: 24, mass: 1 });
+    spring.setTarget(1);
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now) => {
+      const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+      last = now;
+      const v = spring.step(dt);
+      el.style.opacity = String(Math.min(1, 0.35 + 0.65 * v));
+      el.style.transform = `translate3d(0, ${(1 - v) * 8}px, 0)`;
+      if (!spring.atRest) raf = requestAnimationFrame(tick);
+      else {
+        el.style.opacity = "1";
+        el.style.transform = "";
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [item?.id]);
 
   const go = (n) => {
     if (!count) return;
@@ -96,7 +128,8 @@ export const NewsHero = forwardRef(function NewsHero({ items, embedPort, onRead,
       onFocus={() => setHeld(true)}
       onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setHeld(false); }}
     >
-      <div className="nh-frame" key={item.id}>
+      <ConstellationBackdrop density={5} speed={10} linkDist={110} opacity={0.38} />
+      <div className="nh-frame" ref={frameRef} key={item.id}>
         {playing && video ? (
           <Player video={video} embedPort={embedPort} />
         ) : (

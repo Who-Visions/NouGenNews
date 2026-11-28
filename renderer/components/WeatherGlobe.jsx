@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "../lib/bridge.js";
+import { ConstellationBackdrop } from "./ConstellationBackdrop.jsx";
 
 const clockOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
@@ -69,8 +70,25 @@ export function WeatherGlobe({ lat, lon, place }) {
   useEffect(() => {
     if (!playing || !radarOn || count < 2 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
       return undefined;
-    const t = setInterval(() => setFrame((f) => (f + 1) % count), 800);
-    return () => clearInterval(t);
+    // Schedule radar frames with requestAnimationFrame + clamped dt (<= 50ms) per canvas-anim-ts law.
+    let raf = 0;
+    let last = performance.now();
+    let acc = 0;
+    const STEP_SEC = 0.8;
+    const tick = (now) => {
+      const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+      last = now;
+      if (!document.hidden) {
+        acc += dt;
+        if (acc >= STEP_SEC) {
+          acc -= STEP_SEC;
+          setFrame((f) => (f + 1) % count);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [playing, radarOn, count]);
 
   const f = radar ? radar.frames[frame] : null;
@@ -81,7 +99,10 @@ export function WeatherGlobe({ lat, lon, place }) {
       <iframe ref={frameEl} className="wg__map" src="./globe.html" title={`Globe centred on ${place}`} />
 
       {phase === "loading" ? (
-        <div className="wg__note mono">Loading instrument map…</div>
+        <>
+          <ConstellationBackdrop density={6} speed={12} linkDist={100} opacity={0.5} />
+          <div className="wg__note mono">Loading instrument map…</div>
+        </>
       ) : null}
 
       {phase === "error" ? (
